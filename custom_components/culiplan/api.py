@@ -70,6 +70,10 @@ class FlavorplanApiClient:
             "/api/voice/ha-assist", {"tool": tool_name, "params": params}
         )
 
+    async def async_post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Generic POST — used by the AI service layer (task-1387)."""
+        return await self._post(path, payload)
+
     # ─── HTTP helpers ────────────────────────────────────────────────────────
 
     async def _get(self, path: str) -> Any:
