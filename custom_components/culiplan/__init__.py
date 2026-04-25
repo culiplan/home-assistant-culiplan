@@ -15,6 +15,7 @@ from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow, inte
 from .api import FlavorplanApiClient
 from .const import DOMAIN, PLATFORMS
 from .coordinator import FlavorplanCoordinator
+from .services import async_register_services, async_unregister_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     _register_intents(hass, entry)
+    async_register_services(hass)
     entry.async_on_unload(coordinator.async_stop)
     return True
 
@@ -71,6 +73,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        async_unregister_services(hass)
     return unload_ok
 
 
