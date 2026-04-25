@@ -45,6 +45,18 @@
     "reauth_required": {
       "title": "Re-authentication required for Flavorplan",
       "description": "Your Flavorplan session has expired. [Re-authenticate your account]({url})."
+    },
+    "premium_required": {
+      "title": "{title}",
+      "description": "{description}\n\n[Upgrade on Flavorplan]({upgrade_url})",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Upgrade Flavorplan",
+            "description": "To use **{feature}**, you need a Flavorplan Premium subscription.\n\n[Open upgrade page]({upgrade_url})"
+          }
+        }
+      }
     }
   }
 }
