@@ -14,3 +14,8 @@ venv/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Node dependencies (Lovelace card build pipeline)
+node_modules/
+pnpm-debug.log
+.pnpm-store/

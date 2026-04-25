@@ -1,0 +1,18 @@
+{
+  "name": "home-assistant-culiplan-cards",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Build pipeline for Culiplan Lovelace custom cards (kitchen-dashboard, pantry-tracker). The Python integration itself is independent of this; this package.json only governs the LitElement card bundles in lovelace/cards/.",
+  "scripts": {
+    "build:cards": "node lovelace/build.mjs",
+    "build": "pnpm run build:cards",
+    "verify:cards": "node lovelace/verify-bundles.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "lit": "^2.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

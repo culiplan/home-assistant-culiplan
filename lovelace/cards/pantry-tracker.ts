@@ -13,7 +13,7 @@
  * Registration: flavorplan-pantry-tracker
  */
 
-import { LitElement, html, css } from "https://unpkg.com/lit@2/index.js?module";
+import { LitElement, html, css } from "lit";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 

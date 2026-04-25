@@ -13,7 +13,7 @@
  *              lovelace/cards/dist/kitchen-dashboard.js as a resource.
  */
 
-import { LitElement, html, css } from "https://unpkg.com/lit@2/index.js?module";
+import { LitElement, html, css } from "lit";
 
 /**
  * Type shapes for data coming from the HA state machine / Culiplan coordinator.
