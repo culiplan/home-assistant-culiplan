@@ -12,7 +12,9 @@ Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home 
 
 ---
 
-## Features (v0.1 beta)
+## Features (v0.2 — Phase 2 Pantry & Dinner Party Automations)
+
+### Entities
 
 | Entity | Description |
 |---|---|
@@ -20,7 +22,58 @@ Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home 
 | `todo.flavorplan_shopping_list` | Active shopping list — items can be checked off or added |
 | `sensor.flavorplan_meals_today` | Number of meals planned today |
 | `sensor.flavorplan_shopping_items` | Count of unchecked shopping list items |
-| `sensor.flavorplan_expiring_pantry` | Pantry items expiring within 3 days |
+| `sensor.flavorplan_expiring_pantry` | Pantry items expiring within 3 days (count) |
+| `binary_sensor.flavorplan_pantry_has_expiring` | **NEW** — On when any pantry item expires within 48 h |
+| `binary_sensor.flavorplan_dinner_party_active` | **NEW** — On when a dinner party is planned for today |
+
+### Services (Phase 2)
+
+| Service | Description | Tier |
+|---|---|---|
+| `flavorplan.pantry_decrement` | Decrement stock for a barcode-scanned item (FEFO) | Free |
+| `flavorplan.pantry_expiring_items` | Fetch expiring pantry item IDs into a HA event | Free |
+| `flavorplan.scale_tonight_servings` | Scale tonight's recipe portions to present household count | **Premium** |
+
+### Blueprints (Phase 2)
+
+Five automation blueprints ship with the integration (installable via HACS):
+
+| Blueprint | Description | Tier |
+|---|---|---|
+| `pantry-barcode-decrement` | Decrement pantry on barcode scanner event | Free |
+| `pantry-zero-shopping` | Add to shopping list when item depleted | Free |
+| `pantry-expiry-notify` | Daily 09:00 reminder if items expire within 48 h | Free |
+| `presence-scale-servings` | Scale servings when household presence changes | **Premium** |
+| `dinner-party-pre-arrival` | Dim lights + start playlist 15 min before guests arrive | Free |
+
+### Sample automation: Dinner party pre-arrival (task-1380 AC#4)
+
+```yaml
+automation:
+  alias: "Dinner party — pre-arrival ambiance"
+  use_blueprint:
+    path: culiplan/dinner-party-pre-arrival.yaml
+    input:
+      light_target: light.living_room
+      light_brightness: 40
+      light_kelvin: 2700
+      media_player: media_player.living_room_speaker
+      playlist_uri: "spotify:playlist:37i9dQZF1DX4PP3DA4J0N8"
+      pre_arrival_minutes: 15
+```
+
+### Sample automation: Barcode scan decrement (task-1376 AC#3)
+
+```yaml
+# Example: USB barcode scanner fires barcode_scanned event with {barcode: "..."}
+automation:
+  alias: "Pantry — barcode scan decrement"
+  use_blueprint:
+    path: culiplan/pantry-barcode-decrement.yaml
+    input:
+      barcode_event: barcode_scanned
+      decrement_qty: 1
+```
 
 Voice (Assist): say "Add bread to the shopping list" or "What's for dinner tonight?" once the integration is linked.
 
