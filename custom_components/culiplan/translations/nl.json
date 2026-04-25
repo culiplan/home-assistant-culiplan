@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Flavorplan verbinden"
+      },
+      "ai_provider": {
+        "title": "AI-aanbieder",
+        "description": "Kies hoe Flavorplan AI-functies in Home Assistant worden uitgevoerd.\n\n**Cloud AI** — Flavorplan verwerkt aanvragen (Premium-abonnement vereist).\n**BYOK** — Jouw API-sleutel wordt lokaal opgeslagen en rechtstreeks naar de AI-aanbieder gestuurd; Flavorplan ziet hem nooit.\n**Lokale AI** — Aanvragen gaan naar jouw lokale Ollama- of LM Studio-eindpunt.",
+        "data": {
+          "ai_mode": "AI-modus",
+          "byok_provider": "AI-aanbieder",
+          "byok_api_key": "API-sleutel",
+          "local_endpoint": "Lokale AI-eindpunt-URL",
+          "local_model": "Modelnaam"
+        },
+        "data_description": {
+          "byok_api_key": "Alleen opgeslagen in Home Assistant — nooit naar Flavorplan gestuurd.",
+          "local_endpoint": "bijv. http://localhost:11434",
+          "local_model": "bijv. llama3.2"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Flavorplan opnieuw verifiëren",
+        "description": "Jouw Flavorplan-sessie is verlopen. Klik op Verzenden om opnieuw te verifiëren."
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met Flavorplan",
+      "invalid_api_key": "Ongeldige API-sleutel — controleer de sleutel en probeer opnieuw.",
+      "invalid_endpoint": "Kan het lokale AI-eindpunt niet bereiken. Controleer de URL en of de service actief is.",
+      "unknown": "Onverwachte fout"
+    },
+    "abort": {
+      "already_configured": "Flavorplan is al geconfigureerd",
+      "oauth_error": "OAuth-fout: {error}",
+      "missing_configuration": "Integratie niet geconfigureerd. Configureer deze via de UI."
+    }
+  }
+}

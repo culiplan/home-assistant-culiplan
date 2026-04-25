@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Connecter Flavorplan"
+      },
+      "ai_provider": {
+        "title": "Fournisseur d'IA",
+        "description": "Choisissez comment les fonctionnalités IA de Flavorplan s'exécutent dans Home Assistant.\n\n**Cloud IA** — Flavorplan traite les requêtes (abonnement Premium requis).\n**BYOK** — Votre clé API est stockée localement et envoyée directement au fournisseur d'IA ; Flavorplan ne la voit jamais.\n**IA locale** — Les requêtes sont envoyées à votre point de terminaison Ollama ou LM Studio local.",
+        "data": {
+          "ai_mode": "Mode IA",
+          "byok_provider": "Fournisseur d'IA",
+          "byok_api_key": "Clé API",
+          "local_endpoint": "URL du point de terminaison IA local",
+          "local_model": "Nom du modèle"
+        },
+        "data_description": {
+          "byok_api_key": "Stockée uniquement dans Home Assistant — jamais envoyée à Flavorplan.",
+          "local_endpoint": "ex. http://localhost:11434",
+          "local_model": "ex. llama3.2"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Réauthentifier Flavorplan",
+        "description": "Votre session Flavorplan a expiré. Cliquez sur Soumettre pour vous réauthentifier."
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à Flavorplan",
+      "invalid_api_key": "Clé API invalide — veuillez vérifier la clé et réessayer.",
+      "invalid_endpoint": "Impossible d'atteindre le point de terminaison IA local. Vérifiez l'URL et que le service est en cours d'exécution.",
+      "unknown": "Erreur inattendue"
+    },
+    "abort": {
+      "already_configured": "Flavorplan est déjà configuré",
+      "oauth_error": "Erreur OAuth : {error}",
+      "missing_configuration": "Intégration non configurée. Veuillez la configurer dans l'interface."
+    }
+  }
+}

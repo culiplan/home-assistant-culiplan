@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Connect Flavorplan"
+      },
+      "ai_provider": {
+        "title": "AI Provider",
+        "description": "Choose how Flavorplan AI features run in Home Assistant.\n\n**Cloud AI** — Flavorplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Flavorplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.",
+        "data": {
+          "ai_mode": "AI Mode",
+          "byok_provider": "AI Provider",
+          "byok_api_key": "API Key",
+          "local_endpoint": "Local AI Endpoint URL",
+          "local_model": "Model Name"
+        },
+        "data_description": {
+          "byok_api_key": "Stored in Home Assistant only — never sent to Flavorplan.",
+          "local_endpoint": "e.g. http://localhost:11434",
+          "local_model": "e.g. llama3.2"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Flavorplan",
+        "description": "Your Flavorplan session has expired. Click **Submit** to re-authenticate."
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_api_key": "Invalid API key — please check the key and try again.",
+      "invalid_endpoint": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_account%]",
+      "oauth_error": "OAuth error: {error}",
+      "missing_configuration": "Integration not configured. Please configure it in the UI."
+    }
+  },
+  "issues": {
+    "reauth_required": {
+      "title": "Re-authentication required for Flavorplan",
+      "description": "Your Flavorplan session has expired. [Re-authenticate your account]({url})."
+    }
+  }
+}
