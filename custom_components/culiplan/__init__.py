@@ -11,6 +11,7 @@ from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow
 
 from .api import FlavorplanApiClient
 from .const import DOMAIN, PLATFORMS
+from .coordinator import FlavorplanCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,14 +32,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         access_token=session.token["access_token"],
     )
 
+    coordinator = FlavorplanCoordinator(hass, client, entry)
+    # Initial REST fetch so entities have data before the Socket.IO push arrives.
+    await coordinator.async_config_entry_first_refresh()
+    # Start the persistent WebSocket connection.
+    await coordinator.async_start()
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
-        "session": session,
+        "coordinator": coordinator,
     }
 
     await hass.config_entries.async_forward_entry_setups(
         entry, [Platform(p) for p in PLATFORMS]
     )
+
+    entry.async_on_unload(coordinator.async_stop)
     return True
 
 

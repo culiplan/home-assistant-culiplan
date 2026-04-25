@@ -1,11 +1,25 @@
-"""Todo entity placeholder — implemented in task-1367."""
+"""Todo entity — one per Flavorplan shopping list (task-1367)."""
 
 from __future__ import annotations
 
-from homeassistant.components.todo import TodoListEntity
+import logging
+from typing import Any
+
+from homeassistant.components.todo import (
+    TodoItem,
+    TodoItemStatus,
+    TodoListEntity,
+    TodoListEntityFeature,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN
+from .coordinator import FlavorplanCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -13,5 +27,79 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up todo entities — full implementation in task-1367."""
-    # Entities are added once coordinator and schema are finalised in task-1367.
+    """Set up Flavorplan todo (shopping list) entities."""
+    coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    shopping_lists = (coordinator.data or {}).get("shopping_lists", [])
+    async_add_entities(
+        FlavorplanShoppingList(coordinator, sl) for sl in shopping_lists
+    )
+
+
+class FlavorplanShoppingList(CoordinatorEntity[FlavorplanCoordinator], TodoListEntity):
+    """Todo entity for a Flavorplan shopping list."""
+
+    _attr_has_entity_name = True
+    _attr_supported_features = (
+        TodoListEntityFeature.CREATE_TODO_ITEM
+        | TodoListEntityFeature.UPDATE_TODO_ITEM
+        | TodoListEntityFeature.DELETE_TODO_ITEM
+    )
+
+    def __init__(
+        self,
+        coordinator: FlavorplanCoordinator,
+        shopping_list: dict[str, Any],
+    ) -> None:
+        super().__init__(coordinator)
+        self._list_id: str = shopping_list["id"]
+        self._attr_unique_id = f"{DOMAIN}_todo_{self._list_id}"
+        self._attr_name = shopping_list.get("name", "Shopping List")
+
+    @property
+    def todo_items(self) -> list[TodoItem]:
+        """Return the current items in this shopping list."""
+        lists = (self.coordinator.data or {}).get("shopping_lists", [])
+        for sl in lists:
+            if sl["id"] == self._list_id:
+                return [_to_todo_item(item) for item in sl.get("items", [])]
+        return []
+
+    # ─── Mutations (two-way sync via REST) ───────────────────────────────────
+
+    async def async_create_todo_item(self, item: TodoItem) -> None:
+        """Add an item to the shopping list (HA → backend)."""
+        client = self.coordinator.client
+        await client.async_add_shopping_item(
+            self._list_id,
+            name=item.summary or "",
+            quantity=None,
+        )
+        # Coordinator will refresh via the shopping_list.item.added Socket.IO event.
+
+    async def async_update_todo_item(self, item: TodoItem) -> None:
+        """Check or uncheck an item (HA → backend)."""
+        client = self.coordinator.client
+        completed = item.status == TodoItemStatus.COMPLETED
+        await client.async_update_shopping_item(
+            self._list_id,
+            item_id=item.uid or "",
+            completed=completed,
+        )
+
+    async def async_delete_todo_items(self, uids: list[str]) -> None:
+        """Remove items from the shopping list (HA → backend)."""
+        client = self.coordinator.client
+        for uid in uids:
+            await client.async_remove_shopping_item(self._list_id, item_id=uid)
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def _to_todo_item(item: dict[str, Any]) -> TodoItem:
+    completed = item.get("completed", False)
+    return TodoItem(
+        uid=item.get("id", ""),
+        summary=item.get("name", ""),
+        status=TodoItemStatus.COMPLETED if completed else TodoItemStatus.NEEDS_ACTION,
+    )
