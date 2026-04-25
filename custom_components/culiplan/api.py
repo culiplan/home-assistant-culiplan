@@ -89,6 +89,17 @@ class FlavorplanApiClient:
             f"{BASE_URL}{path}", headers=self._headers(), json=payload
         ) as resp:
             self._raise_for_status(resp.status, path)
+            if resp.status == 403:
+                # Read the body BEFORE calling raise_for_status() so the
+                # services layer can extract {error, feature, upgradeUrl} and
+                # create the correct Repairs issue (task-1395).
+                try:
+                    import json as _json
+                    body = await resp.json()
+                    body_str = _json.dumps(body)
+                except Exception:
+                    body_str = await resp.text()
+                raise Exception(f"403 {body_str}")
             resp.raise_for_status()
             return await resp.json()
 
