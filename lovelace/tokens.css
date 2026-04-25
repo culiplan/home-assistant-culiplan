@@ -1,0 +1,289 @@
+/**
+ * Culiplan Design Tokens — Lovelace Card Pack
+ *
+ * Source-of-truth: packages/mobile/src/styles/theme.ts (brand, color ramp, spacing, type, radius)
+ * Reconciled with: packages/front/tailwind.config.ts (shadows, gradients, HSL references)
+ *
+ * All variables are :root-scoped so Home Assistant users can override them via
+ * card-mod without touching Shadow DOM internals. Example card-mod override:
+ *
+ *   card_mod:
+ *     style: |
+ *       :root {
+ *         --culiplan-primary: #e05a30;
+ *       }
+ *
+ * Token groups:
+ *   1. Brand & Semantic colours
+ *   2. Light-mode surface palette
+ *   3. Dark-mode surface palette  (auto-activated via @media prefers-color-scheme)
+ *   4. Spacing scale (4px base, Tailwind-compatible)
+ *   5. Typography ramp
+ *   6. Border radius
+ *   7. Shadows
+ *   8. Gradients
+ *   9. Motion curves
+ */
+
+/* ============================================================
+   1. BRAND & SEMANTIC COLOURS
+   Source: mobile/theme.ts → colors export
+   ============================================================ */
+:root {
+  /* Brand primary — Culiplan Orange */
+  --culiplan-primary:        #f26744;
+  --culiplan-primary-light:  #f58566;
+  --culiplan-primary-dark:   #d94d2a;
+
+  /* Brand secondary — Culiplan Green */
+  --culiplan-secondary:       #16A34A;
+  --culiplan-secondary-light: #22C55E;
+  --culiplan-secondary-dark:  #15803D;
+
+  /* Semantic — Error */
+  --culiplan-error:       #EF4444;
+  --culiplan-error-dark:  #DC2626;
+
+  /* Semantic — Warning */
+  --culiplan-warning:      #EAB308;
+  --culiplan-warning-dark: #CA8A04;
+
+  /* Semantic — Info */
+  --culiplan-info:      #3B82F6;
+  --culiplan-info-dark: #2563EB;
+
+  /* Semantic — Success (mirrors secondary) */
+  --culiplan-success:      #22C55E;
+  --culiplan-success-dark: #16A34A;
+
+  /* Absolute */
+  --culiplan-white: #FFFFFF;
+  --culiplan-black: #000000;
+  --culiplan-overlay:       rgba(0, 0, 0, 0.5);
+  --culiplan-overlay-light: rgba(0, 0, 0, 0.3);
+
+  /* ============================================================
+     2. LIGHT-MODE SURFACE PALETTE
+     Source: mobile/theme.ts → lightColors export
+     ============================================================ */
+
+  /* Backgrounds */
+  --culiplan-bg:         #FAF8F5;  /* Warm cream — lightColors.background */
+  --culiplan-bg-subtle:  #FFFBF7;  /* lightColors.backgroundSubtle */
+
+  /* Cards / surfaces */
+  --culiplan-surface:       #FFFFFF;  /* lightColors.card */
+  --culiplan-surface-hover: #F9FAFB;  /* lightColors.cardHover */
+
+  /* Text */
+  --culiplan-text-primary:   #1C1917;  /* lightColors.foreground — dark brown */
+  --culiplan-text-secondary: #6B7280;  /* lightColors.foregroundSecondary — gray500 */
+  --culiplan-text-muted:     #9CA3AF;  /* lightColors.foregroundMuted — gray400 */
+
+  /* Borders */
+  --culiplan-border:        #E5E7EB;  /* lightColors.border — gray200 */
+  --culiplan-border-subtle: #F3F4F6;  /* lightColors.borderSubtle — gray100 */
+
+  /* Muted surface */
+  --culiplan-muted:            #F3F4F6;  /* lightColors.muted */
+  --culiplan-muted-foreground: #6B7280;  /* lightColors.mutedForeground */
+
+  /* Grayscale ramp (light mode; same key names as dark for easy override) */
+  --culiplan-gray-50:  #F9FAFB;
+  --culiplan-gray-100: #F3F4F6;
+  --culiplan-gray-200: #E5E7EB;
+  --culiplan-gray-300: #D1D5DB;
+  --culiplan-gray-400: #9CA3AF;
+  --culiplan-gray-500: #6B7280;
+  --culiplan-gray-600: #4B5563;
+  --culiplan-gray-700: #374151;
+  --culiplan-gray-800: #1F2937;
+  --culiplan-gray-900: #111827;
+
+  /* ============================================================
+     4. SPACING SCALE (4 px base, Tailwind-compatible)
+     Source: mobile/theme.ts → spacing export
+     ============================================================ */
+  --culiplan-space-0:   0px;
+  --culiplan-space-px:  1px;
+  --culiplan-space-0-5: 2px;
+  --culiplan-space-1:   4px;
+  --culiplan-space-1-5: 6px;
+  --culiplan-space-2:   8px;
+  --culiplan-space-2-5: 10px;
+  --culiplan-space-3:   12px;
+  --culiplan-space-3-5: 14px;
+  --culiplan-space-4:   16px;
+  --culiplan-space-5:   20px;
+  --culiplan-space-6:   24px;
+  --culiplan-space-7:   28px;
+  --culiplan-space-8:   32px;
+  --culiplan-space-9:   36px;
+  --culiplan-space-10:  40px;
+  --culiplan-space-12:  48px;
+  --culiplan-space-14:  56px;
+  --culiplan-space-16:  64px;
+  --culiplan-space-20:  80px;
+  --culiplan-space-24:  96px;
+
+  /* Named aliases (mirrors mobile/theme.ts spacing named aliases) */
+  --culiplan-space-xs:  8px;
+  --culiplan-space-sm:  12px;
+  --culiplan-space-md:  16px;
+  --culiplan-space-lg:  24px;
+  --culiplan-space-xl:  32px;
+  --culiplan-space-2xl: 48px;
+
+  /* ============================================================
+     5. TYPOGRAPHY RAMP
+     Source: mobile/theme.ts → fontSize, fontWeight, lineHeight exports
+     ============================================================ */
+
+  /* Font family (system stack; override with card-mod for custom fonts) */
+  --culiplan-font-display: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --culiplan-font-body:    -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --culiplan-font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  /* Font sizes */
+  --culiplan-text-xs:   12px;
+  --culiplan-text-sm:   14px;
+  --culiplan-text-base: 16px;
+  --culiplan-text-lg:   18px;
+  --culiplan-text-xl:   20px;
+  --culiplan-text-2xl:  24px;
+  --culiplan-text-3xl:  30px;
+  --culiplan-text-4xl:  36px;
+  --culiplan-text-5xl:  48px;
+
+  /* Font weights */
+  --culiplan-font-normal:   400;
+  --culiplan-font-medium:   500;
+  --culiplan-font-semibold: 600;
+  --culiplan-font-bold:     700;
+
+  /* Line heights */
+  --culiplan-leading-tight:   1.25;
+  --culiplan-leading-normal:  1.5;
+  --culiplan-leading-relaxed: 1.625;
+  --culiplan-leading-loose:   2;
+
+  /* ============================================================
+     6. BORDER RADIUS
+     Source: mobile/theme.ts → borderRadius export
+     ============================================================ */
+  --culiplan-radius-none: 0px;
+  --culiplan-radius-sm:   2px;   /* borderRadius.sm */
+  --culiplan-radius:      4px;   /* borderRadius.default */
+  --culiplan-radius-md:   6px;   /* borderRadius.md */
+  --culiplan-radius-lg:   8px;   /* borderRadius.lg */
+  --culiplan-radius-xl:   12px;  /* borderRadius.xl */
+  --culiplan-radius-2xl:  16px;  /* borderRadius.2xl */
+  --culiplan-radius-3xl:  24px;  /* borderRadius.3xl */
+  --culiplan-radius-full: 9999px;
+
+  /* ============================================================
+     7. SHADOWS
+     Source: packages/front/tailwind.config.ts → boxShadow extensions
+     Reconciled with mobile drop-shadow usage patterns
+     ============================================================ */
+  --culiplan-shadow-soft:   0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.06);
+  --culiplan-shadow-medium: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.07);
+  --culiplan-shadow-strong: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.08);
+  --culiplan-shadow-card:   0 2px 12px 0 rgba(242,103,68,0.08);  /* branded orange-tinted card shadow */
+
+  /* ============================================================
+     8. GRADIENTS
+     Source: packages/front/tailwind.config.ts → backgroundImage extensions
+     ============================================================ */
+  --culiplan-gradient-hero:   linear-gradient(135deg, #f26744 0%, #f58566 50%, #ffb89a 100%);
+  --culiplan-gradient-subtle: linear-gradient(180deg, #FFFBF7 0%, #FAF8F5 100%);
+  --culiplan-gradient-card:   linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(250,248,245,0.95) 100%);
+  --culiplan-gradient-green:  linear-gradient(135deg, #16A34A 0%, #22C55E 100%);
+
+  /* ============================================================
+     9. MOTION CURVES
+     Source: mobile/theme.ts animation usage patterns + HA conventions
+     ============================================================ */
+  --culiplan-motion-fast:        150ms;
+  --culiplan-motion-normal:      250ms;
+  --culiplan-motion-slow:        350ms;
+  --culiplan-motion-ease-out:    cubic-bezier(0.0, 0.0, 0.2, 1);
+  --culiplan-motion-ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --culiplan-motion-spring:      cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Composed transitions (for convenience) */
+  --culiplan-transition-fast:   all var(--culiplan-motion-fast)   var(--culiplan-motion-ease-out);
+  --culiplan-transition-normal: all var(--culiplan-motion-normal) var(--culiplan-motion-ease-out);
+  --culiplan-transition-slow:   all var(--culiplan-motion-slow)   var(--culiplan-motion-ease-out);
+}
+
+/* ============================================================
+   3. DARK-MODE SURFACE PALETTE
+   Source: mobile/theme.ts → darkColors export
+   Activated via prefers-color-scheme media query AND
+   via Home Assistant's [data-theme="dark"] selector.
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Backgrounds — blue-gray tones, not pure black (per dark mode design decision) */
+    --culiplan-bg:        #1A1F2E;  /* darkColors.background — HSL 222 47% 11% */
+    --culiplan-bg-subtle: #1E2433;  /* darkColors.backgroundSubtle */
+
+    /* Cards / surfaces */
+    --culiplan-surface:       #212838;  /* darkColors.card — HSL 222 47% 13% */
+    --culiplan-surface-hover: #283041;  /* darkColors.cardHover */
+
+    /* Text (inverted) */
+    --culiplan-text-primary:   #F8FAFC;  /* darkColors.foreground */
+    --culiplan-text-secondary: #94A3B8;  /* darkColors.foregroundSecondary */
+    --culiplan-text-muted:     #64748B;  /* darkColors.foregroundMuted */
+
+    /* Borders */
+    --culiplan-border:        #334155;  /* darkColors.border — HSL 217 33% 20% */
+    --culiplan-border-subtle: #2D3A4D;  /* darkColors.borderSubtle */
+
+    /* Muted surface */
+    --culiplan-muted:            #283041;  /* darkColors.muted */
+    --culiplan-muted-foreground: #94A3B8;  /* darkColors.mutedForeground */
+
+    /* Grayscale ramp — inverted for dark mode */
+    --culiplan-gray-50:  #1A1F2E;
+    --culiplan-gray-100: #212838;
+    --culiplan-gray-200: #283041;
+    --culiplan-gray-300: #334155;
+    --culiplan-gray-400: #475569;
+    --culiplan-gray-500: #64748B;
+    --culiplan-gray-600: #94A3B8;
+    --culiplan-gray-700: #CBD5E1;
+    --culiplan-gray-800: #E2E8F0;
+    --culiplan-gray-900: #F8FAFC;
+
+    /* Dark shadows — subtler, less contrast needed */
+    --culiplan-shadow-soft:   0 1px 3px 0 rgba(0,0,0,0.25), 0 1px 2px -1px rgba(0,0,0,0.25);
+    --culiplan-shadow-medium: 0 4px 6px -1px rgba(0,0,0,0.30), 0 2px 4px -2px rgba(0,0,0,0.30);
+    --culiplan-shadow-strong: 0 10px 15px -3px rgba(0,0,0,0.35), 0 4px 6px -4px rgba(0,0,0,0.35);
+    --culiplan-shadow-card:   0 2px 12px 0 rgba(242,103,68,0.15);
+
+    /* Dark gradients */
+    --culiplan-gradient-subtle: linear-gradient(180deg, #1E2433 0%, #1A1F2E 100%);
+    --culiplan-gradient-card:   linear-gradient(145deg, rgba(33,40,56,0.97) 0%, rgba(26,31,46,0.97) 100%);
+  }
+}
+
+/* HA dark-mode selector (used when HA theme forces dark) */
+:host-context([data-theme="dark"]) {
+  --culiplan-bg:        #1A1F2E;
+  --culiplan-bg-subtle: #1E2433;
+  --culiplan-surface:       #212838;
+  --culiplan-surface-hover: #283041;
+  --culiplan-text-primary:   #F8FAFC;
+  --culiplan-text-secondary: #94A3B8;
+  --culiplan-text-muted:     #64748B;
+  --culiplan-border:        #334155;
+  --culiplan-border-subtle: #2D3A4D;
+  --culiplan-muted:            #283041;
+  --culiplan-muted-foreground: #94A3B8;
+  --culiplan-shadow-card: 0 2px 12px 0 rgba(242,103,68,0.15);
+  --culiplan-gradient-subtle: linear-gradient(180deg, #1E2433 0%, #1A1F2E 100%);
+  --culiplan-gradient-card:   linear-gradient(145deg, rgba(33,40,56,0.97) 0%, rgba(26,31,46,0.97) 100%);
+}

@@ -1,0 +1,122 @@
+# ============================================================
+# Culiplan — Voice PE Companion Dashboard
+# Layout: Wall-mounted display or Voice PE companion screen
+#         (typically 7–10" landscape, always-on)
+#
+# Install:
+#   Home Assistant → Dashboards → Add Dashboard → Take Control
+#   Paste this file's contents into the RAW configuration editor.
+#
+# Designed for voice-first use:
+#   - Prominent meal summary (large text, high contrast)
+#   - Microphone / Assist button at top for quick voice access
+#   - Shopping list visible at a glance (tick-off from couch)
+#   - Pantry expiry warnings without needing to tap
+#
+# Voice commands that work with this layout:
+#   "What's for dinner tonight?"          → sensor.culiplan_meals_today
+#   "Add milk to the shopping list"       → todo.culiplan_shopping_list
+#   "What's expiring in the pantry?"      → sensor.culiplan_expiring_pantry
+#
+# Known v1 limitation:
+#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included.
+#   It is blocked on the cooking session resource (task-1396, Phase 3).
+#   When available, it will surface active timers on this display
+#   automatically — ideal for voice PE companion use.
+# ============================================================
+
+title: "Voice Companion"
+icon: mdi:microphone
+path: culiplan-voice
+theme: default
+
+views:
+  - title: "Voice Companion"
+    path: voice
+    icon: mdi:microphone
+    type: panel
+
+    cards:
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+
+          # ── Left — Meal plan + voice shortcut ────────────────
+          - type: vertical-stack
+            cards:
+
+              # Assist voice button — top of screen for tap-to-talk
+              - type: assist_satellite
+                # Requires HA 2024.5+ with an active Assist satellite
+                # (e.g. ESPHome microphone, Wyoming satellite, etc.)
+                # Remove this card if no satellite is configured.
+
+              # Today's meals — large font, high-contrast for wall display
+              - type: custom:flavorplan-kitchen-dashboard
+                entity: calendar.culiplan_meal_plan
+                shopping_entity: todo.culiplan_shopping_list
+                title: "Today's plan"
+                show_shopping: false
+                max_meals: 3
+
+              # Meal plan week view
+              - type: calendar
+                title: "This week"
+                entities:
+                  - entity: calendar.culiplan_meal_plan
+                    name: "Meal plan"
+                initial_view: listWeek
+
+          # ── Right — Pantry + shopping list ───────────────────
+          - type: vertical-stack
+            cards:
+
+              # Sensor row — at a glance without tapping
+              - type: glance
+                title: "Kitchen status"
+                show_name: true
+                show_icon: true
+                show_state: true
+                columns: 3
+                entities:
+                  - entity: sensor.culiplan_meals_today
+                    name: "Meals today"
+                    icon: mdi:food-variant
+                  - entity: sensor.culiplan_shopping_items
+                    name: "Shopping items"
+                    icon: mdi:cart
+                  - entity: sensor.culiplan_expiring_pantry
+                    name: "Expiring soon"
+                    icon: mdi:clock-alert-outline
+
+              # Pantry — expiry-focused for voice PE companion
+              - type: custom:flavorplan-pantry-tracker
+                entity: sensor.culiplan_expiring_pantry
+                shopping_entity: todo.culiplan_shopping_list
+                title: "Pantry watch"
+                max_items: 8
+
+              # Shopping list — voice add-item is the primary interaction
+              - type: todo-list
+                title: "Shopping list"
+                entity: todo.culiplan_shopping_list
+
+              # Placeholder: Cooking Mode will appear here in Phase 3
+              # When available, replace this markdown card with:
+              #   type: custom:flavorplan-cooking-mode
+              #   entity: sensor.culiplan_cooking_session
+              - type: markdown
+                content: >
+                  **Cooking Mode** — Phase 3
+
+                  Active timers and recipe steps will appear here when a
+                  cooking session is in progress. Say _"Hey Google, start
+                  the pasta timer"_ once cooking sessions are available.
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: transparent;
+                      border: 1.5px dashed var(--culiplan-primary, #f26744);
+                      opacity: 0.5;
+                    }

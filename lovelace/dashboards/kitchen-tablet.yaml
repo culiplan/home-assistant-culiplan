@@ -1,0 +1,111 @@
+# ============================================================
+# Culiplan — Kitchen Tablet Dashboard
+# Layout: 10" landscape tablet (1024 x 768+ viewport)
+#
+# Install:
+#   Home Assistant → Dashboards → Add Dashboard → Take Control
+#   Paste this file's contents into the RAW configuration editor.
+#
+# Requirements:
+#   - Culiplan integration installed and authenticated
+#   - HACS integration (for card resource loading) OR
+#     manually add lovelace resources (see README)
+#
+# Custom cards used:
+#   - flavorplan-kitchen-dashboard (today's plan)
+#   - flavorplan-pantry-tracker    (pantry with expiry tiles)
+#
+# Known v1 limitation:
+#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included
+#   in this dashboard. It is blocked on the cooking session resource
+#   (task-1396, Phase 3 backend work). Add it manually once Phase 3
+#   ships. Placeholder comment below marks its intended position.
+# ============================================================
+
+title: "Kitchen"
+icon: mdi:chef-hat
+path: culiplan-kitchen
+theme: default
+
+views:
+  - title: "Kitchen"
+    path: kitchen
+    icon: mdi:chef-hat
+    type: panel
+
+    cards:
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+
+          # ── Left column — Today's plan ────────────────────────
+          - type: vertical-stack
+            cards:
+              - type: custom:flavorplan-kitchen-dashboard
+                entity: calendar.culiplan_meal_plan
+                shopping_entity: todo.culiplan_shopping_list
+                title: "What's for Dinner?"
+                show_shopping: true
+                max_meals: 3
+
+              # Summary sensors below the kitchen card
+              - type: glance
+                title: "Today at a glance"
+                show_name: true
+                show_icon: true
+                show_state: true
+                columns: 3
+                entities:
+                  - entity: sensor.culiplan_meals_today
+                    name: "Meals today"
+                    icon: mdi:food-variant
+                  - entity: sensor.culiplan_shopping_items
+                    name: "Shopping items"
+                    icon: mdi:cart
+                  - entity: sensor.culiplan_expiring_pantry
+                    name: "Expiring soon"
+                    icon: mdi:clock-alert-outline
+
+          # ── Centre column — Calendar ──────────────────────────
+          - type: vertical-stack
+            cards:
+              - type: calendar
+                title: "Meal plan"
+                entities:
+                  - entity: calendar.culiplan_meal_plan
+                    name: "Meal plan"
+                initial_view: dayGridWeek
+
+              # Placeholder: Cooking Mode card will go here in Phase 3
+              # Blocked: task-1396 (cooking session resource, Phase 3)
+              # When available, replace this markdown card with:
+              #   type: custom:flavorplan-cooking-mode
+              #   entity: sensor.culiplan_cooking_session
+              - type: markdown
+                content: >
+                  **Cooking Mode** coming in Phase 3.
+
+                  When active, this space will show the current recipe step,
+                  active timers, and voice-command shortcuts. Requires the
+                  cooking session resource (backend task-1396).
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: linear-gradient(135deg, #faf8f5 0%, #fff 100%);
+                      border: 1.5px dashed var(--culiplan-primary, #f26744);
+                      opacity: 0.65;
+                    }
+
+          # ── Right column — Pantry ─────────────────────────────
+          - type: vertical-stack
+            cards:
+              - type: custom:flavorplan-pantry-tracker
+                entity: sensor.culiplan_expiring_pantry
+                shopping_entity: todo.culiplan_shopping_list
+                title: "Pantry"
+                max_items: 12
+
+              - type: todo-list
+                title: "Shopping list"
+                entity: todo.culiplan_shopping_list
