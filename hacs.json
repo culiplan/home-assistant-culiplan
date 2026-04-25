@@ -1,4 +1,7 @@
 {
   "name": "Flavorplan",
-  "render_readme": true
+  "render_readme": true,
+  "iot_class": "cloud_push",
+  "country": ["BE", "NL", "DE", "FR", "ES", "GB", "US", "AU"],
+  "zip_release": false
 }

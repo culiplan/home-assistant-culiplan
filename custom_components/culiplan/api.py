@@ -70,6 +70,12 @@ class FlavorplanApiClient:
         """Remove an item from a shopping list."""
         await self._delete(f"/api/shopping-lists/{list_id}/items/{item_id}")
 
+    async def async_call_voice_tool(
+        self, tool_name: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call a ha-assist:eligible voice tool via the public voice endpoint."""
+        return await self._post("/api/voice/ha-assist", {"tool": tool_name, "params": params})
+
     # ─── HTTP helpers ────────────────────────────────────────────────────────
 
     async def _get(self, path: str) -> Any:

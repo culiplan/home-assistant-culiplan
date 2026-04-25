@@ -114,6 +114,27 @@ action:
 
 ---
 
+## Beta — known limitations
+
+This is a Tier 1 beta. The following features are **not yet available** and are planned for later HACS releases:
+
+- **Lovelace custom cards** (Kitchen Dashboard, Cooking Mode, Pantry Tracker) — Phase 2
+- **AI shopping list fill** (voice command "fill my shopping list for the week") — Phase 2
+- **Smart pantry recommendations** — Phase 2
+- **Cooking Mode step-by-step timers** — Phase 3
+- **Mealie data migration wizard** — Phase 2
+- **HA Core catalog listing** — Phase 4 (after HACS community validation)
+
+What **does** work in 0.1.0:
+- OAuth account linking
+- Calendar entity (meal plan events, dinner parties)
+- Shopping list todo entity (two-way sync)
+- Sensors: meals this week, shopping items count, expiring pantry items
+- Assist voice commands: add to shopping list, what's for dinner, what's in pantry (en/nl/de/fr/es)
+- Live push updates via WebSocket (no polling)
+
+---
+
 ## Contributing
 
 Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

@@ -39,3 +39,26 @@ jobs:
 
       - name: ruff format check
         run: ruff format --check custom_components/
+
+  intents-idempotent:
+    name: Intents idempotency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install script deps
+        run: pip install requests pyyaml
+
+      - name: Regenerate intents from fixture
+        run: |
+          if [ -f scripts/fixtures/ha_tools.json ]; then
+            python scripts/generate_intents.py --from-fixture scripts/fixtures/ha_tools.json
+            git diff --exit-code custom_components/culiplan/intents/ || \
+              (echo "ERROR: committed intents are out of sync — run generate_intents.py and commit" && exit 1)
+          else
+            echo "No fixture found — skipping idempotency check"
+          fi
