@@ -13,6 +13,7 @@ from homeassistant.components.todo import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -31,7 +32,7 @@ async def async_setup_entry(
     coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     shopping_lists = (coordinator.data or {}).get("shopping_lists", [])
     async_add_entities(
-        FlavorplanShoppingList(coordinator, sl) for sl in shopping_lists
+        FlavorplanShoppingList(coordinator, sl, entry) for sl in shopping_lists
     )
 
 
@@ -49,57 +50,64 @@ class FlavorplanShoppingList(CoordinatorEntity[FlavorplanCoordinator], TodoListE
         self,
         coordinator: FlavorplanCoordinator,
         shopping_list: dict[str, Any],
+        entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
         self._list_id: str = shopping_list["id"]
         self._attr_unique_id = f"{DOMAIN}_todo_{self._list_id}"
         self._attr_name = shopping_list.get("name", "Shopping List")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Flavorplan",
+            manufacturer="Flavorplan",
+            model="Meal Planner",
+            entry_type="service",
+        )
 
     @property
     def todo_items(self) -> list[TodoItem]:
         """Return the current items in this shopping list."""
-        lists = (self.coordinator.data or {}).get("shopping_lists", [])
-        for sl in lists:
+        for sl in (self.coordinator.data or {}).get("shopping_lists", []):
             if sl["id"] == self._list_id:
                 return [_to_todo_item(item) for item in sl.get("items", [])]
         return []
 
-    # ─── Mutations (two-way sync via REST) ───────────────────────────────────
+    # ─── Mutations ───────────────────────────────────────────────────────────
 
     async def async_create_todo_item(self, item: TodoItem) -> None:
         """Add an item to the shopping list (HA → backend)."""
-        client = self.coordinator.client
-        await client.async_add_shopping_item(
-            self._list_id,
-            name=item.summary or "",
-            quantity=None,
+        await self.coordinator.client.async_add_shopping_item(
+            self._list_id, name=item.summary or ""
         )
-        # Coordinator will refresh via the shopping_list.item.added Socket.IO event.
+        # Optimistic state update so the UI is instant; Socket.IO event corrects later.
+        await self.coordinator._refresh_shopping_lists()  # noqa: SLF001
+        self.async_write_ha_state()
 
     async def async_update_todo_item(self, item: TodoItem) -> None:
         """Check or uncheck an item (HA → backend)."""
-        client = self.coordinator.client
-        completed = item.status == TodoItemStatus.COMPLETED
-        await client.async_update_shopping_item(
+        await self.coordinator.client.async_update_shopping_item(
             self._list_id,
             item_id=item.uid or "",
-            completed=completed,
+            completed=(item.status == TodoItemStatus.COMPLETED),
         )
+        await self.coordinator._refresh_shopping_lists()  # noqa: SLF001
+        self.async_write_ha_state()
 
     async def async_delete_todo_items(self, uids: list[str]) -> None:
         """Remove items from the shopping list (HA → backend)."""
-        client = self.coordinator.client
         for uid in uids:
-            await client.async_remove_shopping_item(self._list_id, item_id=uid)
-
-
-# ─── Helpers ─────────────────────────────────────────────────────────────────
+            await self.coordinator.client.async_remove_shopping_item(
+                self._list_id, item_id=uid
+            )
+        await self.coordinator._refresh_shopping_lists()  # noqa: SLF001
+        self.async_write_ha_state()
 
 
 def _to_todo_item(item: dict[str, Any]) -> TodoItem:
-    completed = item.get("completed", False)
     return TodoItem(
         uid=item.get("id", ""),
         summary=item.get("name", ""),
-        status=TodoItemStatus.COMPLETED if completed else TodoItemStatus.NEEDS_ACTION,
+        status=(
+            TodoItemStatus.COMPLETED if item.get("completed") else TodoItemStatus.NEEDS_ACTION
+        ),
     )

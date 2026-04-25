@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import FlavorplanCoordinator
+from .helpers import parse_dt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,9 +29,7 @@ async def async_setup_entry(
     """Set up Flavorplan calendar entities."""
     coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     meal_plans = (coordinator.data or {}).get("meal_plans", [])
-    async_add_entities(
-        FlavorplanCalendar(coordinator, plan) for plan in meal_plans
-    )
+    async_add_entities(FlavorplanCalendar(coordinator, plan, entry) for plan in meal_plans)
 
 
 class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntity):
@@ -40,20 +41,38 @@ class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntit
         self,
         coordinator: FlavorplanCoordinator,
         plan: dict[str, Any],
+        entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
         self._plan = plan
         self._plan_id: str = plan["id"]
         self._attr_unique_id = f"{DOMAIN}_calendar_{self._plan_id}"
         self._attr_name = plan.get("name", "Meal Plan")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Flavorplan",
+            manufacturer="Flavorplan",
+            model="Meal Planner",
+            entry_type="service",
+        )
 
     @property
     def event(self) -> CalendarEvent | None:
-        """Return the current/next event."""
-        events = self._build_events()
-        now = datetime.now(tz=timezone.utc)
-        upcoming = [e for e in events if e.end > now]
+        """Return the current/next upcoming event."""
+        now = datetime.now(tz=UTC)
+        upcoming = [e for e in self._build_events() if e.end > now]
         return upcoming[0] if upcoming else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose recipe metadata for the current/next event (IDs only, §14.3)."""
+        ev = self.event
+        if ev is None or ev.description is None:
+            return {}
+        try:
+            return json.loads(ev.description)
+        except (ValueError, TypeError):
+            return {}
 
     async def async_get_events(
         self,
@@ -71,26 +90,26 @@ class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntit
     def _build_events(self) -> list[CalendarEvent]:
         """Convert meal plan slots into CalendarEvent objects."""
         events: list[CalendarEvent] = []
-        plans = (self.coordinator.data or {}).get("meal_plans", [])
-        for plan in plans:
+        for plan in (self.coordinator.data or {}).get("meal_plans", []):
             if plan["id"] != self._plan_id:
                 continue
             for slot in plan.get("slots", []):
                 try:
-                    start = _parse_dt(slot["date"])
+                    start = parse_dt(slot["date"])
                     end = start + timedelta(hours=1)
+                    # Recipe metadata goes into description as JSON (IDs only per §14.3).
+                    description = json.dumps({
+                        "recipe_id": slot.get("recipeId"),
+                        "servings": slot.get("servings"),
+                        "course": slot.get("course"),
+                    })
                     events.append(
                         CalendarEvent(
                             start=start,
                             end=end,
                             summary=slot.get("title", "Meal"),
-                            description=None,
+                            description=description,
                             uid=slot.get("id"),
-                            extra_state_attributes={
-                                "recipe_id": slot.get("recipeId"),
-                                "servings": slot.get("servings"),
-                                "course": slot.get("course"),
-                            },
                         )
                     )
                 except (KeyError, ValueError) as err:
@@ -98,24 +117,9 @@ class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntit
         return sorted(events, key=lambda e: e.start)
 
     def _handle_coordinator_update(self) -> None:
-        """Refresh plan reference from coordinator data."""
         plans = (self.coordinator.data or {}).get("meal_plans", [])
         for plan in plans:
             if plan["id"] == self._plan_id:
                 self._plan = plan
                 break
         super()._handle_coordinator_update()
-
-
-def _parse_dt(value: str) -> datetime:
-    """Parse an ISO 8601 date or datetime string into a timezone-aware datetime."""
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except ValueError:
-        # Treat bare date strings as midnight UTC.
-        return datetime.combine(date.fromisoformat(value), datetime.min.time()).replace(
-            tzinfo=timezone.utc
-        )

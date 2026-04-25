@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from aiohttp import ClientSession
+from aiohttp import ClientResponseError, ClientSession
+
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .const import BASE_URL
 
@@ -29,19 +31,15 @@ class FlavorplanApiClient:
     # ─── Read ────────────────────────────────────────────────────────────────
 
     async def async_get_user(self) -> dict[str, Any]:
-        """Fetch the authenticated user profile."""
         return await self._get("/api/users/me")
 
     async def async_get_meal_plans(self) -> list[dict[str, Any]]:
-        """Fetch active meal plans with their slots."""
         return await self._get("/api/meal-plans")
 
     async def async_get_shopping_lists(self) -> list[dict[str, Any]]:
-        """Fetch shopping lists with their items."""
         return await self._get("/api/shopping-lists")
 
     async def async_get_pantry_items(self) -> list[dict[str, Any]]:
-        """Fetch pantry items."""
         return await self._get("/api/pantry")
 
     # ─── Shopping list mutations ─────────────────────────────────────────────
@@ -49,7 +47,6 @@ class FlavorplanApiClient:
     async def async_add_shopping_item(
         self, list_id: str, name: str, quantity: str | None = None
     ) -> dict[str, Any]:
-        """Add an item to a shopping list."""
         payload: dict[str, Any] = {"name": name}
         if quantity:
             payload["quantity"] = quantity
@@ -58,23 +55,20 @@ class FlavorplanApiClient:
     async def async_update_shopping_item(
         self, list_id: str, item_id: str, completed: bool
     ) -> dict[str, Any]:
-        """Check or uncheck a shopping list item."""
         return await self._patch(
             f"/api/shopping-lists/{list_id}/items/{item_id}",
             {"completed": completed},
         )
 
-    async def async_remove_shopping_item(
-        self, list_id: str, item_id: str
-    ) -> None:
-        """Remove an item from a shopping list."""
+    async def async_remove_shopping_item(self, list_id: str, item_id: str) -> None:
         await self._delete(f"/api/shopping-lists/{list_id}/items/{item_id}")
 
     async def async_call_voice_tool(
         self, tool_name: str, params: dict[str, Any]
     ) -> dict[str, Any]:
-        """Call a ha-assist:eligible voice tool via the public voice endpoint."""
-        return await self._post("/api/voice/ha-assist", {"tool": tool_name, "params": params})
+        return await self._post(
+            "/api/voice/ha-assist", {"tool": tool_name, "params": params}
+        )
 
     # ─── HTTP helpers ────────────────────────────────────────────────────────
 
@@ -82,6 +76,7 @@ class FlavorplanApiClient:
         async with self._session.get(
             f"{BASE_URL}{path}", headers=self._headers()
         ) as resp:
+            self._raise_for_status(resp.status, path)
             resp.raise_for_status()
             return await resp.json()
 
@@ -89,6 +84,7 @@ class FlavorplanApiClient:
         async with self._session.post(
             f"{BASE_URL}{path}", headers=self._headers(), json=payload
         ) as resp:
+            self._raise_for_status(resp.status, path)
             resp.raise_for_status()
             return await resp.json()
 
@@ -96,6 +92,7 @@ class FlavorplanApiClient:
         async with self._session.patch(
             f"{BASE_URL}{path}", headers=self._headers(), json=payload
         ) as resp:
+            self._raise_for_status(resp.status, path)
             resp.raise_for_status()
             return await resp.json()
 
@@ -103,4 +100,13 @@ class FlavorplanApiClient:
         async with self._session.delete(
             f"{BASE_URL}{path}", headers=self._headers()
         ) as resp:
+            self._raise_for_status(resp.status, path)
             resp.raise_for_status()
+
+    @staticmethod
+    def _raise_for_status(status: int, path: str) -> None:
+        """Convert 401 to ConfigEntryAuthFailed so HA triggers re-auth flow."""
+        if status == 401:
+            raise ConfigEntryAuthFailed(
+                f"Flavorplan token expired or revoked (401 on {path})"
+            )

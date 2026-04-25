@@ -18,33 +18,18 @@ from .const import BASE_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Socket.IO namespace and event names (matches haEventPublisher.ts)
 HA_NAMESPACE = "/ha-events"
 HA_EVENT = "ha:event"
 HA_ERROR = "ha:error"
 
-# Heartbeat: backend sends Socket.IO pings every 25 s.
-# We track missed pings via disconnect events rather than raw ping/pong.
 _MAX_HEARTBEAT_MISSES = 2
-
-# Reconnect: exponential backoff between 2 s and 120 s.
 _RECONNECT_INITIAL_DELAY = 2.0
 _RECONNECT_MAX_DELAY = 120.0
 _RECONNECT_FACTOR = 2.0
 
 
 class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Push-first coordinator backed by the /ha-events Socket.IO namespace.
-
-    Flow:
-    1. async_start() connects to Socket.IO and does an initial REST fetch.
-    2. On ha:event, the relevant resource is re-fetched via REST and
-       async_set_updated_data() triggers entity updates.
-    3. On disconnect, the reconnect loop re-establishes the connection with
-       exponential backoff, then does a full REST refresh.
-    4. After _MAX_HEARTBEAT_MISSES consecutive failures the coordinator marks
-       itself unavailable via UpdateFailed.
-    """
+    """Push-first coordinator backed by the /ha-events Socket.IO namespace."""
 
     def __init__(
         self,
@@ -52,33 +37,37 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         client: FlavorplanApiClient,
         entry: ConfigEntry,
     ) -> None:
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            # No periodic polling; all updates arrive via push.
-            update_interval=None,
-        )
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
         self.client = client
         self.entry = entry
         self._sio: socketio.AsyncClient | None = None
         self._reconnect_task: asyncio.Task | None = None
         self._connected = False
         self._miss_count = 0
+        self._stopped = False  # set by async_stop(); guards against post-unload reconnects
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────
 
     async def async_start(self) -> None:
-        """Connect to Socket.IO and perform the initial data fetch."""
+        """Connect to Socket.IO."""
+        self._stopped = False
         await self._connect()
 
     async def async_stop(self) -> None:
         """Disconnect Socket.IO and cancel background tasks."""
+        self._stopped = True
         if self._reconnect_task and not self._reconnect_task.done():
             self._reconnect_task.cancel()
+            try:
+                await self._reconnect_task
+            except asyncio.CancelledError:
+                pass
             self._reconnect_task = None
         if self._sio:
-            await self._sio.disconnect()
+            try:
+                await self._sio.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
             self._sio = None
 
     # ─── DataUpdateCoordinator protocol ─────────────────────────────────────
@@ -104,10 +93,13 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _connect(self) -> None:
         """Create the Socket.IO client and connect to the HA namespace."""
+        if self._stopped:
+            return
+
         access_token = await self._get_valid_token()
 
         sio = socketio.AsyncClient(
-            reconnection=False,  # We manage reconnection ourselves.
+            reconnection=False,
             logger=False,
             engineio_logger=False,
         )
@@ -115,10 +107,9 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         @sio.event(namespace=HA_NAMESPACE)
         async def connect() -> None:
-            _LOGGER.info("Connected to Flavorplan /ha-events namespace")
+            _LOGGER.info("Connected to Flavorplan /ha-events")
             self._connected = True
             self._miss_count = 0
-            # Full state refresh on (re)connect.
             await self.async_refresh()
 
         @sio.event(namespace=HA_NAMESPACE)
@@ -153,11 +144,8 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._schedule_reconnect()
 
     async def _handle_event(self, payload: dict[str, Any]) -> None:
-        """Process an inbound ha:event by refetching the changed resource."""
         event_type: str = payload.get("type", "")
-        resource_id: str = payload.get("id", "")
-
-        _LOGGER.debug("ha:event type=%s id=%s", event_type, resource_id)
+        _LOGGER.debug("ha:event type=%s id=%s", event_type, payload.get("id"))
 
         if event_type == "meal_plan.updated":
             await self._refresh_meal_plans()
@@ -169,42 +157,40 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _refresh_meal_plans(self) -> None:
         try:
             meal_plans = await self.client.async_get_meal_plans()
-            current = dict(self.data or {})
-            current["meal_plans"] = meal_plans
-            self.async_set_updated_data(current)
+            self.async_set_updated_data({**(self.data or {}), "meal_plans": meal_plans})
         except Exception as err:
             _LOGGER.error("Failed to refresh meal plans: %s", err)
 
     async def _refresh_shopping_lists(self) -> None:
         try:
             shopping_lists = await self.client.async_get_shopping_lists()
-            current = dict(self.data or {})
-            current["shopping_lists"] = shopping_lists
-            self.async_set_updated_data(current)
+            self.async_set_updated_data({**(self.data or {}), "shopping_lists": shopping_lists})
         except Exception as err:
             _LOGGER.error("Failed to refresh shopping lists: %s", err)
 
     async def _refresh_pantry(self) -> None:
         try:
             pantry_items = await self.client.async_get_pantry_items()
-            current = dict(self.data or {})
-            current["pantry_items"] = pantry_items
-            self.async_set_updated_data(current)
+            self.async_set_updated_data({**(self.data or {}), "pantry_items": pantry_items})
         except Exception as err:
             _LOGGER.error("Failed to refresh pantry items: %s", err)
 
     # ─── Reconnect logic ─────────────────────────────────────────────────────
 
     def _schedule_reconnect(self, delay: float = _RECONNECT_INITIAL_DELAY) -> None:
-        """Schedule a reconnect attempt using exponential backoff."""
+        """Schedule reconnect with exponential backoff. No-op if stopped."""
+        if self._stopped:
+            return
         if self._reconnect_task and not self._reconnect_task.done():
             return
 
         async def _reconnect_loop(initial_delay: float) -> None:
             wait = initial_delay
-            while not self._connected:
+            while not self._connected and not self._stopped:
                 _LOGGER.info("Reconnecting to Flavorplan in %.0f s…", wait)
                 await asyncio.sleep(wait)
+                if self._stopped:
+                    return
                 try:
                     if self._sio:
                         await self._sio.disconnect()
@@ -215,7 +201,8 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("Reconnect attempt failed: %s", err)
                 wait = min(wait * _RECONNECT_FACTOR, _RECONNECT_MAX_DELAY)
 
-        self._reconnect_task = self.hass.loop.create_task(
+        # Use HA-managed background task so HA can cancel it on shutdown.
+        self._reconnect_task = self.hass.async_create_background_task(
             _reconnect_loop(delay),
             name=f"{DOMAIN}_reconnect",
         )
@@ -223,7 +210,6 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ─── Token helpers ───────────────────────────────────────────────────────
 
     async def _get_valid_token(self) -> str:
-        """Return a valid OAuth access token, refreshing if necessary."""
         from homeassistant.helpers import config_entry_oauth2_flow
 
         implementation = (
@@ -236,6 +222,5 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         await session.async_ensure_token_valid()
         token = session.token.get("access_token", "")
-        # Update client with the refreshed token.
         self.client._access_token = token  # noqa: SLF001
         return token
