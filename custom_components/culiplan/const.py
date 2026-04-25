@@ -22,4 +22,14 @@ CONF_BYOK_API_KEY = "byok_api_key"
 CONF_LOCAL_ENDPOINT = "local_endpoint"
 CONF_LOCAL_MODEL = "local_model"
 
-PLATFORMS: list[str] = ["calendar", "sensor", "todo"]
+# binary_sensor added in Phase 2 (tasks 1378 + 1380)
+PLATFORMS: list[str] = ["binary_sensor", "calendar", "sensor", "todo"]
+
+# ─── Mealie migration (Phase 2, task-1394) ────────────────────────────────────
+CONF_MEALIE_URL = "mealie_url"
+CONF_MEALIE_TOKEN = "mealie_token"
+CONF_MEALIE_JOB_ID = "mealie_job_id"
+CONF_MEALIE_IMPORT_AT = "mealie_import_at"
+
+# How long the rollback button remains available after import (seconds)
+MEALIE_ROLLBACK_WINDOW_SECONDS = 24 * 60 * 60  # 24 hours
