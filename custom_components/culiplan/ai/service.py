@@ -41,6 +41,30 @@ from .types import (
     ToolResult,
 )
 
+# HTTP status codes that indicate a non-retryable client error (4xx)
+_NON_RETRYABLE_STATUS_CODES = frozenset({400, 401, 403, 404, 405, 409, 410, 422, 429})
+
+
+def _is_non_retryable(exc: Exception) -> bool:
+    """
+    Return True when the exception signals a 4xx-class error that the model
+    should not retry.
+
+    We inspect the exception message for status codes rather than depending on
+    a specific exception type — the tool calls traverse multiple layers and the
+    original aiohttp exception may be wrapped.
+    """
+    # Check for explicit status_code attribute (aiohttp ClientResponseError)
+    status = getattr(exc, "status", None) or getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status in _NON_RETRYABLE_STATUS_CODES
+    # Fallback: scan string representation for 4xx codes
+    exc_str = str(exc)
+    for code in _NON_RETRYABLE_STATUS_CODES:
+        if str(code) in exc_str:
+            return True
+    return False
+
 _LOGGER = logging.getLogger(__name__)
 
 _MAX_TOOL_TURNS = 10  # guard against runaway function-calling loops
@@ -66,6 +90,7 @@ class AIDispatchService:
         api_key: str = "",
         base_url: str | None = None,
         debug: bool = False,
+        config_dir: str | None = None,
     ) -> None:
         self._mode = mode
         self._client = flavorplan_client
@@ -75,6 +100,7 @@ class AIDispatchService:
             api_key=api_key,
             base_url=base_url,
             debug=debug,
+            config_dir=config_dir,
         )
 
     async def fetch_envelope(
@@ -160,11 +186,22 @@ class AIDispatchService:
                 try:
                     result_data = await self.execute_tool_call(tc)
                 except Exception as exc:
+                    # Log the full exception internally (AC#1) but never surface
+                    # internal exception strings to the AI provider — that would
+                    # leak Flavorplan architecture details to BYOK providers (AC#3,
+                    # task-1414).
                     _LOGGER.warning(
-                        "[culiplan][ai-service] Tool '%s' failed: %s",
-                        tc.name, exc,
+                        "[culiplan][ai-service] Tool '%s' (call_id=%s) failed: %s",
+                        tc.name, tc.call_id, exc,
+                        exc_info=True,
                     )
-                    result_data = {"error": str(exc)}
+                    retryable = not _is_non_retryable(exc)
+                    # AC#2: sanitised payload — no internal details
+                    result_data = {
+                        "error": "tool_execution_failed",
+                        "tool": tc.name,
+                        "retryable": retryable,
+                    }
 
                 tool_results.append(
                     ToolResult(

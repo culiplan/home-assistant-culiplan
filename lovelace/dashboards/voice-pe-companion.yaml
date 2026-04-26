@@ -10,6 +10,7 @@
 # Designed for voice-first use:
 #   - Prominent meal summary (large text, high contrast)
 #   - Microphone / Assist button at top for quick voice access
+#   - Cooking Mode card: active timers + step state while cooking
 #   - Shopping list visible at a glance (tick-off from couch)
 #   - Pantry expiry warnings without needing to tap
 #
@@ -17,12 +18,8 @@
 #   "What's for dinner tonight?"          → sensor.culiplan_meals_today
 #   "Add milk to the shopping list"       → todo.culiplan_shopping_list
 #   "What's expiring in the pantry?"      → sensor.culiplan_expiring_pantry
-#
-# Known v1 limitation:
-#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included.
-#   It is blocked on the cooking session resource (task-1396, Phase 3).
-#   When available, it will surface active timers on this display
-#   automatically — ideal for voice PE companion use.
+#   "Next step"                           → advances cooking session step
+#   "Start cooking [recipe name]"         → starts a cooking session
 # ============================================================
 
 title: "Voice Companion"
@@ -102,21 +99,11 @@ views:
                 title: "Shopping list"
                 entity: todo.culiplan_shopping_list
 
-              # Placeholder: Cooking Mode will appear here in Phase 3
-              # When available, replace this markdown card with:
-              #   type: custom:flavorplan-cooking-mode
-              #   entity: sensor.culiplan_cooking_session
-              - type: markdown
-                content: >
-                  **Cooking Mode** — Phase 3
-
-                  Active timers and recipe steps will appear here when a
-                  cooking session is in progress. Say _"Hey Google, start
-                  the pasta timer"_ once cooking sessions are available.
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: transparent;
-                      border: 1.5px dashed var(--culiplan-primary, #f26744);
-                      opacity: 0.5;
-                    }
+              # Cooking Mode card — Phase 3 (task-1383 + task-1396)
+              # Voice PE companion: timers + steps always visible while cooking.
+              # Falls back gracefully to "Start cooking from a recipe" CTA.
+              - type: custom:flavorplan-cooking-mode
+                entity: sensor.culiplan_active_cooking_session
+                title: "Cooking"
+                show_step_numbers: true
+                max_timers: 3

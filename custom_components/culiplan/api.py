@@ -7,8 +7,9 @@ from typing import Any
 
 from aiohttp import ClientResponseError, ClientSession
 
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
+from .ai.types import PremiumRequiredError
 from .const import BASE_URL
 
 _LOGGER = logging.getLogger(__name__)
@@ -96,16 +97,25 @@ class FlavorplanApiClient:
         ) as resp:
             self._raise_for_status(resp.status, path)
             if resp.status == 403:
-                # Read the body BEFORE calling raise_for_status() so the
-                # services layer can extract {error, feature, upgradeUrl} and
-                # create the correct Repairs issue (task-1395).
+                # Read the body before raise_for_status() so we can inspect
+                # the structured {error, feature, upgradeUrl} payload and raise
+                # a typed PremiumRequiredError (task-1416).
                 try:
-                    import json as _json
-                    body = await resp.json()
-                    body_str = _json.dumps(body)
+                    body: dict[str, Any] = await resp.json()
                 except Exception:
-                    body_str = await resp.text()
-                raise Exception(f"403 {body_str}")
+                    body = {}
+                if body.get("error") == "premium_required":
+                    raise PremiumRequiredError(
+                        feature=body.get("feature", "unknown"),
+                        upgrade_url=body.get(
+                            "upgradeUrl",
+                            "https://culiplan.com/premium?source=ha",
+                        ),
+                    )
+                # Non-premium 403 (e.g. forbidden scope) — raise as generic HA error
+                raise HomeAssistantError(
+                    f"Flavorplan API returned 403 on {path}: {body}"
+                )
             resp.raise_for_status()
             return await resp.json()
 

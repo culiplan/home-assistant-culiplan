@@ -16,17 +16,25 @@ Each dispatcher:
 
 Streaming responses are deferred to v2 (§13.2).
 
-Debug mode (§13.2):
-    Pass debug=True to log prompts at DEBUG level.  Logs are client-side only,
-    never sent to Flavorplan.  Auto-purge TTL of 24h is noted in the log.
+Debug mode (§13.2, task-1410):
+    Pass debug=True to log prompts at DEBUG level.  Logs are written to a
+    dedicated rotating file (culiplan_ai_debug.log) under the HA config dir,
+    never to the main HA log stream, and are auto-purged after 24h.
+
+Retry policy (§13.6, task-1411):
+    All three dispatchers retry once on 5xx with 1s backoff before raising
+    ProviderUnavailableError.  No retry on 4xx (fail fast).
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import uuid
 from typing import Any
 
+from .debug_logger import get_debug_logger
 from .types import (
     DispatchResult,
     DispatcherError,
@@ -44,6 +52,46 @@ _LOGGER = logging.getLogger(__name__)
 
 # Maximum multi-turn function-calling iterations to prevent runaway loops
 _MAX_TOOL_TURNS = 10
+
+# ─── Retry helper (§13.6, task-1411) ─────────────────────────────────────────
+
+_RETRY_BACKOFF_SECONDS = 1.0  # one second between attempt 1 and the single retry
+
+
+async def _retry_once_on_5xx(coro_factory, *, provider: str) -> Any:
+    """
+    Call ``coro_factory()`` once.  If it raises ``ProviderUnavailableError``
+    (5xx), wait ``_RETRY_BACKOFF_SECONDS`` and try once more.  Any other
+    exception (4xx auth/rate-limit, DispatcherError) is propagated immediately
+    without a retry — fail fast on non-transient errors (AC#2, task-1411).
+
+    The retry attempt is logged at WARN level to support audit-log visibility
+    (AC#3, task-1411).
+
+    Args:
+        coro_factory: A zero-argument callable that returns the coroutine to
+                      execute.  Called twice at most.
+        provider:     Human-readable provider name for log messages.
+
+    Returns:
+        The return value of the successful coroutine call.
+
+    Raises:
+        ProviderUnavailableError: If both attempts return a 5xx response.
+        Any other DispatcherError subclass on the first attempt.
+    """
+    try:
+        return await coro_factory()
+    except ProviderUnavailableError as exc:
+        _LOGGER.warning(
+            "[culiplan][%s] Provider returned 5xx — retrying once after %.1fs. "
+            "Error: %s",
+            provider, _RETRY_BACKOFF_SECONDS, exc,
+        )
+        await asyncio.sleep(_RETRY_BACKOFF_SECONDS)
+        # Raises ProviderUnavailableError (or any other exception) on the second
+        # attempt — let it propagate to the service layer unchanged.
+        return await coro_factory()
 
 
 def _tool_specs_to_openai(tools: list[ToolSpec]) -> list[dict[str, Any]]:
@@ -109,23 +157,24 @@ class OpenAICompatibleDispatcher:
         api_key: str,
         base_url: str | None = None,
         debug: bool = False,
+        config_dir: str | None = None,
     ) -> None:
         """
         Initialise the dispatcher.
 
         Args:
-            api_key:  Provider API key (stored in HA secrets, never sent to Flavorplan).
-                      For local endpoints (Ollama/LM Studio) pass "ollama" or "lm-studio"
-                      as a placeholder — the endpoint does not authenticate.
-            base_url: Override the default OpenAI base URL.
-                      Set to "http://localhost:11434/v1" for Ollama,
-                      "http://localhost:1234/v1" for LM Studio.
-            debug:    If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Provider API key (stored in HA secrets, never sent to Flavorplan).
+            base_url:   Override the default OpenAI base URL.
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from openai import AsyncOpenAI
 
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -156,40 +205,48 @@ class OpenAICompatibleDispatcher:
         tools = _tool_specs_to_openai(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][openai-compat] Sending prompt to provider. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][openai-compat] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "Messages: %s",
                 json.dumps(messages),
             )
 
-        try:
-            from openai import APIStatusError
+        async def _call() -> Any:
+            try:
+                from openai import APIStatusError
 
-            response = await self._client.chat.completions.create(
-                model=envelope.model,
-                messages=messages,  # type: ignore[arg-type]
-                tools=tools if tools else None,  # type: ignore[arg-type]
-                tool_choice="auto" if tools else None,
-            )
-        except APIStatusError as exc:
-            _LOGGER.error(
-                "[culiplan][openai-compat] Provider error: %s %s",
-                exc.status_code, exc.message,
-            )
-            if exc.status_code == 401:
-                raise ProviderAuthError(
-                    f"OpenAI-compatible provider rejected the API key: {exc.message}"
+                return await self._client.chat.completions.create(
+                    model=envelope.model,
+                    messages=messages,  # type: ignore[arg-type]
+                    tools=tools if tools else None,  # type: ignore[arg-type]
+                    tool_choice="auto" if tools else None,
+                )
+            except APIStatusError as exc:
+                _LOGGER.error(
+                    "[culiplan][openai-compat] Provider error: %s %s",
+                    exc.status_code, exc.message,
+                )
+                if exc.status_code == 401:
+                    raise ProviderAuthError(
+                        f"OpenAI-compatible provider rejected the API key: {exc.message}"
+                    ) from exc
+                if exc.status_code == 429:
+                    raise ProviderRateLimitError(
+                        f"OpenAI-compatible provider rate limit exceeded: {exc.message}"
+                    ) from exc
+                if exc.status_code >= 500:
+                    raise ProviderUnavailableError(
+                        f"OpenAI-compatible provider returned {exc.status_code}: {exc.message}"
+                    ) from exc
+                raise DispatcherError(
+                    f"OpenAI-compatible provider error: {exc.message}"
                 ) from exc
-            if exc.status_code == 429:
-                raise ProviderRateLimitError(
-                    f"OpenAI-compatible provider rate limit exceeded: {exc.message}"
-                ) from exc
-            if exc.status_code >= 500:
-                raise ProviderUnavailableError(
-                    f"OpenAI-compatible provider returned {exc.status_code}: {exc.message}"
-                ) from exc
-            raise DispatcherError(f"OpenAI-compatible provider error: {exc.message}") from exc
+
+        # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
+        response = await _retry_once_on_5xx(_call, provider="openai-compat")
 
         choice = response.choices[0]
         finish_reason = choice.finish_reason
@@ -249,16 +306,22 @@ class AnthropicDispatcher:
     Requires: anthropic Python package (bundled in manifest.json requirements).
     """
 
-    def __init__(self, api_key: str, debug: bool = False) -> None:
+    def __init__(
+        self, api_key: str, debug: bool = False, config_dir: str | None = None
+    ) -> None:
         """
         Args:
-            api_key: Anthropic API key (stored in HA secrets, never sent to Flavorplan).
-            debug:   If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Anthropic API key (stored in HA secrets, never sent to Flavorplan).
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from anthropic import AsyncAnthropic
 
         self._client = AsyncAnthropic(api_key=api_key)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -293,42 +356,48 @@ class AnthropicDispatcher:
         tools = _tool_specs_to_anthropic(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][anthropic] Sending prompt to Anthropic. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][anthropic] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "System: %s | Messages: %s",
                 system_content,
                 json.dumps(conversation),
             )
 
-        try:
-            from anthropic import APIStatusError
+        async def _call() -> Any:
+            try:
+                from anthropic import APIStatusError
 
-            response = await self._client.messages.create(
-                model=envelope.model,
-                max_tokens=2048,
-                system=system_content or "",
-                messages=conversation,  # type: ignore[arg-type]
-                tools=tools if tools else [],  # type: ignore[arg-type]
-            )
-        except APIStatusError as exc:
-            _LOGGER.error(
-                "[culiplan][anthropic] Provider error: %s %s",
-                exc.status_code, exc.message,
-            )
-            if exc.status_code == 401:
-                raise ProviderAuthError(
-                    f"Anthropic rejected the API key: {exc.message}"
-                ) from exc
-            if exc.status_code == 429:
-                raise ProviderRateLimitError(
-                    f"Anthropic rate limit exceeded: {exc.message}"
-                ) from exc
-            if exc.status_code >= 500:
-                raise ProviderUnavailableError(
-                    f"Anthropic returned {exc.status_code}: {exc.message}"
-                ) from exc
-            raise DispatcherError(f"Anthropic error: {exc.message}") from exc
+                return await self._client.messages.create(
+                    model=envelope.model,
+                    max_tokens=2048,
+                    system=system_content or "",
+                    messages=conversation,  # type: ignore[arg-type]
+                    tools=tools if tools else [],  # type: ignore[arg-type]
+                )
+            except APIStatusError as exc:
+                _LOGGER.error(
+                    "[culiplan][anthropic] Provider error: %s %s",
+                    exc.status_code, exc.message,
+                )
+                if exc.status_code == 401:
+                    raise ProviderAuthError(
+                        f"Anthropic rejected the API key: {exc.message}"
+                    ) from exc
+                if exc.status_code == 429:
+                    raise ProviderRateLimitError(
+                        f"Anthropic rate limit exceeded: {exc.message}"
+                    ) from exc
+                if exc.status_code >= 500:
+                    raise ProviderUnavailableError(
+                        f"Anthropic returned {exc.status_code}: {exc.message}"
+                    ) from exc
+                raise DispatcherError(f"Anthropic error: {exc.message}") from exc
+
+        # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
+        response = await _retry_once_on_5xx(_call, provider="anthropic")
 
         # Extract content blocks
         tool_calls: list[ToolCall] = []
@@ -363,16 +432,22 @@ class GoogleDispatcher:
     Requires: google-genai Python package (bundled in manifest.json requirements).
     """
 
-    def __init__(self, api_key: str, debug: bool = False) -> None:
+    def __init__(
+        self, api_key: str, debug: bool = False, config_dir: str | None = None
+    ) -> None:
         """
         Args:
-            api_key: Google/Gemini API key (stored in HA secrets).
-            debug:   If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Google/Gemini API key (stored in HA secrets).
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from google import genai  # type: ignore[import]
 
         self._client = genai.Client(api_key=api_key)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -415,61 +490,73 @@ class GoogleDispatcher:
         function_declarations = _tool_specs_to_google(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][google] Sending prompt to Gemini. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][google] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "Contents: %s",
                 json.dumps(contents),
             )
 
-        try:
-            config_kwargs: dict[str, Any] = {}
-            if system_instruction:
-                config_kwargs["system_instruction"] = system_instruction
-            if function_declarations:
-                config_kwargs["tools"] = [
-                    genai_types.Tool(
-                        function_declarations=function_declarations  # type: ignore[arg-type]
-                    )
-                ]
+        async def _call() -> Any:
+            try:
+                config_kwargs: dict[str, Any] = {}
+                if system_instruction:
+                    config_kwargs["system_instruction"] = system_instruction
+                if function_declarations:
+                    config_kwargs["tools"] = [
+                        genai_types.Tool(
+                            function_declarations=function_declarations  # type: ignore[arg-type]
+                        )
+                    ]
 
-            response = await self._client.aio.models.generate_content(
-                model=envelope.model,
-                contents=contents,  # type: ignore[arg-type]
-                config=genai_types.GenerateContentConfig(**config_kwargs)
-                if config_kwargs
-                else None,
-            )
-        except Exception as exc:  # google-genai uses generic exceptions
-            msg = str(exc)
-            _LOGGER.error("[culiplan][google] Provider error: %s", msg)
-            if "401" in msg or "API_KEY_INVALID" in msg:
-                raise ProviderAuthError(f"Gemini rejected the API key: {msg}") from exc
-            if "429" in msg or "RATE_LIMIT" in msg:
-                raise ProviderRateLimitError(
-                    f"Gemini rate limit exceeded: {msg}"
-                ) from exc
-            if "500" in msg or "503" in msg:
-                raise ProviderUnavailableError(
-                    f"Gemini service unavailable: {msg}"
-                ) from exc
-            raise DispatcherError(f"Gemini error: {msg}") from exc
+                return await self._client.aio.models.generate_content(
+                    model=envelope.model,
+                    contents=contents,  # type: ignore[arg-type]
+                    config=genai_types.GenerateContentConfig(**config_kwargs)
+                    if config_kwargs
+                    else None,
+                )
+            except Exception as exc:  # google-genai uses generic exceptions
+                msg = str(exc)
+                _LOGGER.error("[culiplan][google] Provider error: %s", msg)
+                if "401" in msg or "API_KEY_INVALID" in msg:
+                    raise ProviderAuthError(
+                        f"Gemini rejected the API key: {msg}"
+                    ) from exc
+                if "429" in msg or "RATE_LIMIT" in msg:
+                    raise ProviderRateLimitError(
+                        f"Gemini rate limit exceeded: {msg}"
+                    ) from exc
+                if "500" in msg or "503" in msg:
+                    raise ProviderUnavailableError(
+                        f"Gemini service unavailable: {msg}"
+                    ) from exc
+                raise DispatcherError(f"Gemini error: {msg}") from exc
+
+        # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
+        response = await _retry_once_on_5xx(_call, provider="google")
 
         # Extract text and function calls from candidates
         text_parts: list[str] = []
         tool_calls: list[ToolCall] = []
 
-        for candidate in getattr(response, "candidates", []):
+        for idx, candidate in enumerate(getattr(response, "candidates", [])):
             for part in getattr(candidate.content, "parts", []):
                 if hasattr(part, "text") and part.text:
                     text_parts.append(part.text)
                 elif hasattr(part, "function_call") and part.function_call:
                     fc = part.function_call
+                    # task-1412: generate a unique call_id per tool call so that
+                    # two calls to the same tool in a single turn don't collide.
+                    # Format: "<tool_name>-<8-char UUID fragment>"
+                    call_id = f"{fc.name}-{uuid.uuid4().hex[:8]}"
                     tool_calls.append(
                         ToolCall(
                             name=fc.name,
                             params=dict(fc.args) if fc.args else {},
-                            call_id=fc.name,  # Gemini uses name as ID in direct API
+                            call_id=call_id,
                         )
                     )
 
@@ -485,15 +572,17 @@ def create_dispatcher(
     api_key: str = "",
     base_url: str | None = None,
     debug: bool = False,
+    config_dir: str | None = None,
 ) -> "OpenAICompatibleDispatcher | AnthropicDispatcher | GoogleDispatcher":
     """
     Factory: return the correct dispatcher for the given AI mode.
 
     Args:
-        mode:     One of the AIMode values from const.py.
-        api_key:  Provider API key (empty string for local endpoints).
-        base_url: Optional endpoint override (for Ollama / LM Studio).
-        debug:    Enable client-side prompt logging.
+        mode:       One of the AIMode values from const.py.
+        api_key:    Provider API key (empty string for local endpoints).
+        base_url:   Optional endpoint override (for Ollama / LM Studio).
+        debug:      Enable client-side prompt logging.
+        config_dir: HA config directory for debug log files (task-1410).
 
     Raises:
         ValueError: If mode is not a recognised BYOK or Local mode.
@@ -503,11 +592,12 @@ def create_dispatcher(
             api_key=api_key or "ollama",  # local endpoints don't need a real key
             base_url=base_url,
             debug=debug,
+            config_dir=config_dir,
         )
     if mode == "byok-anthropic":
-        return AnthropicDispatcher(api_key=api_key, debug=debug)
+        return AnthropicDispatcher(api_key=api_key, debug=debug, config_dir=config_dir)
     if mode == "byok-gemini":
-        return GoogleDispatcher(api_key=api_key, debug=debug)
+        return GoogleDispatcher(api_key=api_key, debug=debug, config_dir=config_dir)
     raise ValueError(
         f"Unknown AI mode '{mode}'. "
         "Expected one of: byok-openai, byok-anthropic, byok-gemini, "

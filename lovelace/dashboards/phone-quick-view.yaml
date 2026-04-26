@@ -9,12 +9,9 @@
 # Optimised for phones:
 #   - Single column, scrollable
 #   - Kitchen Dashboard card at top (thumb-reach)
+#   - Cooking Mode card (step-by-step when session active)
 #   - Minimal pantry summary (top expiry items only)
 #   - Quick-access shopping list toggle
-#
-# Known v1 limitation:
-#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included.
-#   It is blocked on the cooking session resource (task-1396, Phase 3).
 # ============================================================
 
 title: "Culiplan"
@@ -52,6 +49,14 @@ views:
           - entity: sensor.culiplan_expiring_pantry
             name: "Expiring"
             icon: mdi:clock-alert-outline
+
+      # Cooking Mode — Phase 3 (task-1383)
+      # Shows step list + timers when cooking. Falls back to "Start cooking" CTA.
+      - type: custom:flavorplan-cooking-mode
+        entity: sensor.culiplan_active_cooking_session
+        title: "Cooking"
+        show_step_numbers: true
+        max_timers: 2
 
       # Pantry — compact view for phone (max 6 tiles)
       - type: custom:flavorplan-pantry-tracker

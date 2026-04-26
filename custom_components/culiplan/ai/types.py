@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+# homeassistant is available at runtime in HA; guard the import so the module
+# can still be imported in plain-pytest environments where HA isn't installed.
+try:
+    from homeassistant.exceptions import HomeAssistantError as _HomeAssistantError
+except ImportError:  # pragma: no cover
+    _HomeAssistantError = Exception  # type: ignore[misc,assignment]
+
 
 # ─── Prompt envelope ──────────────────────────────────────────────────────────
 
@@ -101,3 +108,25 @@ class ProviderAuthError(DispatcherError):
 
 class ProviderUnavailableError(DispatcherError):
     """Provider returned 5xx or network error (retry once then surface Repairs)."""
+
+
+# ─── API / premium errors (shared between api.py and services.py) ─────────────
+
+class PremiumRequiredError(_HomeAssistantError):
+    """
+    Raised when a premium-gated feature is invoked by a free-tier user.
+
+    Populated from the structured 403 body returned by the Flavorplan backend:
+        {"error": "premium_required", "feature": "ai.suggestion",
+         "upgradeUrl": "https://culiplan.com/premium?source=ha"}
+
+    Both api.py (raises) and services.py (catches) import this from here to
+    avoid circular imports (task-1416).
+    """
+
+    def __init__(self, feature: str, upgrade_url: str) -> None:
+        self.feature = feature
+        self.upgrade_url = upgrade_url
+        super().__init__(
+            f"'{feature}' requires Flavorplan Premium. Upgrade at: {upgrade_url}"
+        )
