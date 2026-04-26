@@ -10,6 +10,9 @@ Pantry / household services (tasks 1376, 1378, 1379):
     flavorplan.pantry_expiring_items     — list expiring items (free)
     flavorplan.scale_tonight_servings    — presence-based serving scale (PREMIUM)
 
+Blueprint generation service (task 1400):
+    flavorplan.generate_blueprint        — AI-composed HA blueprint (PREMIUM for Cloud AI)
+
 Architecture:
     - Tier rules live ONLY on the backend (§11.1.5). Premium-gated services
       receive a structured 403 → PremiumRequiredError → Repairs upsell.
@@ -55,6 +58,9 @@ SERVICE_PANTRY_DECREMENT = "pantry_decrement"
 SERVICE_PANTRY_EXPIRING = "pantry_expiring_items"
 SERVICE_SCALE_TONIGHT_SERVINGS = "scale_tonight_servings"
 
+# Blueprint generation service (task-1400)
+SERVICE_GENERATE_BLUEPRINT = "generate_blueprint"
+
 SUGGEST_MEAL_SCHEMA = vol.Schema({
     vol.Optional("constraints"): str,
     vol.Optional("meal_slot"): vol.In(["breakfast", "lunch", "dinner", "snack"]),
@@ -81,6 +87,16 @@ SCALE_TONIGHT_SERVINGS_SCHEMA = vol.Schema({
         vol.Coerce(int), vol.Range(min=1, max=100)
     ),
     vol.Optional("plan_date"): str,
+})
+
+GENERATE_BLUEPRINT_SCHEMA = vol.Schema({
+    vol.Required("prompt"): vol.All(str, vol.Length(min=5, max=2000)),
+    vol.Optional("available_entities"): vol.All(
+        list,
+        vol.Length(max=100),
+        [str],
+    ),
+    vol.Optional("install", default=False): bool,
 })
 
 
@@ -425,12 +441,22 @@ def async_register_services(hass: HomeAssistant) -> None:
             async_create_premium_repair(hass, exc.feature, exc.upgrade_url)
             raise
 
+    # Blueprint generation service (task-1400)
+    from .blueprint_generator import handle_generate_blueprint as _handle_bp_gen
+
+    async def handle_generate_blueprint(call: ServiceCall) -> None:
+        entry_id = _find_entry_id(hass)
+        if not entry_id:
+            raise HomeAssistantError("Flavorplan is not configured.")
+        await _handle_bp_gen(hass, call, entry_id)
+
     registrations = [
         (SERVICE_SUGGEST_MEAL, handle_suggest_meal, SUGGEST_MEAL_SCHEMA),
         (SERVICE_FILL_SHOPPING_LIST, handle_fill_shopping_list, FILL_SHOPPING_LIST_SCHEMA),
         (SERVICE_PANTRY_DECREMENT, handle_pantry_decrement, PANTRY_DECREMENT_SCHEMA),
         (SERVICE_PANTRY_EXPIRING, handle_pantry_expiring, PANTRY_EXPIRING_SCHEMA),
         (SERVICE_SCALE_TONIGHT_SERVINGS, handle_scale_tonight_servings, SCALE_TONIGHT_SERVINGS_SCHEMA),
+        (SERVICE_GENERATE_BLUEPRINT, handle_generate_blueprint, GENERATE_BLUEPRINT_SCHEMA),
     ]
     for name, handler, schema in registrations:
         if not hass.services.has_service(DOMAIN, name):
@@ -445,6 +471,7 @@ def async_unregister_services(hass: HomeAssistant) -> None:
         SERVICE_PANTRY_DECREMENT,
         SERVICE_PANTRY_EXPIRING,
         SERVICE_SCALE_TONIGHT_SERVINGS,
+        SERVICE_GENERATE_BLUEPRINT,
     ):
         if hass.services.has_service(DOMAIN, name):
             hass.services.async_remove(DOMAIN, name)

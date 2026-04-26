@@ -1,4 +1,4 @@
-# Flavorplan HA service descriptions (Phase 2 — tasks 1376, 1378, 1379)
+# Flavorplan HA service descriptions (Phase 2 — tasks 1376, 1378, 1379; Phase 3 — task 1400)
 # Used by the Home Assistant UI to show service descriptions and field hints.
 
 pantry_decrement:
@@ -75,3 +75,51 @@ scale_tonight_servings:
       required: false
       selector:
         date: {}
+
+generate_blueprint:
+  name: Generate automation blueprint
+  description: >
+    Generates a Home Assistant automation blueprint YAML from a natural language
+    description using Flavorplan AI.
+
+    **Cloud AI mode**: Flavorplan generates the YAML server-side.
+    **Requires Flavorplan Premium** for Cloud AI mode; free for BYOK / Local AI.
+
+    **BYOK / Local AI mode**: The backend returns a prompt envelope only; your
+    locally-configured AI model generates the YAML. Your API key never leaves
+    Home Assistant.
+
+    On success fires the ``culiplan_blueprint_generated`` event with the YAML and
+    validation result. If ``install`` is true and the blueprint passes validation,
+    the YAML is written to ``config/blueprints/automation/culiplan/`` and HA
+    blueprints are reloaded automatically.
+  fields:
+    prompt:
+      name: Prompt
+      description: >
+        Natural language description of the automation you want to create.
+        For example: "Notify me at 7am with today's meal plan".
+      required: true
+      selector:
+        text:
+          multiline: true
+    available_entities:
+      name: Available entities (optional)
+      description: >
+        List of entity IDs available in your Home Assistant install.
+        When provided, the AI can reference specific entities in the blueprint.
+        Maximum 100 entities.
+      required: false
+      selector:
+        object: {}
+    install:
+      name: Install blueprint
+      description: >
+        When true, write the generated blueprint YAML to
+        config/blueprints/automation/culiplan/ and reload HA blueprints.
+        Only takes effect when the blueprint passes validation.
+        Defaults to false.
+      required: false
+      default: false
+      selector:
+        boolean: {}
