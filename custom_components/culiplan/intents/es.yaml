@@ -40,6 +40,30 @@ intents:
           - "¿qué vence pronto?"
           - "¿qué debo usar pronto?"
           - "¿qué está a punto de caducar?"
+  FlavorplanNextCookingStep:
+    data:
+      - sentences:
+          - "siguiente paso"
+          - "próximo paso"
+          - "¿cuál es el siguiente paso?"
+          - "continuar cocinando"
+  FlavorplanSetRecipeTimer:
+    data:
+      - sentences:
+          - "iniciar el temporizador {label} [de] {duration_sec} segundos"
+          - "iniciar el temporizador {label}"
+          - "poner un temporizador {label} [de] {duration_sec} segundos"
+          - "poner un temporizador para {label}"
+        slots:
+          label: "{label}"
+          duration_sec: "{duration_sec}"
+  FlavorplanCancelRecipeTimer:
+    data:
+      - sentences:
+          - "cancelar el temporizador {label}"
+          - "detener el temporizador {label}"
+        slots:
+          label: "{label}"
 
 responses:
   intents:
@@ -49,3 +73,6 @@ responses:
     FlavorplanAddToShoppingList: "{{ slots.item }} agregado a tu lista de compras."
     FlavorplanWhatsInPantry: "{{ response }}"
     FlavorplanWhatsExpiringSoon: "{{ response }}"
+    FlavorplanNextCookingStep: "Avanzando al siguiente paso de cocina."
+    FlavorplanSetRecipeTimer: "Temporizador {{ slots.label }} iniciado."
+    FlavorplanCancelRecipeTimer: "Temporizador {{ slots.label }} cancelado."

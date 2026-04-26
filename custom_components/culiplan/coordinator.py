@@ -157,6 +157,11 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # task-1380 AC#3 — live update; trigger coordinator listeners so
             # DinnerPartyActiveBinarySensor.async_update() is scheduled.
             self.async_set_updated_data(self.data or {})
+        elif event_type in ("cooking.session.updated", "cooking.session.started",
+                            "cooking.session.completed"):
+            # task-1397 — re-fetch active session and sync HA timer entities.
+            # ID-only payload (§14.3); the full session is re-fetched here.
+            await self._refresh_cooking_session()
 
     async def _refresh_meal_plans(self) -> None:
         try:
@@ -178,6 +183,42 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_set_updated_data({**(self.data or {}), "pantry_items": pantry_items})
         except Exception as err:
             _LOGGER.error("Failed to refresh pantry items: %s", err)
+
+    async def _refresh_cooking_session(self) -> None:
+        """Re-fetch the active cooking session and sync HA timer entities.
+
+        Called when the coordinator receives a cooking.session.* event.
+        Timer sync is a best-effort operation; failures are logged, not raised.
+        """
+        try:
+            # Import here to avoid circular imports between coordinator and
+            # cooking_services (cooking_services imports from api, not coordinator).
+            from .cooking_services import sync_ha_timers  # noqa: PLC0415
+
+            sessions = await self.client.async_get(
+                "/api/cooking-sessions?status=active&limit=1"
+            )
+            if isinstance(sessions, list):
+                items = sessions
+            elif isinstance(sessions, dict):
+                items = sessions.get("sessions", sessions.get("data", []))
+            else:
+                items = []
+
+            if items:
+                session = items[0]
+                await sync_ha_timers(self.hass, session)
+                # Update coordinator data so Lovelace card can refresh.
+                self.async_set_updated_data(
+                    {**(self.data or {}), "active_cooking_session": session}
+                )
+            else:
+                # Session ended — clear from coordinator data.
+                self.async_set_updated_data(
+                    {**(self.data or {}), "active_cooking_session": None}
+                )
+        except Exception as err:
+            _LOGGER.error("Failed to refresh cooking session: %s", err)
 
     # ─── Reconnect logic ─────────────────────────────────────────────────────
 

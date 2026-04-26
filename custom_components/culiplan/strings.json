@@ -99,6 +99,36 @@
       "rollback_failed": "The rollback request failed. Please try again or contact Flavorplan support."
     }
   },
+  "services": {
+    "start_cooking_mode": {
+      "name": "Start cooking mode",
+      "description": "Starts a guided cooking session for the given recipe."
+    },
+    "advance_cooking_step": {
+      "name": "Advance to next cooking step",
+      "description": "Moves the active cooking session forward by one step."
+    },
+    "set_recipe_timer": {
+      "name": "Set a recipe timer",
+      "description": "Adds a named timer to the active cooking session and starts the HA timer entity."
+    },
+    "cancel_recipe_timer": {
+      "name": "Cancel a recipe timer",
+      "description": "Removes a named timer from the active cooking session."
+    },
+    "pause_cooking_mode": {
+      "name": "Pause cooking mode",
+      "description": "Pauses the active cooking session."
+    },
+    "resume_cooking_mode": {
+      "name": "Resume cooking mode",
+      "description": "Resumes the most recently paused cooking session."
+    },
+    "complete_cooking_mode": {
+      "name": "Complete cooking mode",
+      "description": "Marks the active cooking session as completed."
+    }
+  },
   "issues": {
     "reauth_required": {
       "title": "Re-authentication required for Flavorplan",

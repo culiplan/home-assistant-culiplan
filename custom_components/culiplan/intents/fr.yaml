@@ -39,6 +39,30 @@ intents:
       - sentences:
           - "qu'est-ce qui expire bientôt"
           - "qu'est-ce que je dois utiliser rapidement"
+  FlavorplanNextCookingStep:
+    data:
+      - sentences:
+          - "étape suivante"
+          - "prochaine étape"
+          - "quelle est la prochaine étape"
+          - "continuer à cuisiner"
+  FlavorplanSetRecipeTimer:
+    data:
+      - sentences:
+          - "démarrer le minuteur {label} [pour] {duration_sec} secondes"
+          - "démarrer le minuteur {label}"
+          - "mettre un minuteur {label} [pour] {duration_sec} secondes"
+          - "mettre un minuteur pour {label}"
+        slots:
+          label: "{label}"
+          duration_sec: "{duration_sec}"
+  FlavorplanCancelRecipeTimer:
+    data:
+      - sentences:
+          - "annuler le minuteur {label}"
+          - "arrêter le minuteur {label}"
+        slots:
+          label: "{label}"
 
 responses:
   intents:
@@ -48,3 +72,6 @@ responses:
     FlavorplanAddToShoppingList: "{{ slots.item }} ajouté à ta liste de courses."
     FlavorplanWhatsInPantry: "{{ response }}"
     FlavorplanWhatsExpiringSoon: "{{ response }}"
+    FlavorplanNextCookingStep: "Passage à l'étape suivante."
+    FlavorplanSetRecipeTimer: "Minuteur {{ slots.label }} démarré."
+    FlavorplanCancelRecipeTimer: "Minuteur {{ slots.label }} annulé."

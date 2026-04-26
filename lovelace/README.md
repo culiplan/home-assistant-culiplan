@@ -19,10 +19,12 @@ the integration is installed.
 The `flavorplan-cooking-mode` card (Phase 3, task-1383) reads the active cooking session from
 `sensor.culiplan_active_cooking_session`. It requires:
 - The Culiplan backend `/api/cooking-sessions` endpoint (task-1396, shipped in Phase 3).
-- The `culiplan.advance_cooking_step` HA service (task-1397, ships in Phase 3).
+- The `culiplan.advance_cooking_step` HA service (task-1397, shipped in Phase 3).
 - A `sensor.culiplan_active_cooking_session` entity exposed by the coordinator.
 
-When no session is active the card shows a graceful "Start cooking from a recipe" CTA.
+When no session is active the card shows a graceful "Start cooking from a recipe" CTA. Call
+`culiplan.start_cooking_mode` from Assist or a dashboard button to begin a session. All three
+cards auto-register as Lovelace resources on integration setup (task-1408).
 
 ---
 
@@ -52,19 +54,26 @@ card_mod:
 ### Via HACS (recommended — automatic)
 
 The cards load automatically when the Culiplan integration is installed via HACS.
-The integration's `__init__.py` registers the JS resources and CSS tokens file as Lovelace
-resources on first setup. No manual steps required.
+The integration's `__init__.py` (`_async_register_lovelace_resources`) registers all three
+card JS files as Lovelace resources on first setup. No manual steps required.
+
+Resources are registered under the HACS-standard path `/hacsfiles/culiplan/...` which HACS
+populates automatically from the integration repo's `lovelace/cards/dist/` directory.
+
+On integration reload the registration is idempotent — cards already registered are not
+re-added. Resources are intentionally **not removed** when the integration is unloaded: doing
+so would break any dashboard the user has configured. If you want to remove the cards, delete
+them manually via **HA Settings → Dashboards → Resources**.
 
 ### Manual resource registration
 
-If you installed the integration manually (not via HACS), add the following to your
-`configuration.yaml` under `lovelace:resources:` (or use the HA Dashboard Resources UI):
+If you installed the integration manually (not via HACS), the auto-registration will fail
+gracefully (logged as a warning) and you must add the resources yourself. Copy the `lovelace/`
+directory to `config/www/culiplan/lovelace/` in your HA config directory, then add:
 
 ```yaml
 lovelace:
   resources:
-    - url: /local/culiplan/lovelace/tokens.css
-      type: css
     - url: /local/culiplan/lovelace/cards/dist/kitchen-dashboard.js
       type: module
     - url: /local/culiplan/lovelace/cards/dist/pantry-tracker.js
@@ -73,7 +82,7 @@ lovelace:
       type: module
 ```
 
-Copy the `lovelace/` directory to `config/www/culiplan/lovelace/` in your HA config directory.
+Or use the HA Dashboard Resources UI (**Settings → Dashboards → Resources**).
 
 ---
 
