@@ -6,23 +6,44 @@
 
 Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home Assistant.
 
-> **Beta notice** — This is a pre-release. Calendar, to-do, and sensor entities are live;
-> Lovelace cards and advanced AI services ship in a later HACS release.
-> Report issues at [GitHub Issues](https://github.com/culiplan/home-assistant-culiplan/issues).
+> **Phase 2** — Calendar, to-do, sensor entities, Assist intents and the Lovelace card pack
+> (Kitchen Dashboard + Pantry Tracker) are live. Advanced AI services and Cooking Mode card
+> ship in Phase 3. Report issues at [GitHub Issues](https://github.com/culiplan/home-assistant-culiplan/issues).
 
 ---
 
-## Features (v0.1 beta)
+## Features
+
+### Entities
 
 | Entity | Description |
 |---|---|
-| `calendar.flavorplan_meal_plan` | One event per planned meal; dinner-party events included |
-| `todo.flavorplan_shopping_list` | Active shopping list — items can be checked off or added |
-| `sensor.flavorplan_meals_today` | Number of meals planned today |
-| `sensor.flavorplan_shopping_items` | Count of unchecked shopping list items |
-| `sensor.flavorplan_expiring_pantry` | Pantry items expiring within 3 days |
+| `calendar.culiplan_meal_plan` | One event per planned meal; dinner-party events included |
+| `todo.culiplan_shopping_list` | Active shopping list — items can be checked off or added |
+| `sensor.culiplan_meals_today` | Number of meals planned today |
+| `sensor.culiplan_shopping_items` | Count of unchecked shopping list items |
+| `sensor.culiplan_expiring_pantry` | Pantry items expiring within 3 days |
 
 Voice (Assist): say "Add bread to the shopping list" or "What's for dinner tonight?" once the integration is linked.
+
+### Lovelace Card Pack (Phase 2)
+
+Three custom cards with Culiplan's mobile design language, installed automatically alongside
+the integration. See [lovelace/README.md](lovelace/README.md) for installation details.
+
+| Card | Type | Description |
+|---|---|---|
+| Kitchen Dashboard | `custom:flavorplan-kitchen-dashboard` | Today's meals with recipe image, servings, time and shopping shortcut |
+| Pantry Tracker | `custom:flavorplan-pantry-tracker` | Tile grid with expiry warnings, low-stock indicator and inline actions |
+| Cooking Mode | `custom:flavorplan-cooking-mode` | _(Phase 3 — blocked on cooking session resource)_ |
+
+**Three pre-configured dashboard YAMLs** ship in `lovelace/dashboards/`:
+- `kitchen-tablet.yaml` — 10" landscape tablet, three-column layout
+- `phone-quick-view.yaml` — single-column mobile view
+- `voice-pe-companion.yaml` — wall display / Voice PE companion
+
+**Design tokens** (`lovelace/tokens.css`) are `:root`-scoped so users can override the brand
+colour and any token via [card-mod](https://github.com/thomasloven/lovelace-card-mod).
 
 ---
 

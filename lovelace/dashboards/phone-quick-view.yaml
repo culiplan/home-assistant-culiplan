@@ -1,0 +1,74 @@
+# ============================================================
+# Culiplan — Phone Quick-View Dashboard
+# Layout: single-column mobile (360–430 px viewport)
+#
+# Install:
+#   Home Assistant → Dashboards → Add Dashboard → Take Control
+#   Paste this file's contents into the RAW configuration editor.
+#
+# Optimised for phones:
+#   - Single column, scrollable
+#   - Kitchen Dashboard card at top (thumb-reach)
+#   - Minimal pantry summary (top expiry items only)
+#   - Quick-access shopping list toggle
+#
+# Known v1 limitation:
+#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included.
+#   It is blocked on the cooking session resource (task-1396, Phase 3).
+# ============================================================
+
+title: "Culiplan"
+icon: mdi:food-apple
+path: culiplan-phone
+theme: default
+
+views:
+  - title: "Today"
+    path: today
+    icon: mdi:calendar-today
+
+    cards:
+      # Today's meal plan — primary card, top of scroll
+      - type: custom:flavorplan-kitchen-dashboard
+        entity: calendar.culiplan_meal_plan
+        shopping_entity: todo.culiplan_shopping_list
+        title: "What's for Dinner?"
+        show_shopping: true
+        max_meals: 2
+
+      # Quick-stats row
+      - type: glance
+        show_name: true
+        show_icon: true
+        show_state: true
+        columns: 3
+        entities:
+          - entity: sensor.culiplan_meals_today
+            name: "Meals"
+            icon: mdi:food-variant
+          - entity: sensor.culiplan_shopping_items
+            name: "Shopping"
+            icon: mdi:cart
+          - entity: sensor.culiplan_expiring_pantry
+            name: "Expiring"
+            icon: mdi:clock-alert-outline
+
+      # Pantry — compact view for phone (max 6 tiles)
+      - type: custom:flavorplan-pantry-tracker
+        entity: sensor.culiplan_expiring_pantry
+        shopping_entity: todo.culiplan_shopping_list
+        title: "Pantry"
+        max_items: 6
+
+      # Shopping list — collapsible on phone
+      - type: todo-list
+        title: "Shopping list"
+        entity: todo.culiplan_shopping_list
+
+      # Meal plan calendar — week strip at bottom
+      - type: calendar
+        title: "This week"
+        entities:
+          - entity: calendar.culiplan_meal_plan
+            name: "Meal plan"
+        initial_view: listWeek

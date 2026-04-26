@@ -1,0 +1,182 @@
+"""
+AI service orchestration layer (task-1387 + task-1388 + task-1389).
+
+The service layer sits between HA service calls and the dispatcher classes:
+
+    1. HA service call (e.g. flavorplan.suggest_meal)
+    2. → service.py: fetch prompt envelope from Flavorplan backend
+    3. → dispatchers.py: execute AI call locally (key never leaves HA)
+    4. ← dispatcher returns DispatchResult with optional tool_calls
+    5. If tool_calls: call Flavorplan API via OAuth-scoped REST to execute them
+    6. Loop back to dispatcher with tool results (multi-turn function-calling)
+    7. Return final text to HA notification / Assist response
+
+Architecture (§13.2):
+    - For BYOK / Local modes, the backend's job ends at step 2.
+    - Flavorplan never sees the AI response content — only tool-call args
+      (which are scoped data operations, not freeform content).
+
+Streaming: deferred to v2.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from .dispatchers import (
+    AnthropicDispatcher,
+    GoogleDispatcher,
+    OpenAICompatibleDispatcher,
+    create_dispatcher,
+)
+from .types import (
+    DispatchResult,
+    DispatcherError,
+    PromptEnvelope,
+    ProviderAuthError,
+    ProviderRateLimitError,
+    ProviderUnavailableError,
+    ToolCall,
+    ToolResult,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+_MAX_TOOL_TURNS = 10  # guard against runaway function-calling loops
+
+
+class AIDispatchService:
+    """
+    Orchestrates AI calls across all three execution modes.
+
+    Usage:
+        service = AIDispatchService(
+            mode="byok-anthropic",
+            api_key=stored_key,        # from HA secrets store
+            flavorplan_client=client,  # FlavorplanApiClient
+        )
+        result = await service.run_intent("suggest_meal", {"mealSlot": "dinner"})
+    """
+
+    def __init__(
+        self,
+        mode: str,
+        flavorplan_client: Any,
+        api_key: str = "",
+        base_url: str | None = None,
+        debug: bool = False,
+    ) -> None:
+        self._mode = mode
+        self._client = flavorplan_client
+        self._debug = debug
+        self._dispatcher = create_dispatcher(
+            mode=mode,
+            api_key=api_key,
+            base_url=base_url,
+            debug=debug,
+        )
+
+    async def fetch_envelope(
+        self, intent: str, params: dict[str, Any] | None = None
+    ) -> PromptEnvelope:
+        """
+        Fetch the prompt envelope from the Flavorplan backend.
+
+        POST /api/ai/envelope — backend builds the prompt with live user context
+        (pantry, meal plan, dietary info).  No AI keys are sent or accepted.
+        """
+        raw = await self._client.async_post(
+            "/api/ai/envelope",
+            {
+                "intent": intent,
+                "params": params or {},
+                "aiProviderMode": self._mode,
+            },
+        )
+        return PromptEnvelope.from_dict(raw)
+
+    async def execute_tool_call(self, tool_call: ToolCall) -> Any:
+        """
+        Execute a single tool call via the Flavorplan OAuth-scoped REST API.
+
+        Tool calls route back to the backend as standard data operations.
+        This is the only path through which AI responses touch Flavorplan
+        infrastructure — and only the structured tool-call args are sent
+        (no freeform prompt or response content, per §13.6).
+        """
+        return await self._client.async_call_voice_tool(
+            tool_call.name, tool_call.params
+        )
+
+    async def run_intent(
+        self, intent: str, params: dict[str, Any] | None = None
+    ) -> DispatchResult:
+        """
+        Execute a full intent, including multi-turn function-calling.
+
+        Steps:
+          1. Fetch prompt envelope from backend.
+          2. Call AI provider with envelope (locally, key never leaves HA).
+          3. If model requests tool calls, execute them via Flavorplan API.
+          4. Loop until final text response or _MAX_TOOL_TURNS reached.
+
+        Returns:
+            DispatchResult with the final text response.
+
+        Raises:
+            ProviderAuthError:       Key is invalid or expired.
+            ProviderRateLimitError:  Provider rate-limited us.
+            ProviderUnavailableError: Provider 5xx (one retry already done upstream).
+            DispatcherError:         Other provider-level error.
+        """
+        envelope = await self.fetch_envelope(intent, params)
+
+        current_result: DispatchResult | None = None
+        tool_results: list[ToolResult] | None = None
+
+        for turn in range(_MAX_TOOL_TURNS):
+            current_result = await self._dispatcher.dispatch(envelope, tool_results)
+
+            if current_result.is_final:
+                _LOGGER.debug(
+                    "[culiplan][ai-service] Intent '%s' completed in %d turn(s). "
+                    "Mode: %s",
+                    intent, turn + 1, self._mode,
+                )
+                return current_result
+
+            if not current_result.tool_calls:
+                # No text and no tool calls — treat as empty response
+                break
+
+            # Execute all tool calls and collect results
+            tool_results = []
+            for tc in current_result.tool_calls:
+                _LOGGER.debug(
+                    "[culiplan][ai-service] Executing tool '%s' (call_id=%s)",
+                    tc.name, tc.call_id,
+                )
+                try:
+                    result_data = await self.execute_tool_call(tc)
+                except Exception as exc:
+                    _LOGGER.warning(
+                        "[culiplan][ai-service] Tool '%s' failed: %s",
+                        tc.name, exc,
+                    )
+                    result_data = {"error": str(exc)}
+
+                tool_results.append(
+                    ToolResult(
+                        call_id=tc.call_id,
+                        tool_name=tc.name,
+                        content=result_data,
+                    )
+                )
+
+        _LOGGER.warning(
+            "[culiplan][ai-service] Intent '%s' did not resolve after %d turns. "
+            "Returning last result.",
+            intent, _MAX_TOOL_TURNS,
+        )
+        return current_result or DispatchResult(text=None)

@@ -5,9 +5,17 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 dist/
+# Exception: Lovelace pre-built JS bundles must be committed (HA loads them directly)
+!lovelace/cards/dist/
+!lovelace/cards/dist/*.js
 .env
 .venv/
 venv/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Node dependencies (Lovelace card build pipeline)
+node_modules/
+pnpm-debug.log
+.pnpm-store/

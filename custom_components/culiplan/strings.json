@@ -29,7 +29,11 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_api_key": "Invalid API key — please check the key and try again.",
       "invalid_endpoint": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "byok_provider_required": "Please select an AI provider for BYOK mode.",
+      "byok_key_required": "An API key is required for BYOK mode.",
+      "byok_key_invalid": "The API key is invalid or was rejected by the provider. Please check your key and try again. Detail: {error_detail}",
+      "byok_validation_error": "An unexpected error occurred while validating the key. Please try again. Detail: {error_detail}"
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_account%]",
@@ -41,6 +45,18 @@
     "reauth_required": {
       "title": "Re-authentication required for Flavorplan",
       "description": "Your Flavorplan session has expired. [Re-authenticate your account]({url})."
+    },
+    "premium_required": {
+      "title": "{title}",
+      "description": "{description}\n\n[Upgrade on Flavorplan]({upgrade_url})",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Upgrade Flavorplan",
+            "description": "To use **{feature}**, you need a Flavorplan Premium subscription.\n\n[Open upgrade page]({upgrade_url})"
+          }
+        }
+      }
     }
   }
 }
