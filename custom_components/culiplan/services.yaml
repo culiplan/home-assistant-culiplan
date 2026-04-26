@@ -1,0 +1,77 @@
+# Flavorplan HA service descriptions (Phase 2 — tasks 1376, 1378, 1379)
+# Used by the Home Assistant UI to show service descriptions and field hints.
+
+pantry_decrement:
+  name: Decrement pantry item
+  description: >
+    Decrements stock for the pantry item identified by the given barcode.
+    Uses FEFO (First Expired First Out) logic. If the item is not found, a
+    Repairs issue is created prompting you to add it in Flavorplan.
+    Free tier — no Flavorplan Premium required.
+  fields:
+    barcode:
+      name: Barcode
+      description: >
+        Product barcode (EAN-8, EAN-13, UPC-A, or UPC-E). Hyphens and spaces
+        are stripped automatically.
+      required: true
+      selector:
+        text: {}
+    qty:
+      name: Quantity
+      description: How many units to remove from stock. Defaults to 1.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 100
+          step: 0.1
+          mode: box
+
+pantry_expiring_items:
+  name: Get expiring pantry items
+  description: >
+    Fetches the list of pantry items expiring within the given window and fires
+    a `culiplan_pantry_expiring_result` HA event with the item IDs.
+    Free tier — no Flavorplan Premium required.
+  fields:
+    window_hours:
+      name: Expiry window (hours)
+      description: >
+        How many hours ahead to check for expiring items. Defaults to 48.
+      required: false
+      default: 48
+      selector:
+        number:
+          min: 1
+          max: 720
+          step: 1
+          unit_of_measurement: h
+          mode: box
+
+scale_tonight_servings:
+  name: Scale tonight's servings
+  description: >
+    Records the number of household members currently home and updates tonight's
+    meal plan so Flavorplan can display ingredient quantities scaled to the
+    present count.
+    **Requires Flavorplan Premium.** Free users will see a Repairs upsell issue.
+  fields:
+    present_count:
+      name: Present count
+      description: Number of household members currently home.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          mode: box
+    plan_date:
+      name: Plan date (optional)
+      description: >
+        Date to scale servings for (YYYY-MM-DD). Defaults to today.
+      required: false
+      selector:
+        date: {}

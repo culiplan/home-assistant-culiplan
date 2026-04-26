@@ -153,6 +153,10 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._refresh_shopping_lists()
         elif event_type.startswith("pantry.item."):
             await self._refresh_pantry()
+        elif event_type == "dinner_party.updated":
+            # task-1380 AC#3 — live update; trigger coordinator listeners so
+            # DinnerPartyActiveBinarySensor.async_update() is scheduled.
+            self.async_set_updated_data(self.data or {})
 
     async def _refresh_meal_plans(self) -> None:
         try:

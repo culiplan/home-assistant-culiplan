@@ -1,0 +1,52 @@
+blueprint:
+  name: "Flavorplan: Scale tonight's servings from household presence"
+  description: >
+    When the number of household members home changes, this automation calls
+    `flavorplan.scale_tonight_servings` with the current count so Flavorplan
+    can adjust the recipe quantities for tonight's dinner.
+
+    **Requires Flavorplan Premium** — free users will see a HA Repairs upsell
+    issue with an upgrade link.
+
+    Wire your `person.*` entities (or a custom sensor that counts them) to this
+    blueprint. Example: use a template sensor that counts how many `person.*`
+    entities are `home`.
+  domain: automation
+  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/presence-scale-servings.yaml
+  input:
+    presence_sensor:
+      name: Household presence count sensor
+      description: >
+        A sensor whose state equals the number of household members currently
+        home. You can create one with a template sensor:
+
+        ```yaml
+        template:
+          - sensor:
+              - name: "Household members home"
+                state: >
+                  {{ states.person | selectattr('state', 'eq', 'home') | list | count }}
+        ```
+      selector:
+        entity:
+          domain: sensor
+
+trigger:
+  - platform: state
+    entity_id: !input presence_sensor
+
+condition:
+  # Only trigger during dinner prep time (15:00–20:00) to avoid spurious updates
+  - condition: time
+    after: "15:00:00"
+    before: "20:00:00"
+  - condition: template
+    value_template: "{{ trigger.to_state.state | int(0) > 0 }}"
+
+action:
+  - service: flavorplan.scale_tonight_servings
+    data:
+      present_count: "{{ trigger.to_state.state | int }}"
+
+mode: single
+max_exceeded: silent

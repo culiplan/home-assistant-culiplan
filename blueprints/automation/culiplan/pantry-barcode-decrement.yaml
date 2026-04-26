@@ -1,0 +1,49 @@
+blueprint:
+  name: "Flavorplan: Pantry decrement on barcode scan"
+  description: >
+    When a barcode scanner fires an event in Home Assistant, this automation
+    calls the `flavorplan.pantry_decrement` service to remove one unit of the
+    scanned item from your Flavorplan pantry. If the item is not found, a
+    HA Repairs issue is created automatically so you can add it. The pantry
+    sensor and UI refresh in real-time via the Flavorplan WebSocket feed.
+
+    **Prerequisites**: Flavorplan integration installed and connected.
+    **Free tier**: Yes — no Flavorplan Premium required.
+  domain: automation
+  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-barcode-decrement.yaml
+  input:
+    barcode_event:
+      name: Barcode scan event
+      description: >
+        The Home Assistant event that fires when the barcode scanner reads a
+        code. The event data must include a `barcode` field containing the
+        product barcode (EAN-8, EAN-13, UPC-A, or UPC-E format).
+      default: "barcode_scanned"
+      selector:
+        text: {}
+    decrement_qty:
+      name: Quantity to decrement
+      description: How many units to remove from stock. Defaults to 1.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 100
+          step: 0.1
+          mode: box
+
+variables:
+  qty: !input decrement_qty
+
+trigger:
+  - platform: event
+    event_type: !input barcode_event
+
+action:
+  - service: flavorplan.pantry_decrement
+    data:
+      barcode: "{{ trigger.event.data.barcode }}"
+      qty: "{{ qty }}"
+
+mode: queued
+max: 5

@@ -1,0 +1,120 @@
+blueprint:
+  name: "Flavorplan: Dinner party pre-arrival ambiance"
+  description: >
+    15 minutes before your Flavorplan dinner party starts, this automation
+    dims the lights and starts your dinner playlist — setting the mood before
+    guests arrive.
+
+    Uses the `binary_sensor.flavorplan_dinner_party_active` entity and the
+    `start_at` attribute to calculate the exact trigger time.
+
+    **Prerequisites**: Flavorplan integration installed and connected.
+    **Free tier**: Yes — no Flavorplan Premium required.
+
+    **How it works**:
+    1. At the time stored in `binary_sensor.flavorplan_dinner_party_active`'s
+       `start_at` attribute minus 15 minutes, the automation fires.
+    2. Lights dim to the configured brightness level.
+    3. Your chosen media player starts the specified playlist.
+  domain: automation
+  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/dinner-party-pre-arrival.yaml
+  input:
+    light_target:
+      name: Lights to dim
+      description: Light or light group to dim before guests arrive.
+      selector:
+        entity:
+          domain: light
+    light_brightness:
+      name: Dim brightness (%)
+      description: Brightness percentage for pre-arrival ambiance.
+      default: 40
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+    light_kelvin:
+      name: Warm colour temperature (K)
+      description: Colour temperature in Kelvin for a warm ambiance.
+      default: 2700
+      selector:
+        number:
+          min: 2000
+          max: 6500
+          step: 100
+          unit_of_measurement: K
+    media_player:
+      name: Media player for playlist (optional)
+      description: Leave empty to skip music.
+      default: ""
+      selector:
+        text: {}
+    playlist_uri:
+      name: Playlist URI (optional)
+      description: >
+        Spotify URI, TuneIn stream, or other media URI to play.
+        E.g. `spotify:playlist:37i9dQZF1DX4PP3DA4J0N8`.
+      default: ""
+      selector:
+        text: {}
+    pre_arrival_minutes:
+      name: Minutes before start to trigger
+      description: How many minutes before the dinner party start time to fire.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: min
+
+variables:
+  start_at: "{{ state_attr('binary_sensor.flavorplan_dinner_party_active', 'start_at') }}"
+  trigger_time: >
+    {% if start_at %}
+      {{ (as_datetime(start_at) - timedelta(minutes=pre_arrival_minutes)).isoformat() }}
+    {% else %}
+      none
+    {% endif %}
+  brightness_pct: !input light_brightness
+  kelvin: !input light_kelvin
+  media: !input media_player
+  playlist: !input playlist_uri
+
+trigger:
+  - platform: template
+    value_template: >
+      {% if start_at and trigger_time != 'none' %}
+        {{ now().isoformat()[:16] == trigger_time[:16] }}
+      {% else %}
+        false
+      {% endif %}
+
+condition:
+  - condition: state
+    entity_id: binary_sensor.flavorplan_dinner_party_active
+    state: "on"
+
+action:
+  - service: light.turn_on
+    target:
+      entity_id: !input light_target
+    data:
+      brightness_pct: "{{ brightness_pct }}"
+      kelvin: "{{ kelvin }}"
+      transition: 30
+
+  - if:
+      - condition: template
+        value_template: "{{ media | trim != '' and playlist | trim != '' }}"
+    then:
+      - service: media_player.play_media
+        target:
+          entity_id: "{{ media }}"
+        data:
+          media_content_id: "{{ playlist }}"
+          media_content_type: "music"
+
+mode: single

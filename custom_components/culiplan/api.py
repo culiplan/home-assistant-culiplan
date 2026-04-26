@@ -70,8 +70,14 @@ class FlavorplanApiClient:
             "/api/voice/ha-assist", {"tool": tool_name, "params": params}
         )
 
+    # ─── Generic helpers (used by AI dispatcher service + Phase 2 services) ──
+
+    async def async_get(self, path: str) -> Any:
+        """Generic GET — used by Phase 2 service layer (tasks 1378, 1380)."""
+        return await self._get(path)
+
     async def async_post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """Generic POST — used by the AI service layer (task-1387)."""
+        """Generic POST — used by AI dispatcher (1387) and Phase 2 services (1376, 1379)."""
         return await self._post(path, payload)
 
     # ─── HTTP helpers ────────────────────────────────────────────────────────
@@ -101,6 +107,26 @@ class FlavorplanApiClient:
                     body_str = await resp.text()
                 raise Exception(f"403 {body_str}")
             resp.raise_for_status()
+            return await resp.json()
+
+    async def _post_raw(self, path: str, payload: dict[str, Any]) -> Any:
+        """POST that preserves error response body in the raised exception message.
+
+        Used by Phase 2 services so structured error bodies (e.g. 403 premium_required,
+        404 PANTRY_ITEM_NOT_FOUND) can be parsed by the service layer.
+        """
+        import json as _json
+        async with self._session.post(
+            f"{BASE_URL}{path}", headers=self._headers(), json=payload
+        ) as resp:
+            self._raise_for_status(resp.status, path)
+            if not resp.ok:
+                try:
+                    body = await resp.json()
+                    body_str = _json.dumps(body)
+                except Exception:
+                    body_str = await resp.text()
+                raise Exception(f"{resp.status} {body_str}")
             return await resp.json()
 
     async def _patch(self, path: str, payload: dict[str, Any]) -> Any:

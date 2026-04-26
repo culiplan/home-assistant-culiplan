@@ -63,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _register_intents(hass, entry)
     async_register_services(hass)
     entry.async_on_unload(coordinator.async_stop)
+    entry.async_on_unload(lambda: async_unregister_services(hass))
     return True
 
 

@@ -1,141 +1,60 @@
 blueprint:
-  name: "Culiplan: Pantry Zero → Shopping List"
+  name: "Flavorplan: Add to shopping list when pantry item depleted"
   description: >
-    When a pantry item hits zero stock (Culiplan fires a `pantry.item.depleted`
-    event), this automation automatically appends the depleted item to your
-    active shopping list and notifies the whole household.
+    When Flavorplan emits a `pantry.item.depleted` event (stock crossed below
+    the configured threshold), this automation appends the item to your active
+    shopping list and optionally sends a push notification to the household.
 
-    **How it works**
+    The threshold is configured per-item in the Flavorplan app. This blueprint
+    wires the event to your preferred notification target.
 
-    Culiplan's HA integration publishes a `culiplan_event` event on the HA
-    event bus whenever a pantry item is marked as depleted. This blueprint
-    listens for that event, extracts the item name from the event payload, adds
-    it to the configured HA `todo` entity (your Culiplan shopping list), and
-    sends an optional notification to one or more `notify.*` services.
-
-    **Requirements**
-
-    - Culiplan integration installed and connected
-    - `todo.culiplan_shopping_list` entity available (registered by the
-      integration automatically)
-
-    **Tips**
-
-    - Use a `notify.mobile_app_*` service to push directly to household phones.
-    - Use a `notify.alexa_media_*` or `notify.google_home_*` service for a
-      spoken announcement in the kitchen.
-    - Combine with the *Culiplan: Sunday Plan Push* blueprint to keep your
-      shopping list fully synchronised throughout the week.
+    **Prerequisites**: Flavorplan integration installed and connected.
+    **Free tier**: Yes — no Flavorplan Premium required.
   domain: automation
-  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-zero-shopping.yaml
-  author: Culiplan
-  homeassistant:
-    min_version: "2024.6.0"
-
+  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-zero-shopping.yaml
   input:
-    shopping_list_entity:
-      name: Shopping list (todo entity)
+    notify_target:
+      name: Notification target (optional)
       description: >
-        The `todo` entity that represents your active shopping list. Defaults
-        to the list created by the Culiplan integration.
-      default: todo.culiplan_shopping_list
-      selector:
-        entity:
-          domain: todo
-
-    notify_services:
-      name: Notification services (optional)
-      description: >
-        A comma-separated list of `notify.*` service names to alert when an
-        item is added, e.g. `notify.mobile_app_phone,notify.kitchen_speaker`.
-        Leave blank to skip notifications.
+        Service to call for the push notification, e.g. `notify.mobile_app_phone`.
+        Leave empty to skip the notification.
       default: ""
       selector:
         text: {}
-
-    notification_title:
+    notify_title:
       name: Notification title
-      description: Title shown on household notifications.
-      default: "Pantry update: item added to shopping list"
+      description: Title of the push notification.
+      default: "Flavorplan — Pantry low"
       selector:
         text: {}
-
-    only_when_home:
-      name: Only notify when someone is home
+    notify_message:
+      name: Notification message
       description: >
-        Enable to suppress notifications when the house is empty. The item is
-        still added to the shopping list regardless of this setting.
-      default: false
+        Message body. You may use `{{ trigger.event.data.id }}` to include the
+        item ID (detail available via the Flavorplan app).
+      default: "A pantry item is running low. Check your Flavorplan app."
       selector:
-        boolean: {}
-
-    presence_entity:
-      name: Presence sensor (used when "Only notify when home" is on)
-      description: >
-        Only evaluated when *Only notify when someone is home* is enabled.
-        A binary sensor, person, or group that is **on** / **home** when
-        someone is present.
-      default: ""
-      selector:
-        entity:
-          domain:
-            - binary_sensor
-            - person
-            - group
-            - device_tracker
-
-variables:
-  shopping_list_entity: !input shopping_list_entity
-  notify_services: !input notify_services
-  only_when_home: !input only_when_home
-  presence_entity: !input presence_entity
-  notification_title: !input notification_title
+        text: {}
 
 trigger:
   - platform: event
-    event_type: culiplan_event
-    event_data:
-      event_type: pantry.item.depleted
+    event_type: culiplan_pantry_depleted  # fired by Flavorplan backend via HA event bus
 
-condition:
-  - alias: "Event has item name"
-    condition: template
-    value_template: >
-      {{ trigger.event.data.get('item_name', '') | length > 0 }}
+condition: []
 
 action:
-  - alias: "Add item to shopping list"
-    service: todo.add_item
-    target:
-      entity_id: "{{ shopping_list_entity }}"
-    data:
-      item: "{{ trigger.event.data.get('item_name', 'Unknown item') }}"
-      description: >
-        Added automatically by Culiplan when pantry stock reached zero on
-        {{ now().strftime('%A, %d %B %Y at %H:%M') }}.
-
-  - alias: "Notify household"
-    choose:
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ notify_services | length > 0 and
-                 (not only_when_home or
-                  (presence_entity | length > 0 and
-                   states(presence_entity) in ['on', 'home'])) }}
-        sequence:
-          - repeat:
-              for_each: "{{ notify_services.split(',') | map('trim') | list }}"
-              sequence:
-                - service: "{{ repeat.item }}"
-                  data:
-                    title: "{{ notification_title }}"
-                    message: >
-                      **{{ trigger.event.data.get('item_name', 'An item') }}**
-                      ran out and has been added to your shopping list.
-                      {% if trigger.event.data.get('pantry_item_id') %}
-                      Open Culiplan to see pantry details.
-                      {% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ notify_target | trim != '' }}"
+    then:
+      - service: "{{ notify_target }}"
+        data:
+          title: !input notify_title
+          message: !input notify_message
+          data:
+            url: "https://culiplan.com/pantry"
+            push:
+              category: "flavorplan_pantry_low"
 
 mode: queued
 max: 10
