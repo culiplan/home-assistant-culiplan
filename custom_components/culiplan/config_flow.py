@@ -2,13 +2,20 @@
 
 task-1390: BYOK key validation + HA local secret store
 task-1391: Local AI auto-detection (Ollama + LM Studio)
+task-1413: Non-loopback Local AI endpoint warning
+task-1422: Mealie config_flow wizard steps + OptionsFlow rollback
 """
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import logging
+import time
 from typing import Any
+from urllib.parse import urlparse
 
+import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import config_entry_oauth2_flow
@@ -19,13 +26,19 @@ from .const import (
     AI_MODE_CLOUD,
     AI_MODE_LOCAL,
     AI_MODES,
+    BASE_URL,
     BYOK_PROVIDERS,
     CONF_AI_MODE,
     CONF_BYOK_API_KEY,
     CONF_BYOK_PROVIDER,
     CONF_LOCAL_ENDPOINT,
     CONF_LOCAL_MODEL,
+    CONF_MEALIE_IMPORT_AT,
+    CONF_MEALIE_JOB_ID,
+    CONF_MEALIE_TOKEN,
+    CONF_MEALIE_URL,
     DOMAIN,
+    MEALIE_ROLLBACK_WINDOW_SECONDS,
 )
 from .ai.key_store import BYOKKeyStore, validate_byok_key
 from .ai.local_ai import (
@@ -41,12 +54,55 @@ _LOGGER = logging.getLogger(__name__)
 # Sentinel string for the "manual entry" option in the detected-model selector
 _MANUAL_ENTRY = "__manual__"
 
+# Hostnames that are definitively loopback (task-1413)
+_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_loopback_host(endpoint: str) -> bool:
+    """Return True if the endpoint resolves to a loopback or mDNS .local host.
+
+    Loopback (no warning needed):
+      - localhost, 127.0.0.1, ::1
+      - IPv4 loopback range 127.0.0.0/8
+      - IPv6 loopback ::1
+    mDNS (treated as local network, no warning):
+      - *.local hostnames (mDNS / Bonjour)
+
+    Everything else (RFC-1918 private ranges, public IPs, hostnames) gets a
+    warning because the token might travel over an untrusted network.
+    """
+    try:
+        parsed = urlparse(endpoint if "://" in endpoint else f"http://{endpoint}")
+        host = parsed.hostname or ""
+    except Exception:  # noqa: BLE001
+        return False
+
+    if not host:
+        return False
+
+    # Explicit loopback names
+    if host in _LOOPBACK_HOSTNAMES:
+        return True
+
+    # mDNS .local — Bonjour / Avahi, never leaves the subnet
+    if host.endswith(".local"):
+        return True
+
+    # IP address checks
+    try:
+        addr = ipaddress.ip_address(host)
+        return addr.is_loopback
+    except ValueError:
+        pass
+
+    return False
+
 
 class OAuth2FlowHandler(
     config_entry_oauth2_flow.AbstractOAuth2FlowHandler,
     domain=DOMAIN,
 ):
-    """Handle OAuth2 authentication and AI provider selection."""
+    """Handle OAuth2 authentication, AI provider selection, and Mealie import."""
 
     DOMAIN = DOMAIN
 
@@ -54,10 +110,20 @@ class OAuth2FlowHandler(
         super().__init__()
         self._oauth_data: dict[str, Any] = {}
         self._detected_endpoints: list[LocalAIEndpoint] = []
+        self._entry_data: dict[str, Any] = {}
+        # Mealie flow state
+        self._mealie_preview: dict[str, Any] = {}
 
     @property
     def logger(self) -> logging.Logger:
         return _LOGGER
+
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Return the options flow handler."""
+        return MealieOptionsFlow(config_entry)
 
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> dict[str, Any]:
         """Handle successful OAuth completion; proceed to AI provider step."""
@@ -66,6 +132,10 @@ class OAuth2FlowHandler(
         # (AC#1: probe runs on entering AI provider config flow step)
         self._detected_endpoints = await probe_local_ai_endpoints()
         return await self.async_step_ai_provider()
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: ai_provider
+    # ──────────────────────────────────────────────────────────────────────────
 
     async def async_step_ai_provider(
         self, user_input: dict[str, Any] | None = None
@@ -79,9 +149,10 @@ class OAuth2FlowHandler(
           - On success: key stored in BYOKKeyStore (HA local storage only)
           - On failure: user-friendly error, key NOT stored
 
-        Local AI path (task-1391):
+        Local AI path (task-1391 + task-1413):
           - If endpoints detected: show "Detected X at host:port — use it?"
           - AC#4: manual entry always available
+          - Non-loopback endpoint triggers warning step (task-1413)
         """
         errors: dict[str, str] = {}
         description_placeholders: dict[str, str] = {}
@@ -165,7 +236,16 @@ class OAuth2FlowHandler(
                     entry_data[CONF_LOCAL_MODEL] = local_model
 
             if not errors:
-                return self.async_create_entry(title="Flavorplan", data=entry_data)
+                self._entry_data = entry_data
+
+                # task-1413: non-loopback Local AI endpoint warning
+                if ai_mode == AI_MODE_LOCAL:
+                    local_ep = entry_data.get(CONF_LOCAL_ENDPOINT, "")
+                    if local_ep and not _is_loopback_host(local_ep):
+                        return await self.async_step_local_endpoint_remote_warning()
+
+                # Proceed to Mealie offer step
+                return await self.async_step_mealie_offer()
 
         # ── Build form schema ──────────────────────────────────────────────────
         schema_fields: dict[Any, Any] = {
@@ -207,6 +287,204 @@ class OAuth2FlowHandler(
             description_placeholders=description_placeholders,
         )
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: local_endpoint_remote_warning  (task-1413)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_local_endpoint_remote_warning(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Warn the user that their Local AI endpoint is on a remote host.
+
+        The user is informed (not blocked) and must tick a checkbox to continue.
+        """
+        if user_input is not None:
+            # User acknowledged — proceed to Mealie offer
+            return await self.async_step_mealie_offer()
+
+        local_ep = self._entry_data.get(CONF_LOCAL_ENDPOINT, "")
+        return self.async_show_form(
+            step_id="local_endpoint_remote_warning",
+            data_schema=vol.Schema(
+                {vol.Required("confirmed", default=False): bool}
+            ),
+            description_placeholders={"endpoint": local_ep},
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: mealie_offer  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_mealie_offer(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Offer the user the option to import from Mealie.
+
+        User can skip and complete setup without importing.
+        """
+        if user_input is not None:
+            if user_input.get("migrate_mealie", False):
+                return await self.async_step_mealie_credentials()
+            # User skipped Mealie — create entry now
+            return self.async_create_entry(title="Flavorplan", data=self._entry_data)
+
+        return self.async_show_form(
+            step_id="mealie_offer",
+            data_schema=vol.Schema(
+                {vol.Required("migrate_mealie", default=False): bool}
+            ),
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: mealie_credentials  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_mealie_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Collect Mealie base URL and API token, then fetch a preview."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            mealie_url = user_input.get(CONF_MEALIE_URL, "").strip().rstrip("/")
+            mealie_token = user_input.get(CONF_MEALIE_TOKEN, "").strip()
+
+            if not mealie_url:
+                errors[CONF_MEALIE_URL] = "invalid_mealie_url"
+            elif not mealie_token:
+                errors[CONF_MEALIE_TOKEN] = "byok_key_required"
+            else:
+                try:
+                    preview = await _call_migrate_preview(
+                        self.hass,
+                        self._entry_data,
+                        mealie_url,
+                        mealie_token,
+                    )
+                    self._mealie_preview = preview
+                    # Stash credentials for use in _preview → _progress
+                    self._entry_data[CONF_MEALIE_URL] = mealie_url
+                    self._entry_data[CONF_MEALIE_TOKEN] = mealie_token
+                    return await self.async_step_mealie_preview()
+                except aiohttp.ClientConnectionError:
+                    errors[CONF_MEALIE_URL] = "mealie_unreachable"
+                except asyncio.TimeoutError:
+                    errors[CONF_MEALIE_URL] = "mealie_timeout"
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.error("[culiplan][mealie] Preview failed: %s", exc)
+                    errors["base"] = "unknown"
+
+        return self.async_show_form(
+            step_id="mealie_credentials",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_MEALIE_URL): str,
+                    vol.Required(CONF_MEALIE_TOKEN): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: mealie_preview  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_mealie_preview(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Show import preview and ask for confirmation."""
+        if user_input is not None:
+            if user_input.get("confirm_import", False):
+                return await self.async_step_mealie_progress()
+            # User cancelled — skip import, create entry without Mealie data
+            self._entry_data.pop(CONF_MEALIE_URL, None)
+            self._entry_data.pop(CONF_MEALIE_TOKEN, None)
+            return self.async_create_entry(title="Flavorplan", data=self._entry_data)
+
+        p = self._mealie_preview
+        return self.async_show_form(
+            step_id="mealie_preview",
+            data_schema=vol.Schema(
+                {vol.Required("confirm_import", default=True): bool}
+            ),
+            description_placeholders={
+                "will_import": str(p.get("willImport", 0)),
+                "will_flag": str(p.get("willFlag", 0)),
+                "will_skip": str(p.get("willSkip", 0)),
+                "samples": ", ".join(p.get("sampleTitles", [])[:3]),
+            },
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: mealie_progress  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_mealie_progress(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Kick off the import and poll until complete."""
+        mealie_url = self._entry_data.get(CONF_MEALIE_URL, "")
+        mealie_token = self._entry_data.get(CONF_MEALIE_TOKEN, "")
+
+        try:
+            result = await _call_migrate_start(
+                self.hass,
+                self._entry_data,
+                mealie_url,
+                mealie_token,
+            )
+            job_id = result.get("jobId", "")
+            errors_count = result.get("errors", 0)
+
+            # Persist jobId + import timestamp for rollback window check
+            self._entry_data[CONF_MEALIE_JOB_ID] = job_id
+            self._entry_data[CONF_MEALIE_IMPORT_AT] = int(time.time())
+
+            return await self.async_step_mealie_done(
+                job_id=job_id, errors_count=errors_count
+            )
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.error("[culiplan][mealie] Import start failed: %s", exc)
+            # Strip token and create entry anyway — user can retry via options flow
+            self._entry_data.pop(CONF_MEALIE_TOKEN, None)
+            self._entry_data.pop(CONF_MEALIE_URL, None)
+            return self.async_create_entry(title="Flavorplan", data=self._entry_data)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step: mealie_done  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_mealie_done(
+        self,
+        user_input: dict[str, Any] | None = None,
+        *,
+        job_id: str = "",
+        errors_count: int = 0,
+    ) -> dict[str, Any]:
+        """Show completion summary and create the config entry.
+
+        §6.6 compliance: Mealie token and URL are stripped before persisting.
+        """
+        if user_input is not None or job_id:
+            # ── CRITICAL: strip Mealie credentials before persisting (§6.6) ──
+            self._entry_data.pop(CONF_MEALIE_TOKEN, None)
+            self._entry_data.pop(CONF_MEALIE_URL, None)
+
+            return self.async_create_entry(title="Flavorplan", data=self._entry_data)
+
+        return self.async_show_form(
+            step_id="mealie_done",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "job_id": job_id,
+                "errors": str(errors_count),
+            },
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Re-authentication
+    # ──────────────────────────────────────────────────────────────────────────
+
     async def async_step_reauth(
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -220,6 +498,84 @@ class OAuth2FlowHandler(
         if user_input is None:
             return self.async_show_form(step_id="reauth_confirm")
         return await self.async_step_user()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Options Flow — Mealie rollback  (task-1422)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class MealieOptionsFlow(config_entries.OptionsFlow):
+    """Options flow: allow rolling back a Mealie import within 24 hours."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        super().__init__()
+        self._config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Show rollback option if within the 24-hour window."""
+        job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID)
+        import_at = self._config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
+        elapsed = int(time.time()) - import_at
+        rollback_available = bool(
+            job_id and elapsed < MEALIE_ROLLBACK_WINDOW_SECONDS
+        )
+
+        if user_input is not None:
+            if user_input.get("rollback") and rollback_available:
+                return await self.async_step_mealie_rollback()
+            return self.async_create_entry(title="", data={})
+
+        schema: dict[Any, Any] = {}
+        if rollback_available:
+            schema[vol.Optional("rollback", default=False)] = bool
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(schema) if schema else None,
+            description_placeholders={
+                "rollback_available": str(rollback_available).lower(),
+                "job_id": job_id or "",
+            },
+        )
+
+    async def async_step_mealie_rollback(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Call the backend rollback endpoint and report the result."""
+        job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID, "")
+
+        try:
+            client = FlavorplanApiClient(
+                self.hass,
+                self._config_entry,
+            )
+            async with aiohttp.ClientSession() as session:
+                async with session.delete(
+                    f"{BASE_URL}/api/migrate/mealie",
+                    headers={
+                        "Authorization": f"Bearer {self._config_entry.data.get('access_token', '')}",
+                    },
+                    json={"jobId": job_id},
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
+                    resp.raise_for_status()
+
+            _LOGGER.info("[culiplan][mealie] Rollback succeeded for jobId=%s", job_id)
+            return self.async_abort(reason="rollback_complete")
+
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.error(
+                "[culiplan][mealie] Rollback failed for jobId=%s: %s", job_id, exc
+            )
+            return self.async_abort(reason="rollback_failed")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Private helpers
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 def _parse_local_endpoint(endpoint: str) -> tuple[str, str]:
@@ -244,3 +600,47 @@ def _parse_local_endpoint(endpoint: str) -> tuple[str, str]:
         return host.strip(), port.strip()
 
     raise ValueError(f"Cannot parse host:port from endpoint '{endpoint}'")
+
+
+async def _call_migrate_preview(
+    hass: Any,
+    entry_data: dict[str, Any],
+    mealie_url: str,
+    mealie_token: str,
+) -> dict[str, Any]:
+    """Call POST /api/migrate/mealie/preview via Flavorplan backend.
+
+    Returns a dict with keys: willImport, willFlag, willSkip, sampleTitles.
+    """
+    access_token = entry_data.get("access_token", "")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{BASE_URL}/api/migrate/mealie/preview",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()
+
+
+async def _call_migrate_start(
+    hass: Any,
+    entry_data: dict[str, Any],
+    mealie_url: str,
+    mealie_token: str,
+) -> dict[str, Any]:
+    """Call POST /api/migrate/mealie to start the import job.
+
+    Returns a dict with keys: jobId, errors.
+    """
+    access_token = entry_data.get("access_token", "")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"{BASE_URL}/api/migrate/mealie",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
+            timeout=aiohttp.ClientTimeout(total=120),
+        ) as resp:
+            resp.raise_for_status()
+            return await resp.json()

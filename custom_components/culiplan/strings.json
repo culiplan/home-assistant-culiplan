@@ -6,7 +6,7 @@
       },
       "ai_provider": {
         "title": "AI Provider",
-        "description": "Choose how Flavorplan AI features run in Home Assistant.\n\n**Cloud AI** — Flavorplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Flavorplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.",
+        "description": "Choose how Flavorplan AI features run in Home Assistant.\n\n**Cloud AI** — Flavorplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Flavorplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.\n\n> **Debug mode**: When enabled, AI prompt content is written to `culiplan_ai_debug.log` inside your HA config folder. These logs are stored **client-side only** and are automatically deleted after **24 hours**. Disable debug mode when not actively troubleshooting.",
         "data": {
           "ai_mode": "AI Mode",
           "byok_provider": "AI Provider",
@@ -20,6 +20,43 @@
           "local_model": "e.g. llama3.2"
         }
       },
+      "local_endpoint_remote_warning": {
+        "title": "Remote AI Endpoint",
+        "description": "The endpoint **{endpoint}** is on a remote host. Your AI prompts (which may include recipe names, meal plans, and pantry contents) will be sent to this address over your network.\n\nIf this is intentional (e.g. a server on your home network), you can continue. If you are unsure, go back and use `localhost` instead.",
+        "data": {
+          "confirmed": "I understand and want to continue"
+        }
+      },
+      "mealie_offer": {
+        "title": "Import from Mealie",
+        "description": "Flavorplan can import your existing Mealie recipe library in one click. This is optional — you can always import later from the integration settings.",
+        "data": {
+          "migrate_mealie": "Import my Mealie recipe library now"
+        }
+      },
+      "mealie_credentials": {
+        "title": "Mealie Connection",
+        "description": "Enter your Mealie server URL and an API token. The token is used only during import and is **never stored**.",
+        "data": {
+          "mealie_url": "Mealie URL",
+          "mealie_token": "Mealie API Token"
+        },
+        "data_description": {
+          "mealie_url": "e.g. http://192.168.1.10:9000",
+          "mealie_token": "Generate a token in Mealie → Profile → API Tokens. It will not be saved after import."
+        }
+      },
+      "mealie_preview": {
+        "title": "Import Preview",
+        "description": "Flavorplan found the following in your Mealie library:\n\n- **{will_import}** recipes ready to import\n- **{will_flag}** recipes that need review\n- **{will_skip}** recipes that will be skipped (duplicates)\n\nSample titles: {samples}\n\nConfirm to start the import. You can undo this within 24 hours from the integration settings.",
+        "data": {
+          "confirm_import": "Start import"
+        }
+      },
+      "mealie_done": {
+        "title": "Import Complete",
+        "description": "Your Mealie recipe library has been imported into Flavorplan.\n\n- **Job ID**: {job_id}\n- **Errors**: {errors} recipes could not be imported\n\nYou can roll back this import within 24 hours from the integration settings (Settings → Integrations → Flavorplan → Configure)."
+      },
       "reauth_confirm": {
         "title": "Re-authenticate Flavorplan",
         "description": "Your Flavorplan session has expired. Click **Submit** to re-authenticate."
@@ -29,6 +66,11 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_api_key": "Invalid API key — please check the key and try again.",
       "invalid_endpoint": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
+      "local_endpoint_unreachable": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
+      "local_endpoint_invalid": "The endpoint URL is not valid. Use the format http://host:port (e.g. http://localhost:11434).",
+      "invalid_mealie_url": "Please enter your Mealie server URL (e.g. http://192.168.1.10:9000).",
+      "mealie_unreachable": "Could not connect to your Mealie server. Check the URL and that Mealie is running.",
+      "mealie_timeout": "The connection to Mealie timed out. Check that Mealie is reachable from Home Assistant.",
       "unknown": "[%key:common::config_flow::error::unknown%]",
       "byok_provider_required": "Please select an AI provider for BYOK mode.",
       "byok_key_required": "An API key is required for BYOK mode.",
@@ -39,6 +81,22 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_account%]",
       "oauth_error": "OAuth error: {error}",
       "missing_configuration": "Integration not configured. Please configure it in the UI."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Flavorplan Settings",
+        "description": "Manage your Flavorplan integration.",
+        "data": {
+          "rollback": "Roll back Mealie import (available within 24 hours of import)"
+        }
+      }
+    },
+    "abort": {
+      "no_action": "No changes were made.",
+      "rollback_complete": "The Mealie import has been rolled back. Your Flavorplan recipe library has been restored to its previous state.",
+      "rollback_failed": "The rollback request failed. Please try again or contact Flavorplan support."
     }
   },
   "issues": {
