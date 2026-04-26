@@ -1,0 +1,207 @@
+blueprint:
+  name: "Culiplan: Pre-heat on Presence"
+  description: >
+    Automatically pre-heats your oven or induction hob a configurable number
+    of minutes before tonight's recipe start time — but only when someone is
+    actually home. Powered by Culiplan's meal-plan calendar entity.
+
+    **How it works**
+
+    Every minute between the configurable *earliest check* and *latest check*
+    times, the automation inspects the next calendar event on
+    `calendar.culiplan_meal_plan`. When the event's start time is within the
+    pre-heat window **and** the selected presence sensor reports someone is
+    home, it calls your climate or switch entity to start pre-heating and sends
+    an optional notification.
+
+    **Requirements**
+
+    - Culiplan integration installed and connected (provides
+      `calendar.culiplan_meal_plan`)
+    - A presence sensor (e.g. `binary_sensor.someone_home`, a person entity,
+      or a group)
+    - A climate entity **or** a smart-plug/switch that controls your hob
+
+    **Tips**
+
+    - For a dumb oven on a smart plug, set *Appliance entity* to the switch
+      entity and leave the *Target temperature* at 0 — the automation will
+      only toggle the switch.
+    - For a smart oven or hob, enter the desired preheat temperature.
+    - Add multiple people to a group helper and use that group as your
+      presence sensor for accurate household-level presence.
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/preheat-on-presence.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    preheat_minutes:
+      name: Pre-heat lead time (minutes)
+      description: >
+        How many minutes before the recipe start time should the appliance
+        begin heating? Typical oven: 15–20 min. Induction: 2–5 min.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: min
+          mode: slider
+
+    check_window_start:
+      name: Earliest check time
+      description: >
+        The automation will not fire before this time of day. Set to just
+        after your lunch to avoid spurious morning triggers.
+      default: "14:00:00"
+      selector:
+        time: {}
+
+    check_window_end:
+      name: Latest check time
+      description: >
+        The automation will not fire after this time of day.
+      default: "20:00:00"
+      selector:
+        time: {}
+
+    presence_entity:
+      name: Presence sensor
+      description: >
+        A binary sensor, person entity, or group that is **on** / **home**
+        when at least one household member is present. The appliance will not
+        start if this entity is off / not_home.
+      selector:
+        entity:
+          domain:
+            - binary_sensor
+            - person
+            - group
+            - device_tracker
+
+    appliance_entity:
+      name: Appliance entity
+      description: >
+        The climate entity (smart oven/hob) or switch entity (smart plug) to
+        turn on for pre-heating.
+      selector:
+        entity:
+          domain:
+            - climate
+            - switch
+            - input_boolean
+
+    target_temperature:
+      name: Target temperature (°C)
+      description: >
+        Target preheat temperature for climate entities. Set to **0** if using
+        a simple switch — the automation will then only toggle the switch
+        without setting a temperature.
+      default: 200
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 5
+          unit_of_measurement: "°C"
+          mode: box
+
+    notification_service:
+      name: Notification service (optional)
+      description: >
+        Select a `notify.*` service to send a message when pre-heating starts.
+        Leave blank to skip notifications.
+      default: ""
+      selector:
+        text: {}
+
+    notification_title:
+      name: Notification title
+      description: Title of the pre-heat notification.
+      default: "Oven pre-heating started 🍽️"
+      selector:
+        text: {}
+
+variables:
+  preheat_minutes: !input preheat_minutes
+  appliance_entity: !input appliance_entity
+  target_temperature: !input target_temperature
+  presence_entity: !input presence_entity
+  notification_service: !input notification_service
+  notification_title: !input notification_title
+
+trigger:
+  - platform: time_pattern
+    minutes: "/1"
+
+condition:
+  - alias: "Within check window"
+    condition: time
+    after: !input check_window_start
+    before: !input check_window_end
+
+  - alias: "Someone is home"
+    condition: template
+    value_template: >
+      {% set state = states(presence_entity) %}
+      {{ state in ['on', 'home'] }}
+
+  - alias: "Meal plan has an event today"
+    condition: template
+    value_template: >
+      {{ state_attr('calendar.culiplan_meal_plan', 'start_time') is not none }}
+
+  - alias: "Event starts within pre-heat window"
+    condition: template
+    value_template: >
+      {% set start_str = state_attr('calendar.culiplan_meal_plan', 'start_time') %}
+      {% if start_str is none %}
+        false
+      {% else %}
+        {% set start = as_datetime(start_str) %}
+        {% set now_dt = now() %}
+        {% set diff_minutes = ((start - now_dt).total_seconds() / 60) | round(0) %}
+        {{ diff_minutes > 0 and diff_minutes <= preheat_minutes | int }}
+      {% endif %}
+
+action:
+  - alias: "Start appliance"
+    choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ target_temperature | int > 0 and
+                 appliance_entity.startswith('climate.') }}
+        sequence:
+          - service: climate.set_temperature
+            target:
+              entity_id: !input appliance_entity
+            data:
+              temperature: "{{ target_temperature }}"
+          - service: climate.turn_on
+            target:
+              entity_id: !input appliance_entity
+    default:
+      - service: homeassistant.turn_on
+        target:
+          entity_id: !input appliance_entity
+
+  - alias: "Send notification if configured"
+    condition: template
+    value_template: "{{ notification_service | length > 0 }}"
+  - service: "{{ notification_service }}"
+    data:
+      title: "{{ notification_title }}"
+      message: >
+        {% set start_str = state_attr('calendar.culiplan_meal_plan', 'start_time') %}
+        {% set recipe = state_attr('calendar.culiplan_meal_plan', 'message') or
+                        state_attr('calendar.culiplan_meal_plan', 'description') or
+                        'tonight's dinner' %}
+        Pre-heating for {{ recipe }}. Dinner starts at
+        {{ as_datetime(start_str).strftime('%H:%M') }}.
+
+mode: single
+max_exceeded: silent

@@ -1,0 +1,164 @@
+blueprint:
+  name: "Culiplan: Sunday Plan Push"
+  description: >
+    Every Sunday at a configurable time, pull next week's meal plan from
+    `calendar.culiplan_meal_plan` and push a beautifully formatted summary
+    to the household tablet (or any `notify.*` target).
+
+    **How it works**
+
+    At the configured trigger time on Sundays, the automation reads the next
+    seven calendar events from `calendar.culiplan_meal_plan`, formats them
+    into a day-by-day summary, and delivers the message via your chosen
+    notification service. Works great with companion app notifications,
+    smart displays, or media player TTS.
+
+    **Requirements**
+
+    - Culiplan integration installed and connected (provides
+      `calendar.culiplan_meal_plan`)
+    - At least one `notify.*` service configured in Home Assistant
+
+    **Tips**
+
+    - For a wall tablet running Companion App, use `notify.mobile_app_<tablet>`.
+    - For a spoken announcement use `notify.alexa_media_kitchen` or
+      `notify.google_home_kitchen`.
+    - Set *Trigger time* to Friday evening if your household prefers a
+      weekend-ahead view.
+    - The message format uses Markdown — most HA notification services render
+      it, but plain text fallback is included automatically.
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/sunday-plan-push.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    trigger_time:
+      name: Trigger time
+      description: >
+        Time on Sunday when the weekly plan is pushed. 18:00 is the
+        recommended default — after breakfast/lunch, before Monday prep.
+      default: "18:00:00"
+      selector:
+        time: {}
+
+    trigger_weekday:
+      name: Day of week to send
+      description: >
+        0 = Monday, 6 = Sunday. Default is 6 (Sunday). Change to 4 (Friday)
+        for a "weekend ahead" preview.
+      default: 6
+      selector:
+        number:
+          min: 0
+          max: 6
+          step: 1
+          mode: box
+
+    notify_service:
+      name: Notification service
+      description: >
+        The `notify.*` service used to deliver the weekly plan. For a tablet
+        use `notify.mobile_app_<device>`. For a shared household group use a
+        `notify.group_*` service.
+      selector:
+        text: {}
+
+    message_title:
+      name: Message title
+      description: Title shown at the top of the weekly plan notification.
+      default: "🗓️ This week's meal plan"
+      selector:
+        text: {}
+
+    include_shopping_count:
+      name: Include shopping list item count
+      description: >
+        Add a line at the end of the message showing how many items are
+        currently on the shopping list.
+      default: true
+      selector:
+        boolean: {}
+
+    include_expiring_soon:
+      name: Include pantry expiry warning
+      description: >
+        Add a line showing how many pantry items are expiring in the next
+        7 days (uses `sensor.culiplan_pantry_expiring_soon`).
+      default: true
+      selector:
+        boolean: {}
+
+variables:
+  notify_service: !input notify_service
+  message_title: !input message_title
+  include_shopping_count: !input include_shopping_count
+  include_expiring_soon: !input include_expiring_soon
+  trigger_weekday: !input trigger_weekday
+
+trigger:
+  - platform: time
+    at: !input trigger_time
+
+condition:
+  - alias: "Correct day of week"
+    condition: template
+    value_template: "{{ now().weekday() == trigger_weekday | int }}"
+
+  - alias: "Notification service is configured"
+    condition: template
+    value_template: "{{ notify_service | length > 0 }}"
+
+action:
+  - alias: "Build and send weekly plan message"
+    variables:
+      calendar_state: "{{ states('calendar.culiplan_meal_plan') }}"
+      next_event_title: >
+        {{ state_attr('calendar.culiplan_meal_plan', 'message') or
+           state_attr('calendar.culiplan_meal_plan', 'description') or
+           'No meal planned' }}
+      next_event_start: >
+        {{ state_attr('calendar.culiplan_meal_plan', 'start_time') }}
+      shopping_count: >
+        {{ states('sensor.culiplan_shopping_items') | int(0) }}
+      expiring_count: >
+        {{ states('sensor.culiplan_pantry_expiring_soon') | int(0) }}
+      meals_this_week: >
+        {{ states('sensor.culiplan_meals_planned_this_week') | int(0) }}
+      plan_message: >
+        {% set title = message_title %}
+        {% set week_start = (now() + timedelta(days=1)).strftime('%d %b') %}
+        {% set week_end = (now() + timedelta(days=7)).strftime('%d %b') %}
+
+        **{{ title }}**
+        Week of {{ week_start }} – {{ week_end }}
+
+        📅 **{{ meals_this_week }} meal{{ 's' if meals_this_week != 1 else '' }} planned** this week
+
+        {% if next_event_start %}
+        **Next up:** {{ next_event_title }}
+        on {{ as_datetime(next_event_start).strftime('%A, %d %b at %H:%M') }}
+        {% endif %}
+
+        {% if include_shopping_count %}
+        🛒 **{{ shopping_count }} item{{ 's' if shopping_count != 1 else '' }}** on the shopping list
+        {% endif %}
+
+        {% if include_expiring_soon and expiring_count > 0 %}
+        ⚠️ **{{ expiring_count }} pantry item{{ 's' if expiring_count != 1 else '' }}** expiring soon — check Culiplan
+        {% endif %}
+
+        Open the Culiplan app to see the full week and make changes.
+
+  - service: "{{ notify_service }}"
+    data:
+      title: "{{ message_title }}"
+      message: "{{ plan_message }}"
+      data:
+        url: "culiplan://meal-plan"
+        clickAction: "culiplan://meal-plan"
+
+mode: single
+max_exceeded: silent

@@ -1,0 +1,181 @@
+blueprint:
+  name: "Culiplan: Energy-Aware Meal Swap"
+  description: >
+    Suggest an energy-friendly alternative meal when electricity prices exceed
+    a configurable threshold. Keeps cooking costs down on peak-price days
+    without requiring manual meal plan edits.
+
+    **How it works**
+
+    At your chosen check time, the automation reads the current spot price from
+    any HA energy-price sensor (Amber Electric, Tibber, Nordpool, ENTSO-E, or
+    any sensor with a numeric kWh price). If the price is above your threshold,
+    it sends a notification suggesting the household's tagged "energy-light"
+    alternative meal from Culiplan, and optionally fires a `culiplan_event`
+    service call to trigger an AI-swap in the app (requires Culiplan premium).
+
+    **Requirements**
+
+    - Culiplan integration installed and connected
+    - An electricity-price sensor (numeric, unit cents/kWh or the native unit
+      of your provider)
+    - Optional: Culiplan premium subscription for in-app AI meal swap
+
+    **Supported price sensor formats**
+
+    | Integration | Example entity |
+    |---|---|
+    | Tibber | `sensor.tibber_pulse_current_price` |
+    | Nordpool | `sensor.nordpool_kwh_nl_eur_3_10_021` |
+    | Amber Electric | `sensor.amber_general_price` |
+    | ENTSO-E | `sensor.entsoe_average_electricity_price` |
+    | Generic | Any `sensor.*` with a numeric state |
+
+    **Tips**
+
+    - Set the threshold to your off-peak average price and double the margin
+      for significant deviations.
+    - Leave *Notify only* on to simply raise awareness — the household still
+      decides manually.
+    - Combine with the *Culiplan: Late-Event Quick-Cook* blueprint for a fully
+      adaptive dinner automation.
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/energy-aware-swap.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    price_sensor:
+      name: Electricity price sensor
+      description: >
+        A numeric sensor whose state represents the current electricity price.
+        Typically in ct/kWh or the native unit of your energy provider.
+      selector:
+        entity:
+          domain: sensor
+          device_class: monetary
+
+    price_threshold:
+      name: High-price threshold
+      description: >
+        If the current price **exceeds** this value, the automation triggers.
+        Use the same unit as your price sensor (e.g. 30 for 30 ct/kWh).
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 500
+          step: 1
+          mode: box
+
+    check_time:
+      name: Daily check time
+      description: >
+        Time of day at which the price check runs. 16:00 is ideal — early
+        enough to plan dinner, late enough to have the current spot price.
+      default: "16:00:00"
+      selector:
+        time: {}
+
+    notify_service:
+      name: Notification service
+      description: >
+        The `notify.*` service to deliver the meal swap suggestion.
+      selector:
+        text: {}
+
+    notify_only:
+      name: Notify only (no in-app swap)
+      description: >
+        When **on**, the automation only sends a notification without
+        triggering an in-app meal swap. Disable to also fire the
+        `culiplan_suggest_meal_swap` service (requires premium).
+      default: true
+      selector:
+        boolean: {}
+
+    alternative_meal_label:
+      name: Energy-light meal label/tag
+      description: >
+        The Culiplan label or tag used to identify energy-light recipe
+        alternatives (e.g. "quick-cook", "no-oven", "energy-light"). Only
+        used when *Notify only* is off.
+      default: "energy-light"
+      selector:
+        text: {}
+
+    notification_title:
+      name: Notification title
+      description: Title of the high-price alert notification.
+      default: "Energy prices are high — consider a lighter dinner"
+      selector:
+        text: {}
+
+variables:
+  price_sensor: !input price_sensor
+  price_threshold: !input price_threshold
+  notify_service: !input notify_service
+  notify_only: !input notify_only
+  alternative_meal_label: !input alternative_meal_label
+  notification_title: !input notification_title
+
+trigger:
+  - platform: time
+    at: !input check_time
+
+condition:
+  - alias: "Price sensor is available"
+    condition: template
+    value_template: >
+      {{ states(price_sensor) not in ['unknown', 'unavailable', 'none'] }}
+
+  - alias: "Current price exceeds threshold"
+    condition: template
+    value_template: >
+      {{ states(price_sensor) | float(0) > price_threshold | float }}
+
+  - alias: "Meal plan has an event today"
+    condition: template
+    value_template: >
+      {{ states('calendar.culiplan_meal_plan') == 'on' or
+         state_attr('calendar.culiplan_meal_plan', 'start_time') is not none }}
+
+  - alias: "Notification service is set"
+    condition: template
+    value_template: "{{ notify_service | length > 0 }}"
+
+action:
+  - alias: "Send high-price notification"
+    service: "{{ notify_service }}"
+    data:
+      title: "{{ notification_title }}"
+      message: >
+        {% set price = states(price_sensor) | float(0) | round(1) %}
+        {% set unit = state_attr(price_sensor, 'unit_of_measurement') or 'ct/kWh' %}
+        {% set meal = state_attr('calendar.culiplan_meal_plan', 'message') or
+                      state_attr('calendar.culiplan_meal_plan', 'description') or
+                      "tonight's planned meal" %}
+        Current electricity price is **{{ price }} {{ unit }}**
+        (threshold: {{ price_threshold }} {{ unit }}).
+
+        Tonight's planned meal — *{{ meal }}* — may require significant oven
+        time. Consider switching to a lighter alternative.
+        Open Culiplan to browse energy-light recipes tagged
+        "{{ alternative_meal_label }}".
+      data:
+        url: "culiplan://recipes?tag={{ alternative_meal_label }}"
+        clickAction: "culiplan://recipes?tag={{ alternative_meal_label }}"
+
+  - alias: "Fire in-app swap if not notify-only"
+    condition: template
+    value_template: "{{ not notify_only }}"
+  - event: culiplan_request_meal_swap
+    event_data:
+      reason: energy_price
+      label: "{{ alternative_meal_label }}"
+      current_price: "{{ states(price_sensor) | float(0) }}"
+      threshold: "{{ price_threshold }}"
+
+mode: single
+max_exceeded: silent

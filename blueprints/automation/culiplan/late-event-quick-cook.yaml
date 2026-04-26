@@ -1,0 +1,190 @@
+blueprint:
+  name: "Culiplan: Late-Event Quick-Cook Swap"
+  description: >
+    When the family calendar shows a late-running event tonight, automatically
+    swap the planned dinner for the household's tagged "quick-cook" alternative
+    and notify the household so nobody comes home expecting a roast.
+
+    **How it works**
+
+    At a configurable check time, the automation scans a family/shared calendar
+    for any event that ends **after** a configurable "late event" threshold
+    (e.g. 18:30). If one exists **and** the Culiplan meal plan has an event
+    tonight, it sends a notification suggesting the household's quick-cook
+    alternative (a Culiplan recipe tagged with your chosen label) and optionally
+    fires a `culiplan_request_meal_swap` event so the Culiplan AI dispatcher
+    can propose a specific substitute (requires premium).
+
+    **Requirements**
+
+    - Culiplan integration installed and connected
+    - A shared household calendar entity (Google Calendar, CalDAV, iCloud, etc.)
+    - At least one recipe in Culiplan tagged with your chosen quick-cook label
+
+    **Tips**
+
+    - "Quick-cook" is the default tag, but any Culiplan label works —
+      "20-minute", "one-pot", "no-prep" are common alternatives.
+    - Set *Late event threshold* to match when your household typically starts
+      cooking (18:00–19:00 is typical).
+    - If multiple household members each have their own calendar, create a
+      calendar group helper and use that as the trigger calendar.
+    - Combine with *Culiplan: Energy-Aware Meal Swap* to cover both late nights
+      and high-energy days in a single setup.
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/late-event-quick-cook.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    family_calendar:
+      name: Family / shared calendar
+      description: >
+        The calendar entity to watch for late-running events. Must be a
+        `calendar.*` entity readable by HA (Google Calendar, CalDAV, iCloud,
+        Nextcloud, etc.).
+      selector:
+        entity:
+          domain: calendar
+
+    late_threshold_time:
+      name: Late event threshold time
+      description: >
+        An event is considered "late" when it ends **at or after** this time.
+        Events finishing before this time do not trigger the swap. Typical
+        value: 18:30 or 19:00.
+      default: "18:30:00"
+      selector:
+        time: {}
+
+    check_time:
+      name: Daily check time
+      description: >
+        Time of day at which the blueprint checks the family calendar.
+        Should be at least 1 hour before typical dinner prep so there is
+        time to act on the suggestion.
+      default: "15:00:00"
+      selector:
+        time: {}
+
+    quick_cook_label:
+      name: Quick-cook recipe label/tag
+      description: >
+        The Culiplan label or tag that identifies quick-cook recipes in
+        your household's library (e.g. "quick-cook", "20-minute", "one-pot").
+      default: "quick-cook"
+      selector:
+        text: {}
+
+    notify_service:
+      name: Notification service
+      description: >
+        The `notify.*` service used to alert the household. Use a group
+        service (e.g. `notify.household`) to reach everyone at once.
+      selector:
+        text: {}
+
+    notify_only:
+      name: Notify only (no in-app swap)
+      description: >
+        When **on**, only sends a notification — the household decides manually.
+        When **off**, also fires a `culiplan_request_meal_swap` event that the
+        Culiplan AI dispatcher can act on (requires premium integration).
+      default: true
+      selector:
+        boolean: {}
+
+    notification_title:
+      name: Notification title
+      description: Title of the late-night alert notification.
+      default: "Late evening ahead — quick-cook dinner suggested"
+      selector:
+        text: {}
+
+variables:
+  family_calendar: !input family_calendar
+  late_threshold_time: !input late_threshold_time
+  notify_service: !input notify_service
+  notify_only: !input notify_only
+  quick_cook_label: !input quick_cook_label
+  notification_title: !input notification_title
+
+trigger:
+  - platform: time
+    at: !input check_time
+
+condition:
+  - alias: "Family calendar is available"
+    condition: template
+    value_template: >
+      {{ states(family_calendar) not in ['unknown', 'unavailable'] }}
+
+  - alias: "Meal plan has a dinner event today"
+    condition: template
+    value_template: >
+      {{ states('calendar.culiplan_meal_plan') == 'on' or
+         state_attr('calendar.culiplan_meal_plan', 'start_time') is not none }}
+
+  - alias: "Notification service is set"
+    condition: template
+    value_template: "{{ notify_service | length > 0 }}"
+
+  - alias: "Family calendar has a late event today"
+    condition: template
+    value_template: >
+      {% set end_str = state_attr(family_calendar, 'end_time') %}
+      {% if end_str is none %}
+        false
+      {% else %}
+        {% set event_end = as_datetime(end_str) %}
+        {% set threshold_str = late_threshold_time %}
+        {% set threshold_parts = threshold_str.split(':') %}
+        {% set threshold_today = today_at(threshold_str) %}
+        {{ event_end >= threshold_today and
+           event_end.date() == now().date() }}
+      {% endif %}
+
+action:
+  - alias: "Capture event and meal details"
+    variables:
+      family_event_title: >
+        {{ state_attr(family_calendar, 'message') or
+           state_attr(family_calendar, 'description') or
+           'a late event' }}
+      family_event_end: >
+        {{ state_attr(family_calendar, 'end_time') }}
+      planned_meal: >
+        {{ state_attr('calendar.culiplan_meal_plan', 'message') or
+           state_attr('calendar.culiplan_meal_plan', 'description') or
+           "tonight's planned meal" }}
+
+  - alias: "Notify household about late night"
+    service: "{{ notify_service }}"
+    data:
+      title: "{{ notification_title }}"
+      message: >
+        {% set end_time = as_datetime(family_event_end).strftime('%H:%M')
+           if family_event_end else 'late' %}
+        *{{ family_event_title }}* runs until **{{ end_time }}** tonight.
+        The planned dinner (*{{ planned_meal }}*) might be a stretch.
+
+        Consider switching to a quick-cook recipe. Open Culiplan to browse
+        your "{{ quick_cook_label }}" options and update the meal plan.
+      data:
+        url: "culiplan://recipes?tag={{ quick_cook_label }}"
+        clickAction: "culiplan://recipes?tag={{ quick_cook_label }}"
+
+  - alias: "Fire in-app swap request if not notify-only"
+    condition: template
+    value_template: "{{ not notify_only }}"
+  - event: culiplan_request_meal_swap
+    event_data:
+      reason: late_event
+      label: "{{ quick_cook_label }}"
+      family_event_title: "{{ family_event_title }}"
+      family_event_end: "{{ family_event_end }}"
+      planned_meal: "{{ planned_meal }}"
+
+mode: single
+max_exceeded: silent
