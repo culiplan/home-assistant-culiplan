@@ -41,6 +41,30 @@ intents:
           - "wat verloopt er binnenkort"
           - "wat moet ik snel gebruiken"
           - "wat is bijna verlopen"
+  FlavorplanNextCookingStep:
+    data:
+      - sentences:
+          - "volgende stap"
+          - "ga naar de volgende stap"
+          - "wat is de volgende stap"
+          - "verder koken"
+  FlavorplanSetRecipeTimer:
+    data:
+      - sentences:
+          - "start [de] {label} timer [van] {duration_sec} seconden"
+          - "start [de] {label} timer"
+          - "zet [een] {label} timer [van] {duration_sec} seconden"
+          - "zet een timer voor {label}"
+        slots:
+          label: "{label}"
+          duration_sec: "{duration_sec}"
+  FlavorplanCancelRecipeTimer:
+    data:
+      - sentences:
+          - "stop [de] {label} timer"
+          - "annuleer [de] {label} timer"
+        slots:
+          label: "{label}"
 
 responses:
   intents:
@@ -50,3 +74,6 @@ responses:
     FlavorplanAddToShoppingList: "{{ slots.item }} toegevoegd aan je boodschappenlijst."
     FlavorplanWhatsInPantry: "{{ response }}"
     FlavorplanWhatsExpiringSoon: "{{ response }}"
+    FlavorplanNextCookingStep: "Naar de volgende kookstap."
+    FlavorplanSetRecipeTimer: "De {{ slots.label }} timer gestart."
+    FlavorplanCancelRecipeTimer: "De {{ slots.label }} timer gestopt."

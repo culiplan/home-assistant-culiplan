@@ -1,4 +1,6 @@
-# Flavorplan HA service descriptions (Phase 2 — tasks 1376, 1378, 1379)
+# Flavorplan HA service descriptions
+# Phase 2: tasks 1376, 1378, 1379 — pantry / household
+# Phase 3: task-1397 — cooking-mode + timer mirroring
 # Used by the Home Assistant UI to show service descriptions and field hints.
 
 pantry_decrement:
@@ -75,3 +77,121 @@ scale_tonight_servings:
       required: false
       selector:
         date: {}
+
+# ─── Phase 3: Cooking-mode services (task-1397) ──────────────────────────────
+
+start_cooking_mode:
+  name: Start cooking mode
+  description: >
+    Starts a guided cooking session for the given recipe in Flavorplan.
+    Any previously active session is automatically completed first.
+    Fires a `culiplan_cooking_session_started` HA event on success.
+    **May require Flavorplan Premium** depending on recipe type.
+  fields:
+    recipe_id:
+      name: Recipe ID
+      description: >
+        The Flavorplan recipe identifier to cook. You can find it in the
+        Flavorplan app under the recipe detail URL.
+      required: true
+      selector:
+        text: {}
+    servings:
+      name: Servings (optional)
+      description: >
+        Override the default serving count for this session. Ingredient
+        quantities in Flavorplan are scaled accordingly.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          mode: box
+
+advance_cooking_step:
+  name: Advance to next cooking step
+  description: >
+    Moves the active cooking session forward by one step.
+    Fires a `culiplan_cooking_step_advanced` HA event.
+    Voice command equivalent: "next step".
+    Raises an error if no cooking session is active.
+
+set_recipe_timer:
+  name: Set a recipe timer
+  description: >
+    Adds a named timer to the active cooking session and starts the
+    corresponding HA timer entity (`timer.culiplan_session_*`).
+    Fires a `culiplan_recipe_timer_started` HA event.
+    Voice command equivalent: "start the [label] timer".
+    Raises an error if no cooking session is active.
+  fields:
+    label:
+      name: Timer label
+      description: >
+        Short descriptive name for the timer, e.g. "pasta", "sauce reduce".
+        Used to identify the timer entity and as the Assist voice slot value.
+      required: true
+      selector:
+        text: {}
+    duration_sec:
+      name: Duration (seconds)
+      description: How long the timer should run, in seconds.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 86400
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    step_index:
+      name: Step index (optional)
+      description: >
+        0-indexed recipe step this timer belongs to. Defaults to the
+        current step if not provided.
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 1
+          mode: box
+
+cancel_recipe_timer:
+  name: Cancel a recipe timer
+  description: >
+    Removes a named timer from the active cooking session and cancels
+    the corresponding HA timer entity.
+    Fires a `culiplan_recipe_timer_cancelled` HA event.
+    Raises an error if the timer label or ID is not found.
+  fields:
+    label_or_id:
+      name: Timer label or ID
+      description: >
+        The label (e.g. "pasta") or backend timer ID of the timer to cancel.
+      required: true
+      selector:
+        text: {}
+
+pause_cooking_mode:
+  name: Pause cooking mode
+  description: >
+    Pauses the active cooking session. Use `resume_cooking_mode` to continue.
+    Fires a `culiplan_cooking_session_paused` HA event.
+    Raises an error if no cooking session is active.
+
+resume_cooking_mode:
+  name: Resume cooking mode
+  description: >
+    Resumes the most recently paused cooking session.
+    Also re-syncs any active HA timer entities from the session state.
+    Fires a `culiplan_cooking_session_resumed` HA event.
+    Raises an error if no paused session exists.
+
+complete_cooking_mode:
+  name: Complete cooking mode
+  description: >
+    Marks the active cooking session as completed and cancels all
+    associated HA timer entities.
+    Fires a `culiplan_cooking_session_completed` HA event.
+    Raises an error if no cooking session is active.
