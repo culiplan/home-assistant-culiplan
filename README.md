@@ -23,6 +23,7 @@ Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home 
 | `sensor.culiplan_meals_today` | Number of meals planned today |
 | `sensor.culiplan_shopping_items` | Count of unchecked shopping list items |
 | `sensor.culiplan_expiring_pantry` | Pantry items expiring within 3 days |
+| `sensor.culiplan_planned_kwh_today` | Estimated cooking energy (kWh) for today's planned meals — Phase 3 |
 
 Voice (Assist): say "Add bread to the shopping list" or "What's for dinner tonight?" once the integration is linked.
 
@@ -37,10 +38,11 @@ the integration. See [lovelace/README.md](lovelace/README.md) for installation d
 | Pantry Tracker | `custom:flavorplan-pantry-tracker` | Tile grid with expiry warnings, low-stock indicator and inline actions |
 | Cooking Mode | `custom:flavorplan-cooking-mode` | Step-by-step cooking session: step list, active timers, voice "next step" shortcut |
 
-**Three pre-configured dashboard YAMLs** ship in `lovelace/dashboards/`:
+**Four pre-configured dashboard YAMLs** ship in `lovelace/dashboards/`:
 - `kitchen-tablet.yaml` — 10" landscape tablet, three-column layout
 - `phone-quick-view.yaml` — single-column mobile view
 - `voice-pe-companion.yaml` — wall display / Voice PE companion
+- `energy-meal-cost.yaml` — planned kWh gauge + history graph (Phase 3, requires `sensor.culiplan_planned_kwh_today`)
 
 **Design tokens** (`lovelace/tokens.css`) are `:root`-scoped so users can override the brand
 colour and any token via [card-mod](https://github.com/thomasloven/lovelace-card-mod).

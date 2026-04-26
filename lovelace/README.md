@@ -88,7 +88,7 @@ Or use the HA Dashboard Resources UI (**Settings → Dashboards → Resources**)
 
 ## Pre-configured Dashboards
 
-Three dashboard YAML presets ship in `lovelace/dashboards/`. Import any of them via
+Four dashboard YAML presets ship in `lovelace/dashboards/`. Import any of them via
 **Home Assistant → Dashboards → Add Dashboard → Take Control**, then paste the YAML
 into the RAW configuration editor.
 
@@ -97,6 +97,25 @@ into the RAW configuration editor.
 | `kitchen-tablet.yaml` | 10" landscape tablet | Three-column layout: Kitchen Dashboard, Meal Calendar, Pantry Tracker |
 | `phone-quick-view.yaml` | Mobile phone (360–430 px) | Single-column scrollable with today's meals + pantry summary |
 | `voice-pe-companion.yaml` | Wall display / Voice PE companion | Two-column always-on layout with prominent voice shortcut |
+| `energy-meal-cost.yaml` | Any display | Planned meal energy gauge + 7-day history + per-meal breakdown. Requires `sensor.culiplan_planned_kwh_today` (Phase 3). |
+
+### Energy & Meal Cost Dashboard (`energy-meal-cost.yaml`)
+
+Added in Phase 3 (task-1399). Shows planned cooking energy consumption alongside your HA
+Energy dashboard.
+
+**Sensor required:** `sensor.culiplan_planned_kwh_today`
+- Unit: `kWh`
+- State class: `total`
+- Device class: `energy`
+- Updated: whenever your meal plan changes (via WebSocket push), and on coordinator refetch
+
+**To add cooking cost to the HA Energy dashboard:**
+1. Go to **Settings → Energy**
+2. Under **Individual devices**, click **Add device**
+3. Select **sensor.culiplan_planned_kwh_today**
+
+HA multiplies the sensor value by your configured energy tariff automatically.
 
 ---
 
@@ -264,7 +283,8 @@ lovelace/
 ├── dashboards/
 │   ├── kitchen-tablet.yaml       # 10" landscape tablet layout
 │   ├── phone-quick-view.yaml     # Single-column phone layout
-│   └── voice-pe-companion.yaml   # Wall display / Voice PE companion layout
+│   ├── voice-pe-companion.yaml   # Wall display / Voice PE companion layout
+│   └── energy-meal-cost.yaml     # Planned kWh gauge + history (Phase 3, task-1399)
 └── screenshots/                  # Visual regression baselines (captured per smoke test)
     ├── kitchen-dashboard-light.png
     ├── kitchen-dashboard-dark.png

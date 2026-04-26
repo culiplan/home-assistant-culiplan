@@ -1,0 +1,111 @@
+# ============================================================
+# Culiplan — Energy & Meal Cost Dashboard (task-1399)
+#
+# Shows planned meal energy consumption alongside your home
+# energy usage. Requires:
+#   - Culiplan integration installed and linked
+#   - sensor.culiplan_planned_kwh_today available
+#   - HA Energy dashboard configured with your energy tariff
+#
+# For planned-vs-spent cost comparison in the HA Energy
+# dashboard, add sensor.culiplan_planned_kwh_today as a
+# 'home appliance' source. HA will multiply kWh × your
+# configured tariff automatically.
+#
+# Install:
+#   Home Assistant → Dashboards → Add Dashboard → Take Control
+#   Paste this file's contents into the RAW configuration editor.
+# ============================================================
+
+title: "Meal Energy"
+icon: mdi:flash
+path: culiplan-energy
+theme: default
+
+views:
+  - title: "Today's Meal Energy"
+    path: meal-energy-today
+    icon: mdi:pot-steam
+    cards:
+      # ── Planned kWh gauge ──────────────────────────────────────────────────
+      - type: gauge
+        name: "Planned meal energy today"
+        entity: sensor.culiplan_planned_kwh_today
+        unit: kWh
+        min: 0
+        max: 10
+        severity:
+          green: 0
+          yellow: 3
+          red: 6
+        needle: true
+
+      # ── History graph — planned kWh over the last 7 days ──────────────────
+      - type: history-graph
+        title: "Planned meal energy — last 7 days"
+        hours_to_show: 168
+        refresh_interval: 300
+        entities:
+          - entity: sensor.culiplan_planned_kwh_today
+            name: "Planned kWh"
+
+      # ── Stat card: today's value with sparkline ────────────────────────────
+      - type: statistic
+        entity: sensor.culiplan_planned_kwh_today
+        name: "Cooking energy today"
+        period:
+          calendar:
+            period: day
+
+      # ── Per-meal breakdown (entities card) ────────────────────────────────
+      # Shows the raw sensor state + key attributes for debugging / insight.
+      - type: entities
+        title: "Meal energy details"
+        entities:
+          - entity: sensor.culiplan_planned_kwh_today
+            name: "Estimated kWh today"
+          - type: attribute
+            entity: sensor.culiplan_planned_kwh_today
+            attribute: slot_count
+            name: "Planned meals"
+            icon: mdi:calendar-today
+          - type: attribute
+            entity: sensor.culiplan_planned_kwh_today
+            attribute: date
+            name: "Date"
+            icon: mdi:calendar
+
+      # ── Weekly energy bar chart ────────────────────────────────────────────
+      - type: statistics-graph
+        title: "Weekly cooking energy"
+        entities:
+          - entity: sensor.culiplan_planned_kwh_today
+            name: "Planned kWh"
+        period:
+          calendar:
+            period: week
+        stat_types:
+          - sum
+          - mean
+        chart_type: bar
+
+      # ── Cost estimate note ─────────────────────────────────────────────────
+      # HA Energy dashboard already computes cost = kWh × your tariff.
+      # Add sensor.culiplan_planned_kwh_today as a 'home appliance' source in
+      #   Settings → Energy → Add appliance → Individual device
+      # to see meal costs alongside your home energy bill.
+      - type: markdown
+        content: >
+          ## Planned-vs-spent cost comparison
+
+          To see meal energy costs alongside your home energy bill:
+
+          1. Go to **Settings → Energy**
+          2. Under **Individual devices**, click **Add device**
+          3. Select **sensor.culiplan_planned_kwh_today**
+
+          HA will multiply the planned kWh by your configured energy tariff
+          (set in the Energy dashboard) to show the estimated cooking cost.
+
+          > **Tip:** This sensor updates automatically whenever your meal plan
+          > changes, so the estimate always reflects today's planned meals.
