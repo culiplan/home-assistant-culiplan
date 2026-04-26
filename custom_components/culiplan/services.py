@@ -39,6 +39,7 @@ from .const import (
     CONF_LOCAL_MODEL,
     DOMAIN,
 )
+from .ai.debug_logger import setup_debug_log_purge
 from .ai.key_store import BYOKKeyStore
 from .ai.service import AIDispatchService
 from .ai.types import PremiumRequiredError
@@ -160,6 +161,12 @@ async def _run_byok_or_local_intent(
     api_key = ""
     base_url = None
     debug = entry_data.get("options", {}).get("debug_ai", False)
+    config_dir: str | None = getattr(hass.config, "config_dir", None)
+
+    # task-1410: when debug mode is active, register the hourly purge job so
+    # that prompt log files are automatically removed after 24h.
+    if debug and config_dir:
+        setup_debug_log_purge(hass)
 
     if ai_mode == AI_MODE_BYOK:
         provider = entry_config.get(CONF_BYOK_PROVIDER, "")
@@ -182,6 +189,7 @@ async def _run_byok_or_local_intent(
         api_key=api_key,
         base_url=base_url,
         debug=debug,
+        config_dir=config_dir,
     )
 
     result = await service.run_intent(intent, params)

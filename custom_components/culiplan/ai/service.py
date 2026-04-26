@@ -90,6 +90,7 @@ class AIDispatchService:
         api_key: str = "",
         base_url: str | None = None,
         debug: bool = False,
+        config_dir: str | None = None,
     ) -> None:
         self._mode = mode
         self._client = flavorplan_client
@@ -99,6 +100,7 @@ class AIDispatchService:
             api_key=api_key,
             base_url=base_url,
             debug=debug,
+            config_dir=config_dir,
         )
 
     async def fetch_envelope(

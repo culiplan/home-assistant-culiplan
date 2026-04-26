@@ -16,9 +16,10 @@ Each dispatcher:
 
 Streaming responses are deferred to v2 (§13.2).
 
-Debug mode (§13.2):
-    Pass debug=True to log prompts at DEBUG level.  Logs are client-side only,
-    never sent to Flavorplan.  Auto-purge TTL of 24h is noted in the log.
+Debug mode (§13.2, task-1410):
+    Pass debug=True to log prompts at DEBUG level.  Logs are written to a
+    dedicated rotating file (culiplan_ai_debug.log) under the HA config dir,
+    never to the main HA log stream, and are auto-purged after 24h.
 
 Retry policy (§13.6, task-1411):
     All three dispatchers retry once on 5xx with 1s backoff before raising
@@ -33,6 +34,7 @@ import logging
 import uuid
 from typing import Any
 
+from .debug_logger import get_debug_logger
 from .types import (
     DispatchResult,
     DispatcherError,
@@ -155,23 +157,24 @@ class OpenAICompatibleDispatcher:
         api_key: str,
         base_url: str | None = None,
         debug: bool = False,
+        config_dir: str | None = None,
     ) -> None:
         """
         Initialise the dispatcher.
 
         Args:
-            api_key:  Provider API key (stored in HA secrets, never sent to Flavorplan).
-                      For local endpoints (Ollama/LM Studio) pass "ollama" or "lm-studio"
-                      as a placeholder — the endpoint does not authenticate.
-            base_url: Override the default OpenAI base URL.
-                      Set to "http://localhost:11434/v1" for Ollama,
-                      "http://localhost:1234/v1" for LM Studio.
-            debug:    If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Provider API key (stored in HA secrets, never sent to Flavorplan).
+            base_url:   Override the default OpenAI base URL.
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from openai import AsyncOpenAI
 
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -202,9 +205,11 @@ class OpenAICompatibleDispatcher:
         tools = _tool_specs_to_openai(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][openai-compat] Sending prompt to provider. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][openai-compat] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "Messages: %s",
                 json.dumps(messages),
             )
@@ -301,16 +306,22 @@ class AnthropicDispatcher:
     Requires: anthropic Python package (bundled in manifest.json requirements).
     """
 
-    def __init__(self, api_key: str, debug: bool = False) -> None:
+    def __init__(
+        self, api_key: str, debug: bool = False, config_dir: str | None = None
+    ) -> None:
         """
         Args:
-            api_key: Anthropic API key (stored in HA secrets, never sent to Flavorplan).
-            debug:   If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Anthropic API key (stored in HA secrets, never sent to Flavorplan).
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from anthropic import AsyncAnthropic
 
         self._client = AsyncAnthropic(api_key=api_key)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -345,9 +356,11 @@ class AnthropicDispatcher:
         tools = _tool_specs_to_anthropic(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][anthropic] Sending prompt to Anthropic. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][anthropic] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "System: %s | Messages: %s",
                 system_content,
                 json.dumps(conversation),
@@ -419,16 +432,22 @@ class GoogleDispatcher:
     Requires: google-genai Python package (bundled in manifest.json requirements).
     """
 
-    def __init__(self, api_key: str, debug: bool = False) -> None:
+    def __init__(
+        self, api_key: str, debug: bool = False, config_dir: str | None = None
+    ) -> None:
         """
         Args:
-            api_key: Google/Gemini API key (stored in HA secrets).
-            debug:   If True, log prompt content at DEBUG level (client-side only).
+            api_key:    Google/Gemini API key (stored in HA secrets).
+            debug:      If True, log prompt content (client-side only, 24h TTL).
+            config_dir: HA config directory for debug log files (task-1410).
         """
         from google import genai  # type: ignore[import]
 
         self._client = genai.Client(api_key=api_key)
         self._debug = debug
+        self._debug_logger = (
+            get_debug_logger(config_dir) if debug and config_dir else _LOGGER
+        )
 
     async def dispatch(
         self,
@@ -471,9 +490,11 @@ class GoogleDispatcher:
         function_declarations = _tool_specs_to_google(envelope.tools)
 
         if self._debug:
-            _LOGGER.debug(
-                "[culiplan][google] Sending prompt to Gemini. "
-                "DEBUG MODE: prompt logged client-side, auto-purge TTL 24h. "
+            # task-1410: use dedicated debug logger (writes to culiplan_ai_debug.log,
+            # purged after 24h) instead of the main HA log stream.
+            self._debug_logger.debug(
+                "[culiplan][google] DEBUG MODE — prompt logged client-side "
+                "in culiplan_ai_debug.log (auto-purged after 24h). "
                 "Contents: %s",
                 json.dumps(contents),
             )
@@ -551,15 +572,17 @@ def create_dispatcher(
     api_key: str = "",
     base_url: str | None = None,
     debug: bool = False,
+    config_dir: str | None = None,
 ) -> "OpenAICompatibleDispatcher | AnthropicDispatcher | GoogleDispatcher":
     """
     Factory: return the correct dispatcher for the given AI mode.
 
     Args:
-        mode:     One of the AIMode values from const.py.
-        api_key:  Provider API key (empty string for local endpoints).
-        base_url: Optional endpoint override (for Ollama / LM Studio).
-        debug:    Enable client-side prompt logging.
+        mode:       One of the AIMode values from const.py.
+        api_key:    Provider API key (empty string for local endpoints).
+        base_url:   Optional endpoint override (for Ollama / LM Studio).
+        debug:      Enable client-side prompt logging.
+        config_dir: HA config directory for debug log files (task-1410).
 
     Raises:
         ValueError: If mode is not a recognised BYOK or Local mode.
@@ -569,11 +592,12 @@ def create_dispatcher(
             api_key=api_key or "ollama",  # local endpoints don't need a real key
             base_url=base_url,
             debug=debug,
+            config_dir=config_dir,
         )
     if mode == "byok-anthropic":
-        return AnthropicDispatcher(api_key=api_key, debug=debug)
+        return AnthropicDispatcher(api_key=api_key, debug=debug, config_dir=config_dir)
     if mode == "byok-gemini":
-        return GoogleDispatcher(api_key=api_key, debug=debug)
+        return GoogleDispatcher(api_key=api_key, debug=debug, config_dir=config_dir)
     raise ValueError(
         f"Unknown AI mode '{mode}'. "
         "Expected one of: byok-openai, byok-anthropic, byok-gemini, "
