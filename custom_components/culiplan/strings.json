@@ -127,6 +127,24 @@
     "complete_cooking_mode": {
       "name": "Complete cooking mode",
       "description": "Marks the active cooking session as completed."
+    },
+    "generate_blueprint": {
+      "name": "Generate automation blueprint",
+      "description": "Generates a Home Assistant automation blueprint YAML from a natural language description using Flavorplan AI. Cloud AI mode requires Flavorplan Premium; BYOK and Local AI modes are free.",
+      "fields": {
+        "prompt": {
+          "name": "Prompt",
+          "description": "Natural language description of the automation you want to create."
+        },
+        "available_entities": {
+          "name": "Available entities",
+          "description": "List of entity IDs available in your Home Assistant install (max 100)."
+        },
+        "install": {
+          "name": "Install blueprint",
+          "description": "Write the generated YAML to config/blueprints/automation/culiplan/ and reload HA blueprints."
+        }
+      }
     }
   },
   "issues": {

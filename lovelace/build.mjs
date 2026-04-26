@@ -22,9 +22,10 @@ const cardsDir = resolve(__dirname, "cards");
 const distDir = resolve(cardsDir, "dist");
 
 const CARDS = [
-  { src: "kitchen-dashboard.ts", out: "kitchen-dashboard.js" },
-  { src: "pantry-tracker.ts",    out: "pantry-tracker.js"    },
-  { src: "cooking-mode.ts",      out: "cooking-mode.js"      }, // Phase 3, task-1383
+  { src: "kitchen-dashboard.ts",    out: "kitchen-dashboard.js"    },
+  { src: "pantry-tracker.ts",       out: "pantry-tracker.js"       },
+  { src: "cooking-mode.ts",         out: "cooking-mode.js"         }, // Phase 3, task-1383
+  { src: "blueprint-generator.ts",  out: "blueprint-generator.js"  }, // Phase 3, task-1400
 ];
 
 const BANNER = `/**
