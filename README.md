@@ -6,9 +6,9 @@
 
 Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home Assistant.
 
-> **Phase 2** — Calendar, to-do, sensor entities, Assist intents and the Lovelace card pack
-> (Kitchen Dashboard + Pantry Tracker) are live. Advanced AI services and Cooking Mode card
-> ship in Phase 3. Report issues at [GitHub Issues](https://github.com/culiplan/home-assistant-culiplan/issues).
+> **Phase 3** — Cooking Mode card (`flavorplan-cooking-mode`) is now live. Calendar, to-do,
+> sensor entities, Assist intents and the full Lovelace card pack (Kitchen Dashboard + Pantry
+> Tracker + Cooking Mode) are available. Report issues at [GitHub Issues](https://github.com/culiplan/home-assistant-culiplan/issues).
 
 ---
 
@@ -26,7 +26,7 @@ Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home 
 
 Voice (Assist): say "Add bread to the shopping list" or "What's for dinner tonight?" once the integration is linked.
 
-### Lovelace Card Pack (Phase 2)
+### Lovelace Card Pack
 
 Three custom cards with Culiplan's mobile design language, installed automatically alongside
 the integration. See [lovelace/README.md](lovelace/README.md) for installation details.
@@ -35,7 +35,7 @@ the integration. See [lovelace/README.md](lovelace/README.md) for installation d
 |---|---|---|
 | Kitchen Dashboard | `custom:flavorplan-kitchen-dashboard` | Today's meals with recipe image, servings, time and shopping shortcut |
 | Pantry Tracker | `custom:flavorplan-pantry-tracker` | Tile grid with expiry warnings, low-stock indicator and inline actions |
-| Cooking Mode | `custom:flavorplan-cooking-mode` | _(Phase 3 — blocked on cooking session resource)_ |
+| Cooking Mode | `custom:flavorplan-cooking-mode` | Step-by-step cooking session: step list, active timers, voice "next step" shortcut |
 
 **Three pre-configured dashboard YAMLs** ship in `lovelace/dashboards/`:
 - `kitchen-tablet.yaml` — 10" landscape tablet, three-column layout
@@ -135,23 +135,24 @@ action:
 
 ---
 
-## Beta — known limitations
+## Known limitations
 
-This is a Tier 1 beta. The following features are **not yet available** and are planned for later HACS releases:
+The following features are **not yet available** and are planned for later HACS releases:
 
-- **Lovelace custom cards** (Kitchen Dashboard, Cooking Mode, Pantry Tracker) — Phase 2
-- **AI shopping list fill** (voice command "fill my shopping list for the week") — Phase 2
-- **Smart pantry recommendations** — Phase 2
-- **Cooking Mode step-by-step timers** — Phase 3
-- **Mealie data migration wizard** — Phase 2
+- **AI shopping list fill** (voice command "fill my shopping list for the week") — Phase 3
+- **Smart pantry recommendations** — Phase 3
+- **Mealie data migration wizard** — Phase 3
 - **HA Core catalog listing** — Phase 4 (after HACS community validation)
+- **HA cooking-mode service** (culiplan.advance_cooking_step — required for Cooking Mode card step taps) — Phase 3 follow-up (task-1397)
 
-What **does** work in 0.1.0:
+What **does** work:
 - OAuth account linking
 - Calendar entity (meal plan events, dinner parties)
 - Shopping list todo entity (two-way sync)
 - Sensors: meals this week, shopping items count, expiring pantry items
 - Assist voice commands: add to shopping list, what's for dinner, what's in pantry (en/nl/de/fr/es)
+- Lovelace card pack: Kitchen Dashboard, Pantry Tracker, Cooking Mode (Phase 3)
+- Cooking Mode card: reads active session, shows step list + timers; graceful idle fallback
 - Live push updates via WebSocket (no polling)
 
 ---

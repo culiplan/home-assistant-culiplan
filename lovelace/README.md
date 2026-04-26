@@ -6,19 +6,23 @@ the integration is installed.
 
 ---
 
-## Cards included in v1
+## Cards included
 
 | Card element | Description | Source |
 |---|---|---|
 | `flavorplan-kitchen-dashboard` | Today's meal plan with recipe image, servings, time and a shopping-list shortcut | `cards/dist/kitchen-dashboard.js` |
 | `flavorplan-pantry-tracker` | Pantry tile grid with expiry warnings (red < 48 h, amber < 7 d), low-stock indicator, filter chips, and inline actions | `cards/dist/pantry-tracker.js` |
+| `flavorplan-cooking-mode` | Step-by-step cooking session: step list, active timers with HA-native countdown, voice "next step" shortcut, graceful idle fallback | `cards/dist/cooking-mode.js` |
 
-### v1 Known Limitations
+### Cooking Mode card
 
-**Cooking Mode card (`flavorplan-cooking-mode`) is NOT included in v1.**
-It depends on the cooking session resource (`GET /api/cooking-sessions/:id`) which is scheduled
-for Phase 3 backend work (task-1396). The three pre-configured dashboard YAMLs contain a
-placeholder `markdown` card with instructions for where to add it once Phase 3 ships.
+The `flavorplan-cooking-mode` card (Phase 3, task-1383) reads the active cooking session from
+`sensor.culiplan_active_cooking_session`. It requires:
+- The Culiplan backend `/api/cooking-sessions` endpoint (task-1396, shipped in Phase 3).
+- The `culiplan.advance_cooking_step` HA service (task-1397, ships in Phase 3).
+- A `sensor.culiplan_active_cooking_session` entity exposed by the coordinator.
+
+When no session is active the card shows a graceful "Start cooking from a recipe" CTA.
 
 ---
 
@@ -64,6 +68,8 @@ lovelace:
     - url: /local/culiplan/lovelace/cards/dist/kitchen-dashboard.js
       type: module
     - url: /local/culiplan/lovelace/cards/dist/pantry-tracker.js
+      type: module
+    - url: /local/culiplan/lovelace/cards/dist/cooking-mode.js
       type: module
 ```
 
@@ -237,12 +243,15 @@ lovelace/
 ├── tokens.css                    # :root CSS variables (brand + surface + type + radius + shadows + motion)
 ├── tokens.README.md              # Mapping table from mobile/theme.ts and tailwind.config.ts
 ├── README.md                     # This file
+├── build.mjs                     # esbuild pipeline — builds all cards to dist/
 ├── cards/
 │   ├── kitchen-dashboard.ts      # LitElement source — flavorplan-kitchen-dashboard
 │   ├── pantry-tracker.ts         # LitElement source — flavorplan-pantry-tracker
+│   ├── cooking-mode.ts           # LitElement source — flavorplan-cooking-mode (Phase 3)
 │   └── dist/
 │       ├── kitchen-dashboard.js  # Pre-built distribution bundle (commit to repo)
-│       └── pantry-tracker.js     # Pre-built distribution bundle (commit to repo)
+│       ├── pantry-tracker.js     # Pre-built distribution bundle (commit to repo)
+│       └── cooking-mode.js       # Pre-built distribution bundle (commit to repo)
 ├── dashboards/
 │   ├── kitchen-tablet.yaml       # 10" landscape tablet layout
 │   ├── phone-quick-view.yaml     # Single-column phone layout
