@@ -154,6 +154,139 @@ iCloud, CalDAV, Nextcloud, and more.
 
 ---
 
+### 6. Pantry Barcode Decrement
+
+**File:** `automation/culiplan/pantry-barcode-decrement.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fpantry-barcode-decrement.yaml)
+
+When a barcode scanner connected to Home Assistant fires a scan event, this
+blueprint calls `culiplan.pantry_decrement` to remove one unit of the matched
+item from your Culiplan pantry. Works with any HA-compatible barcode scanner:
+USB HID readers, Bluetooth scanners, the HA companion app's barcode scanner
+action, or any integration that fires an event with a barcode payload.
+
+**Configurable inputs:** barcode event entity, decrement quantity.
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+Scan an item out of your pantry the same way a supermarket scans it in.
+Connect any barcode reader to Home Assistant, point this blueprint at it, and
+Culiplan's pantry ledger stays accurate in real time — no manual counting, no
+app tap required. Works with USB, Bluetooth, and phone-based scanners.
+
+---
+
+### 7. Daily Pantry Expiry Reminder
+
+**File:** `automation/culiplan/pantry-expiry-notify.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fpantry-expiry-notify.yaml)
+
+Every morning at a configurable time, this blueprint checks whether any pantry
+items are expiring within the next 48 hours and sends a push notification
+prompting the household to act. Pairs perfectly with the Sunday Plan Push
+blueprint to give both a weekly overview and daily last-chance reminders for
+items about to turn.
+
+**Configurable inputs:** reminder time, notification service, title, message template.
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+Stop throwing money away. This blueprint sends a daily nudge when something in
+your pantry is about to expire — before it ends up in the bin. Takes 30 seconds
+to set up and runs itself every morning. Your household bins less, wastes less,
+and plans better.
+
+---
+
+### 8. Presence-Based Serving Scale
+
+**File:** `automation/culiplan/presence-scale-servings.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fpresence-scale-servings.yaml)
+
+When the number of household members home changes, this blueprint calls
+`culiplan.scale_tonight_servings` with the live count so Culiplan can
+automatically adjust tonight's recipe quantities. A family of four with one
+person away on a work trip gets a three-portion recipe automatically; a dinner
+party that fills up gets scaled up without anyone touching the app.
+
+**Configurable inputs:** presence sensor (person group or count sensor).
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+The right number of portions, automatically. Link your HA household presence
+sensors to Culiplan and tonight's recipe scales itself in real time as people
+arrive or leave. No more guessing at quantities, no more leftovers by accident.
+Pairs with the Dinner Party Pre-Arrival blueprint for full event-night automation.
+
+---
+
+### 9. Dinner Party Pre-Arrival Ambiance
+
+**File:** `automation/culiplan/dinner-party-pre-arrival.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fdinner-party-pre-arrival.yaml)
+
+Fifteen minutes before your Culiplan dinner party starts, this blueprint dims
+the lights to a warm ambiance level and starts your dinner playlist — so the
+mood is set before the first guest rings the doorbell. Reads the `start_at`
+attribute from `binary_sensor.culiplan_dinner_party_active` and fires at
+exactly the right moment.
+
+**Configurable inputs:** light target, brightness percentage, colour temperature (K),
+media player entity, playlist URI, minutes-before-start lead time.
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+Every dinner party deserves a proper entrance. Culiplan knows when your guests
+arrive — this blueprint makes sure your lights and music agree. Candlelight dim
+and dinner playlist start automatically, timed to the minute. Works with any
+HA-compatible light and media player: Philips Hue, LIFX, Sonos, Cast, and more.
+
+---
+
+### 10. Smart Oven & Induction Preheat
+
+**File:** `automation/culiplan/smart-oven-preheat.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fsmart-oven-preheat.yaml)
+
+The recipe-aware evolution of blueprint #1. Where "Pre-heat on Presence" fires
+a single appliance at a fixed temperature, this blueprint reads the recipe's
+`requiredTemperature` and `cookingMethod` attributes directly from the
+`calendar.culiplan_meal_plan` event and orchestrates your oven **and**
+induction hob as a coordinated pair.
+
+When tonight's recipe is tagged `oven` the oven fires at the recipe's specified
+temperature (or your configured default). When tagged `induction` the hob fires
+instead. When tagged `oven,induction` — or when no tag is present — both
+appliances fire in the same run. A presence gate, a configurable preheat
+window, and an optional push notification round out the feature set.
+
+Per-step appliance routing (e.g. induction for sautéing at step 1, oven for
+finishing at step 3) is forward-compatible: when Culiplan exposes
+`step_appliances` on the calendar event the blueprint will route accordingly,
+and the notification message will flag this to the user.
+
+**Configurable inputs:** preheat lead time (1–60 min, default 15), check window
+start/end, oven entity (climate or switch), default oven temperature (°C),
+induction entity (optional, climate or switch), default induction temperature,
+"fire induction without cookingMethod" toggle, presence sensor (optional),
+notification service (optional), notification title.
+
+**Recipe metadata used:** `requiredTemperature` (integer, °C) and
+`cookingMethod` (string: `oven`, `induction`, or `oven,induction`) from
+`calendar.culiplan_meal_plan` event attributes. Falls back gracefully when
+absent.
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+Your kitchen heats up at exactly the right temperature, automatically. This
+blueprint reads tonight's recipe — including the required cooking temperature —
+and tells your oven and induction hob what to do, when to do it, and only when
+someone is home. No more cold ovens, no more guessing at temperatures, no more
+wasted energy while the house is empty. Set it up once and let Culiplan and
+Home Assistant run the kitchen together.
+
+---
+
 ## Installation
 
 ### Option A: One-click import (recommended)
@@ -205,6 +338,15 @@ automations can subscribe to these:
 ---
 
 ## Changelog
+
+### v1.1.0 (2026-04-25)
+
+- Added blueprint #10: Smart Oven & Induction Preheat — recipe-aware
+  multi-appliance choreography with `requiredTemperature` + `cookingMethod`
+  attribute reading, per-step routing forward-compatibility, and presence gate
+- Documented blueprints #6–#9 (Phase 2 pantry/dinner-party blueprints that
+  shipped alongside the cooking-mode card): pantry-barcode-decrement,
+  pantry-expiry-notify, presence-scale-servings, dinner-party-pre-arrival
 
 ### v1.0.0 (2026-04-25)
 

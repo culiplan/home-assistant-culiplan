@@ -1,0 +1,393 @@
+blueprint:
+  name: "Culiplan: Smart Oven & Induction Preheat"
+  description: >
+    Recipe-aware, multi-appliance preheat choreography for your kitchen.
+    Reads tonight's recipe directly from `calendar.culiplan_meal_plan` — including
+    the recipe's `requiredTemperature` attribute and `cookingMethod` tag — and fires
+    `climate.set_temperature` (or `switch.turn_on`) on your oven, your induction
+    hob, or both, at exactly the right lead time before dinner.
+
+    **What makes this different from "Pre-heat on Presence"**
+
+    - **Recipe-driven temperature.** When Culiplan exposes a `requiredTemperature`
+      attribute on tonight's calendar event, that value is used automatically.
+      Your configured *default oven temperature* acts as the fallback.
+    - **Induction support.** Configure a second appliance entity (climate or
+      switch) for your induction hob. The automation fires both in the same run
+      if the recipe's `cookingMethod` tag includes both `oven` and `induction`,
+      or fires only the relevant appliance when a single method is specified.
+    - **Per-step routing note.** Culiplan's calendar event `description` field may
+      include step-level appliance hints in future API versions (e.g.
+      `step_appliances: [{step: 1, appliance: induction}, {step: 3, appliance: oven}]`).
+      When that data is present the automation respects it; for now it falls back
+      to the top-level `cookingMethod` attribute.
+
+    **Requirements**
+
+    - Culiplan integration installed and connected (provides `calendar.culiplan_meal_plan`)
+    - At least one climate or switch entity representing your oven or hob
+    - Home Assistant 2024.6 or later
+
+    **Tips**
+
+    - For a smart oven: set *Oven entity* to the `climate.*` entity and leave
+      *Default oven temperature* at your preferred preheat temperature.
+    - For an oven on a smart plug: set *Oven entity* to the `switch.*` entity;
+      the automation will toggle the switch (no temperature command sent).
+    - For induction only recipes (salads, cold prep): the oven appliance will
+      remain off even if configured — the `cookingMethod` gate prevents spurious
+      firing.
+    - Set *Induction entity* to blank / skip if you only have a conventional oven.
+
+    **Recipe metadata (calendar event attributes)**
+
+    Culiplan populates the following attributes on `calendar.culiplan_meal_plan`
+    for tonight's event when the recipe has been synced:
+
+    | Attribute | Type | Example |
+    |---|---|---|
+    | `requiredTemperature` | integer (°C) | `200` |
+    | `cookingMethod` | string | `"oven"`, `"induction"`, `"oven,induction"` |
+
+    When `requiredTemperature` is absent the blueprint falls back to your
+    *Default oven temperature* input. When `cookingMethod` is absent the blueprint
+    assumes both appliances should fire (conservative default — you can override
+    with the *Force induction even without cookingMethod* toggle).
+
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/smart-oven-preheat.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    # ── Lead time ──────────────────────────────────────────────────────────────
+    preheat_lead_time:
+      name: Preheat lead time (minutes)
+      description: >
+        How many minutes before the recipe start time should the appliances
+        begin heating? Typical oven: 15–20 min. Induction: 2–5 min.
+        The same lead time is applied to both appliances; fire two automations
+        from the same blueprint if you need separate lead times.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: min
+          mode: slider
+
+    # ── Check window ───────────────────────────────────────────────────────────
+    check_window_start:
+      name: Earliest check time
+      description: >
+        The automation will not fire before this time of day. Prevents
+        spurious morning triggers when an event is far in the future.
+      default: "14:00:00"
+      selector:
+        time: {}
+
+    check_window_end:
+      name: Latest check time
+      description: >
+        The automation will not fire after this time of day.
+      default: "21:00:00"
+      selector:
+        time: {}
+
+    # ── Oven appliance ─────────────────────────────────────────────────────────
+    oven_entity:
+      name: Oven entity
+      description: >
+        The climate entity (smart oven) or switch entity (smart plug / relay)
+        that controls your oven. This appliance fires when the recipe's
+        `cookingMethod` attribute is `oven`, `oven,induction`, or absent.
+      selector:
+        entity:
+          domain:
+            - climate
+            - switch
+            - input_boolean
+
+    default_oven_temp:
+      name: Default oven temperature (°C)
+      description: >
+        Temperature to use when the recipe does not specify a
+        `requiredTemperature` attribute. Ignored when the oven entity is a
+        switch (simple on/off). Set to 0 to never send a temperature command.
+      default: 200
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 5
+          unit_of_measurement: "°C"
+          mode: box
+
+    # ── Induction appliance (optional) ─────────────────────────────────────────
+    induction_entity:
+      name: Induction hob entity (optional)
+      description: >
+        The climate entity (smart induction hob) or switch entity (smart plug)
+        that controls your induction hob. Leave blank if you only have a
+        conventional oven. This appliance fires when the recipe's
+        `cookingMethod` attribute is `induction`, `oven,induction`, or absent.
+      default: ""
+      selector:
+        text: {}
+
+    default_induction_temp:
+      name: Default induction temperature (°C)
+      description: >
+        Target temperature for the induction hob when the recipe does not
+        specify one. Ignored when the induction entity is a switch. Set to 0
+        to use switch-only mode.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 5
+          unit_of_measurement: "°C"
+          mode: box
+
+    force_induction_without_method:
+      name: Fire induction even when cookingMethod is absent
+      description: >
+        When enabled (default: on), the induction hob fires whenever
+        `cookingMethod` is absent from the recipe — i.e., treat "unknown
+        method" as "both appliances". Disable this if you only want induction
+        to fire when explicitly tagged.
+      default: true
+      selector:
+        boolean: {}
+
+    # ── Presence gate (optional) ────────────────────────────────────────────────
+    presence_entity:
+      name: Presence sensor (optional)
+      description: >
+        A binary sensor, person entity, or group that is **on** / **home**
+        when at least one household member is present. When configured, both
+        appliances will stand down if this entity is off / not_home. Leave
+        blank to skip the presence check.
+      default: ""
+      selector:
+        text: {}
+
+    # ── Notifications (optional) ────────────────────────────────────────────────
+    notification_target:
+      name: Notification service (optional)
+      description: >
+        A `notify.*` service (e.g. `notify.mobile_app_phone` or
+        `notify.all_devices`) that receives a message when preheating starts.
+        Leave blank to skip notifications.
+      default: ""
+      selector:
+        text: {}
+
+    notification_title:
+      name: Notification title
+      description: Title for the preheat notification.
+      default: "Kitchen is preheating"
+      selector:
+        text: {}
+
+# ── Variables ──────────────────────────────────────────────────────────────────
+variables:
+  preheat_lead_time: !input preheat_lead_time
+  oven_entity: !input oven_entity
+  default_oven_temp: !input default_oven_temp
+  induction_entity: !input induction_entity
+  default_induction_temp: !input default_induction_temp
+  force_induction_without_method: !input force_induction_without_method
+  presence_entity: !input presence_entity
+  notification_target: !input notification_target
+  notification_title: !input notification_title
+
+  # ── Recipe-derived values from the upcoming calendar event ─────────────────
+  # Culiplan populates these attributes on the current (or next) meal-plan event.
+  # Fall back gracefully when not present.
+  _event_start: >
+    {{ state_attr('calendar.culiplan_meal_plan', 'start_time') }}
+  _recipe_temp_raw: >
+    {{ state_attr('calendar.culiplan_meal_plan', 'requiredTemperature') }}
+  _cooking_method_raw: >
+    {{ state_attr('calendar.culiplan_meal_plan', 'cookingMethod') | default('', true) | lower }}
+  _recipe_name: >
+    {{ state_attr('calendar.culiplan_meal_plan', 'message')
+       or state_attr('calendar.culiplan_meal_plan', 'description')
+       or "tonight's dinner" }}
+
+  # Resolved oven temperature: recipe attribute wins over default
+  resolved_oven_temp: >
+    {% if _recipe_temp_raw is not none and _recipe_temp_raw | int(0) > 0 %}
+      {{ _recipe_temp_raw | int }}
+    {% else %}
+      {{ default_oven_temp | int }}
+    {% endif %}
+
+  # Resolved induction temperature: recipe attribute wins over default
+  resolved_induction_temp: >
+    {% if _recipe_temp_raw is not none and _recipe_temp_raw | int(0) > 0 %}
+      {{ _recipe_temp_raw | int }}
+    {% else %}
+      {{ default_induction_temp | int }}
+    {% endif %}
+
+  # Should oven fire? Yes unless cookingMethod is present and explicitly excludes oven.
+  should_fire_oven: >
+    {% set m = _cooking_method_raw %}
+    {% if m == '' %}
+      true
+    {% else %}
+      {{ 'oven' in m }}
+    {% endif %}
+
+  # Should induction fire? Depends on cookingMethod + force toggle.
+  should_fire_induction: >
+    {% set m = _cooking_method_raw %}
+    {% if induction_entity | trim == '' %}
+      false
+    {% elif m == '' %}
+      {{ force_induction_without_method | bool(true) }}
+    {% else %}
+      {{ 'induction' in m }}
+    {% endif %}
+
+  # Step-level appliance hints (future API expansion).
+  # When Culiplan exposes step_appliances in the event description as a JSON
+  # string, parse it here. Currently resolves to an empty list; the top-level
+  # cookingMethod routing above handles all current use-cases.
+  _step_appliances_raw: >
+    {{ state_attr('calendar.culiplan_meal_plan', 'step_appliances') | default([], true) }}
+  has_step_appliances: >
+    {{ _step_appliances_raw | list | length > 0 }}
+
+# ── Trigger ────────────────────────────────────────────────────────────────────
+trigger:
+  - platform: time_pattern
+    minutes: "/1"
+
+# ── Conditions ─────────────────────────────────────────────────────────────────
+condition:
+  - alias: "Within check window"
+    condition: time
+    after: !input check_window_start
+    before: !input check_window_end
+
+  - alias: "Presence check (skipped when no sensor configured)"
+    condition: template
+    value_template: >
+      {% if presence_entity | trim == '' %}
+        true
+      {% else %}
+        {{ states(presence_entity) in ['on', 'home'] }}
+      {% endif %}
+
+  - alias: "Meal plan has an upcoming event"
+    condition: template
+    value_template: >
+      {{ _event_start is not none }}
+
+  - alias: "Event starts within preheat window"
+    condition: template
+    value_template: >
+      {% if _event_start is none %}
+        false
+      {% else %}
+        {% set start = as_datetime(_event_start) %}
+        {% set diff_minutes = ((start - now()).total_seconds() / 60) | round(0) %}
+        {{ diff_minutes > 0 and diff_minutes <= preheat_lead_time | int }}
+      {% endif %}
+
+  - alias: "At least one appliance should fire"
+    condition: template
+    value_template: >
+      {{ should_fire_oven or should_fire_induction }}
+
+# ── Actions ────────────────────────────────────────────────────────────────────
+action:
+  # ── Oven ──────────────────────────────────────────────────────────────────────
+  - alias: "Start oven if recipe requires it"
+    if:
+      - condition: template
+        value_template: "{{ should_fire_oven }}"
+    then:
+      - choose:
+          # Climate entity with a temperature target
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ resolved_oven_temp > 0 and oven_entity.startswith('climate.') }}
+            sequence:
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ oven_entity }}"
+                data:
+                  temperature: "{{ resolved_oven_temp }}"
+              - service: climate.turn_on
+                target:
+                  entity_id: "{{ oven_entity }}"
+        # Switch / smart plug or climate with temp=0
+        default:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: "{{ oven_entity }}"
+
+  # ── Induction ─────────────────────────────────────────────────────────────────
+  - alias: "Start induction hob if recipe requires it"
+    if:
+      - condition: template
+        value_template: "{{ should_fire_induction }}"
+    then:
+      - choose:
+          # Climate entity with a temperature target
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ resolved_induction_temp > 0 and induction_entity.startswith('climate.') }}
+            sequence:
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ induction_entity }}"
+                data:
+                  temperature: "{{ resolved_induction_temp }}"
+              - service: climate.turn_on
+                target:
+                  entity_id: "{{ induction_entity }}"
+        # Switch / smart plug or climate with temp=0
+        default:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: "{{ induction_entity }}"
+
+  # ── Notification ──────────────────────────────────────────────────────────────
+  - alias: "Send notification if configured"
+    if:
+      - condition: template
+        value_template: "{{ notification_target | trim | length > 0 }}"
+    then:
+      - service: "{{ notification_target }}"
+        data:
+          title: "{{ notification_title }}"
+          message: >
+            {% set recipe = _recipe_name %}
+            {% set start_str = _event_start %}
+            {% set temp = resolved_oven_temp %}
+            {% set method = _cooking_method_raw %}
+            {% if should_fire_oven and should_fire_induction %}
+              {% set appliance_desc = 'Oven (' ~ temp ~ ' °C) and induction hob' %}
+            {% elif should_fire_oven %}
+              {% set appliance_desc = 'Oven (' ~ temp ~ ' °C)' %}
+            {% else %}
+              {% set appliance_desc = 'Induction hob' %}
+            {% endif %}
+            {{ appliance_desc }} preheating for {{ recipe }}.
+            Dinner starts at {{ as_datetime(start_str).strftime('%H:%M') }}.
+            {% if has_step_appliances %}
+            Recipe has per-step appliance routing — check the Culiplan app for details.
+            {% endif %}
+
+mode: single
+max_exceeded: silent
