@@ -14,12 +14,7 @@
 # Custom cards used:
 #   - flavorplan-kitchen-dashboard (today's plan)
 #   - flavorplan-pantry-tracker    (pantry with expiry tiles)
-#
-# Known v1 limitation:
-#   The Cooking Mode card (flavorplan-cooking-mode) is NOT included
-#   in this dashboard. It is blocked on the cooking session resource
-#   (task-1396, Phase 3 backend work). Add it manually once Phase 3
-#   ships. Placeholder comment below marks its intended position.
+#   - flavorplan-cooking-mode      (step-by-step cooking — Phase 3)
 # ============================================================
 
 title: "Kitchen"
@@ -67,7 +62,7 @@ views:
                     name: "Expiring soon"
                     icon: mdi:clock-alert-outline
 
-          # ── Centre column — Calendar ──────────────────────────
+          # ── Centre column — Calendar + Cooking Mode ──────────
           - type: vertical-stack
             cards:
               - type: calendar
@@ -77,25 +72,14 @@ views:
                     name: "Meal plan"
                 initial_view: dayGridWeek
 
-              # Placeholder: Cooking Mode card will go here in Phase 3
-              # Blocked: task-1396 (cooking session resource, Phase 3)
-              # When available, replace this markdown card with:
-              #   type: custom:flavorplan-cooking-mode
-              #   entity: sensor.culiplan_cooking_session
-              - type: markdown
-                content: >
-                  **Cooking Mode** coming in Phase 3.
-
-                  When active, this space will show the current recipe step,
-                  active timers, and voice-command shortcuts. Requires the
-                  cooking session resource (backend task-1396).
-                card_mod:
-                  style: |
-                    ha-card {
-                      background: linear-gradient(135deg, #faf8f5 0%, #fff 100%);
-                      border: 1.5px dashed var(--culiplan-primary, #f26744);
-                      opacity: 0.65;
-                    }
+              # Cooking Mode card — Phase 3 (task-1383 + task-1396)
+              # Shows active cooking session: step list, timers, voice shortcut.
+              # Gracefully shows "Start cooking from a recipe" when idle.
+              - type: custom:flavorplan-cooking-mode
+                entity: sensor.culiplan_active_cooking_session
+                title: "Cooking"
+                show_step_numbers: true
+                max_timers: 3
 
           # ── Right column — Pantry ─────────────────────────────
           - type: vertical-stack

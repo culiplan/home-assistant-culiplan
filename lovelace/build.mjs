@@ -23,7 +23,8 @@ const distDir = resolve(cardsDir, "dist");
 
 const CARDS = [
   { src: "kitchen-dashboard.ts", out: "kitchen-dashboard.js" },
-  { src: "pantry-tracker.ts",     out: "pantry-tracker.js"     },
+  { src: "pantry-tracker.ts",    out: "pantry-tracker.js"    },
+  { src: "cooking-mode.ts",      out: "cooking-mode.js"      }, // Phase 3, task-1383
 ];
 
 const BANNER = `/**
