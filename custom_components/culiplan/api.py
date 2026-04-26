@@ -42,6 +42,10 @@ class FlavorplanApiClient:
     async def async_get_pantry_items(self) -> list[dict[str, Any]]:
         return await self._get("/api/pantry")
 
+    async def async_get_energy_today(self) -> dict[str, Any]:
+        """Fetch today's estimated kWh for planned recipes (task-1399)."""
+        return await self._get("/api/ha/energy/today")
+
     # ─── Shopping list mutations ─────────────────────────────────────────────
 
     async def async_add_shopping_item(

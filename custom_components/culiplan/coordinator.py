@@ -78,6 +78,7 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             meal_plans = await self.client.async_get_meal_plans()
             shopping_lists = await self.client.async_get_shopping_lists()
             pantry_items = await self.client.async_get_pantry_items()
+            energy_today = await self.client.async_get_energy_today()
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
@@ -87,6 +88,7 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "meal_plans": meal_plans,
             "shopping_lists": shopping_lists,
             "pantry_items": pantry_items,
+            "energy_today": energy_today,
         }
 
     # ─── Socket.IO connection ─────────────────────────────────────────────────
@@ -149,6 +151,8 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if event_type == "meal_plan.updated":
             await self._refresh_meal_plans()
+            # Energy estimate depends on today's meal plans — refresh together.
+            await self._refresh_energy()
         elif event_type.startswith("shopping_list.item."):
             await self._refresh_shopping_lists()
         elif event_type.startswith("pantry.item."):
@@ -178,6 +182,14 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_set_updated_data({**(self.data or {}), "pantry_items": pantry_items})
         except Exception as err:
             _LOGGER.error("Failed to refresh pantry items: %s", err)
+
+    async def _refresh_energy(self) -> None:
+        """Re-fetch today's kWh estimate (task-1399). Called after meal_plan.updated."""
+        try:
+            energy_today = await self.client.async_get_energy_today()
+            self.async_set_updated_data({**(self.data or {}), "energy_today": energy_today})
+        except Exception as err:
+            _LOGGER.error("Failed to refresh energy today: %s", err)
 
     # ─── Reconnect logic ─────────────────────────────────────────────────────
 
