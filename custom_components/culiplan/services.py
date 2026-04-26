@@ -41,6 +41,7 @@ from .const import (
 )
 from .ai.key_store import BYOKKeyStore
 from .ai.service import AIDispatchService
+from .ai.types import PremiumRequiredError
 from .api import FlavorplanApiClient
 from .repairs import async_create_premium_repair, async_resolve_premium_repair
 
@@ -84,16 +85,8 @@ SCALE_TONIGHT_SERVINGS_SCHEMA = vol.Schema({
 })
 
 
-class PremiumRequiredError(HomeAssistantError):
-    """Raised when a premium-gated feature is invoked by a free-tier user."""
-
-    def __init__(self, feature: str, upgrade_url: str) -> None:
-        self.feature = feature
-        self.upgrade_url = upgrade_url
-        super().__init__(
-            f"'{feature}' requires Flavorplan Premium. Upgrade at: {upgrade_url}"
-        )
-
+# PremiumRequiredError is imported from .ai.types (task-1416: moved to shared
+# module so both api.py and services.py can use it without circular imports).
 
 class PantryItemNotFoundError(HomeAssistantError):
     """Raised when a barcode is not found in the user's pantry."""
@@ -146,19 +139,12 @@ async def _run_cloud_intent(
     try:
         result = await client.async_call_voice_tool(intent, params)
         return result.get("speakable") or result.get("message") or "Done."
+    except PremiumRequiredError:
+        # Already typed — re-raise directly so the caller can create the
+        # Repairs upsell issue (task-1416: no string parsing needed).
+        raise
     except Exception as exc:
-        exc_str = str(exc)
-        if "403" in exc_str or "premium_required" in exc_str:
-            upgrade_url = "https://culiplan.com/premium?source=ha"
-            try:
-                import json
-                if "{" in exc_str:
-                    body = json.loads(exc_str[exc_str.index("{"):])
-                    upgrade_url = body.get("upgradeUrl", upgrade_url)
-            except (ValueError, KeyError):
-                pass
-            raise PremiumRequiredError(feature=intent, upgrade_url=upgrade_url) from exc
-        raise HomeAssistantError(f"Flavorplan AI request failed: {exc_str}") from exc
+        raise HomeAssistantError(f"Flavorplan AI request failed: {exc}") from exc
 
 
 async def _run_byok_or_local_intent(
@@ -262,27 +248,14 @@ async def _call_scale_servings(
         payload["plan_date"] = plan_date
     try:
         return await client.async_post("/api/ha/servings/scale", payload)
+    except PremiumRequiredError:
+        # api.py now raises PremiumRequiredError directly for 403 premium_required
+        # responses (task-1416: no string parsing needed).
+        raise
+    except HomeAssistantError:
+        raise
     except Exception as exc:
-        exc_str = str(exc)
-        if "403" in exc_str or "premium_required" in exc_str:
-            upgrade_url = "https://culiplan.com/premium?source=ha"
-            try:
-                import json
-                if "{" in exc_str:
-                    body = json.loads(exc_str[exc_str.index("{"):])
-                    upgrade_url = body.get("upgradeUrl", upgrade_url)
-            except (ValueError, KeyError):
-                pass
-            raise PremiumRequiredError(
-                feature="household.presence_scaling",
-                upgrade_url=upgrade_url,
-            ) from exc
-        if "404" in exc_str or "NO_MEAL_PLAN" in exc_str:
-            raise HomeAssistantError(
-                "No meal plan found for the requested date. "
-                "Make sure you have a meal planned in Flavorplan."
-            ) from exc
-        raise HomeAssistantError(f"Scale servings failed: {exc_str}") from exc
+        raise HomeAssistantError(f"Scale servings failed: {exc}") from exc
 
 
 def async_register_services(hass: HomeAssistant) -> None:
