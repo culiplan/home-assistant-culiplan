@@ -12,13 +12,11 @@ the integration is installed.
 |---|---|---|
 | `flavorplan-kitchen-dashboard` | Today's meal plan with recipe image, servings, time and a shopping-list shortcut | `cards/dist/kitchen-dashboard.js` |
 | `flavorplan-pantry-tracker` | Pantry tile grid with expiry warnings (red < 48 h, amber < 7 d), low-stock indicator, filter chips, and inline actions | `cards/dist/pantry-tracker.js` |
+| `flavorplan-cooking-mode` | Step-by-step guided cooking display with active timers, step progress and voice shortcut | `cards/dist/cooking-mode.js` |
 
-### v1 Known Limitations
-
-**Cooking Mode card (`flavorplan-cooking-mode`) is NOT included in v1.**
-It depends on the cooking session resource (`GET /api/cooking-sessions/:id`) which is scheduled
-for Phase 3 backend work (task-1396). The three pre-configured dashboard YAMLs contain a
-placeholder `markdown` card with instructions for where to add it once Phase 3 ships.
+The Cooking Mode card requires an active cooking session (call `culiplan.start_cooking_mode`
+from Assist or a dashboard button). All three cards auto-register as Lovelace resources on
+integration setup (task-1408).
 
 ---
 
@@ -48,26 +46,35 @@ card_mod:
 ### Via HACS (recommended — automatic)
 
 The cards load automatically when the Culiplan integration is installed via HACS.
-The integration's `__init__.py` registers the JS resources and CSS tokens file as Lovelace
-resources on first setup. No manual steps required.
+The integration's `__init__.py` (`_async_register_lovelace_resources`) registers all three
+card JS files as Lovelace resources on first setup. No manual steps required.
+
+Resources are registered under the HACS-standard path `/hacsfiles/culiplan/...` which HACS
+populates automatically from the integration repo's `lovelace/cards/dist/` directory.
+
+On integration reload the registration is idempotent — cards already registered are not
+re-added. Resources are intentionally **not removed** when the integration is unloaded: doing
+so would break any dashboard the user has configured. If you want to remove the cards, delete
+them manually via **HA Settings → Dashboards → Resources**.
 
 ### Manual resource registration
 
-If you installed the integration manually (not via HACS), add the following to your
-`configuration.yaml` under `lovelace:resources:` (or use the HA Dashboard Resources UI):
+If you installed the integration manually (not via HACS), the auto-registration will fail
+gracefully (logged as a warning) and you must add the resources yourself. Copy the `lovelace/`
+directory to `config/www/culiplan/lovelace/` in your HA config directory, then add:
 
 ```yaml
 lovelace:
   resources:
-    - url: /local/culiplan/lovelace/tokens.css
-      type: css
     - url: /local/culiplan/lovelace/cards/dist/kitchen-dashboard.js
       type: module
     - url: /local/culiplan/lovelace/cards/dist/pantry-tracker.js
       type: module
+    - url: /local/culiplan/lovelace/cards/dist/cooking-mode.js
+      type: module
 ```
 
-Copy the `lovelace/` directory to `config/www/culiplan/lovelace/` in your HA config directory.
+Or use the HA Dashboard Resources UI (**Settings → Dashboards → Resources**).
 
 ---
 
@@ -240,9 +247,11 @@ lovelace/
 ├── cards/
 │   ├── kitchen-dashboard.ts      # LitElement source — flavorplan-kitchen-dashboard
 │   ├── pantry-tracker.ts         # LitElement source — flavorplan-pantry-tracker
+│   ├── cooking-mode.ts           # LitElement source — flavorplan-cooking-mode (Phase 3)
 │   └── dist/
 │       ├── kitchen-dashboard.js  # Pre-built distribution bundle (commit to repo)
-│       └── pantry-tracker.js     # Pre-built distribution bundle (commit to repo)
+│       ├── pantry-tracker.js     # Pre-built distribution bundle (commit to repo)
+│       └── cooking-mode.js       # Pre-built distribution bundle (commit to repo)
 ├── dashboards/
 │   ├── kitchen-tablet.yaml       # 10" landscape tablet layout
 │   ├── phone-quick-view.yaml     # Single-column phone layout
