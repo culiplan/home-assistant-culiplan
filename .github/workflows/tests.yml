@@ -34,9 +34,22 @@ jobs:
             pytest-homeassistant-custom-component \
             pytest \
             pytest-asyncio \
+            pytest-cov \
             aiohttp \
             python-socketio==5.12.0 \
             PyYAML==6.0.2
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --tb=short \
+            --cov=custom_components/culiplan \
+            --cov-report=term-missing \
+            --cov-fail-under=95
+
+      - name: Upload coverage report
+        if: matrix.ha-version == '2025.4.0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+          retention-days: 7
