@@ -10,13 +10,12 @@ from typing import Any
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import FlavorplanCoordinator
-from .helpers import parse_dt
+from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,13 +47,7 @@ class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntit
         self._plan_id: str = plan["id"]
         self._attr_unique_id = f"{DOMAIN}_calendar_{self._plan_id}"
         self._attr_name = plan.get("name", "Meal Plan")
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Flavorplan",
-            manufacturer="Flavorplan",
-            model="Meal Planner",
-            entry_type="service",
-        )
+        self._attr_device_info = _build_device_info(entry)
 
     @property
     def event(self) -> CalendarEvent | None:

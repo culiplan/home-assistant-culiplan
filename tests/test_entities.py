@@ -127,7 +127,11 @@ class TestFlavorplanCalendar:
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         assert cal._attr_device_info is not None
-        assert (DOMAIN, mock_config_entry.entry_id) in cal._attr_device_info["identifiers"]
+        info = cal._attr_device_info
+        assert (DOMAIN, mock_config_entry.entry_id) in info["identifiers"]
+        assert info["manufacturer"] == "Culiplan"
+        assert info["sw_version"] is not None
+        assert info["configuration_url"] == "https://culiplan.com"
 
 
 # ─── Todo entity ─────────────────────────────────────────────────────────────
@@ -175,7 +179,11 @@ class TestFlavorplanShoppingList:
         entity = FlavorplanShoppingList(
             full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
         )
-        assert (DOMAIN, mock_config_entry.entry_id) in entity._attr_device_info["identifiers"]
+        info = entity._attr_device_info
+        assert (DOMAIN, mock_config_entry.entry_id) in info["identifiers"]
+        assert info["manufacturer"] == "Culiplan"
+        assert info["sw_version"] is not None
+        assert info["configuration_url"] == "https://culiplan.com"
 
 
 # ─── Sensor trio ─────────────────────────────────────────────────────────────
@@ -220,13 +228,8 @@ class TestSensorTrio:
         return coord
 
     def _device(self, entry):
-        return DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Flavorplan",
-            manufacturer="Flavorplan",
-            model="Meal Planner",
-            entry_type="service",
-        )
+        from custom_components.culiplan.helpers import _build_device_info
+        return _build_device_info(entry)
 
     def test_meals_this_week(self, coordinator_with_pantry, mock_config_entry):
         from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor

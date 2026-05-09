@@ -13,12 +13,12 @@ from homeassistant.components.todo import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import FlavorplanCoordinator
+from .helpers import _build_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,13 +56,7 @@ class FlavorplanShoppingList(CoordinatorEntity[FlavorplanCoordinator], TodoListE
         self._list_id: str = shopping_list["id"]
         self._attr_unique_id = f"{DOMAIN}_todo_{self._list_id}"
         self._attr_name = shopping_list.get("name", "Shopping List")
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Flavorplan",
-            manufacturer="Flavorplan",
-            model="Meal Planner",
-            entry_type="service",
-        )
+        self._attr_device_info = _build_device_info(entry)
 
     @property
     def todo_items(self) -> list[TodoItem]:

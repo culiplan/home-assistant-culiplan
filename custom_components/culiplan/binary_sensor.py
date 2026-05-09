@@ -37,7 +37,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import FlavorplanApiClient
 from .const import DOMAIN
 from .coordinator import FlavorplanCoordinator
-from .helpers import parse_dt
+from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,13 +56,7 @@ async def async_setup_entry(
 
     expiry_hours: int = entry.options.get("expiry_hours", DEFAULT_EXPIRY_HOURS)
 
-    device = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name="Flavorplan",
-        manufacturer="Flavorplan",
-        model="Meal Planner",
-        entry_type="service",
-    )
+    device = _build_device_info(entry)
 
     async_add_entities([
         PantryHasExpiringBinarySensor(coordinator, device, expiry_hours),

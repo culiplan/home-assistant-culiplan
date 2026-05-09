@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import FlavorplanCoordinator
-from .helpers import parse_dt
+from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,13 +30,7 @@ async def async_setup_entry(
     """Set up Flavorplan sensor entities."""
     coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     expiry_days: int = entry.options.get("expiry_days", DEFAULT_EXPIRY_DAYS)
-    device = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name="Flavorplan",
-        manufacturer="Flavorplan",
-        model="Meal Planner",
-        entry_type="service",
-    )
+    device = _build_device_info(entry)
     async_add_entities([
         MealsPlanedThisWeekSensor(coordinator, device),
         ShoppingItemsCountSensor(coordinator, device),
