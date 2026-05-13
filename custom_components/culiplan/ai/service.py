@@ -3,17 +3,17 @@ AI service orchestration layer (task-1387 + task-1388 + task-1389).
 
 The service layer sits between HA service calls and the dispatcher classes:
 
-    1. HA service call (e.g. flavorplan.suggest_meal)
-    2. → service.py: fetch prompt envelope from Flavorplan backend
+    1. HA service call (e.g. culiplan.suggest_meal)
+    2. → service.py: fetch prompt envelope from Culiplan backend
     3. → dispatchers.py: execute AI call locally (key never leaves HA)
     4. ← dispatcher returns DispatchResult with optional tool_calls
-    5. If tool_calls: call Flavorplan API via OAuth-scoped REST to execute them
+    5. If tool_calls: call Culiplan API via OAuth-scoped REST to execute them
     6. Loop back to dispatcher with tool results (multi-turn function-calling)
     7. Return final text to HA notification / Assist response
 
 Architecture (§13.2):
     - For BYOK / Local modes, the backend's job ends at step 2.
-    - Flavorplan never sees the AI response content — only tool-call args
+    - Culiplan never sees the AI response content — only tool-call args
       (which are scoped data operations, not freeform content).
 
 Streaming: deferred to v2.
@@ -78,7 +78,7 @@ class AIDispatchService:
         service = AIDispatchService(
             mode="byok-anthropic",
             api_key=stored_key,        # from HA secrets store
-            flavorplan_client=client,  # FlavorplanApiClient
+            culiplan_client=client,  # CuliplanApiClient
         )
         result = await service.run_intent("suggest_meal", {"mealSlot": "dinner"})
     """
@@ -86,14 +86,14 @@ class AIDispatchService:
     def __init__(
         self,
         mode: str,
-        flavorplan_client: Any,
+        culiplan_client: Any,
         api_key: str = "",
         base_url: str | None = None,
         debug: bool = False,
         config_dir: str | None = None,
     ) -> None:
         self._mode = mode
-        self._client = flavorplan_client
+        self._client = culiplan_client
         self._debug = debug
         self._dispatcher = create_dispatcher(
             mode=mode,
@@ -107,7 +107,7 @@ class AIDispatchService:
         self, intent: str, params: dict[str, Any] | None = None
     ) -> PromptEnvelope:
         """
-        Fetch the prompt envelope from the Flavorplan backend.
+        Fetch the prompt envelope from the Culiplan backend.
 
         POST /api/ai/envelope — backend builds the prompt with live user context
         (pantry, meal plan, dietary info).  No AI keys are sent or accepted.
@@ -124,10 +124,10 @@ class AIDispatchService:
 
     async def execute_tool_call(self, tool_call: ToolCall) -> Any:
         """
-        Execute a single tool call via the Flavorplan OAuth-scoped REST API.
+        Execute a single tool call via the Culiplan OAuth-scoped REST API.
 
         Tool calls route back to the backend as standard data operations.
-        This is the only path through which AI responses touch Flavorplan
+        This is the only path through which AI responses touch Culiplan
         infrastructure — and only the structured tool-call args are sent
         (no freeform prompt or response content, per §13.6).
         """
@@ -144,7 +144,7 @@ class AIDispatchService:
         Steps:
           1. Fetch prompt envelope from backend.
           2. Call AI provider with envelope (locally, key never leaves HA).
-          3. If model requests tool calls, execute them via Flavorplan API.
+          3. If model requests tool calls, execute them via Culiplan API.
           4. Loop until final text response or _MAX_TOOL_TURNS reached.
 
         Returns:
@@ -188,7 +188,7 @@ class AIDispatchService:
                 except Exception as exc:
                     # Log the full exception internally (AC#1) but never surface
                     # internal exception strings to the AI provider — that would
-                    # leak Flavorplan architecture details to BYOK providers (AC#3,
+                    # leak Culiplan architecture details to BYOK providers (AC#3,
                     # task-1414).
                     _LOGGER.warning(
                         "[culiplan][ai-service] Tool '%s' (call_id=%s) failed: %s",

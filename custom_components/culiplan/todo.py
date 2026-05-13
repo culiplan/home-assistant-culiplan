@@ -1,4 +1,4 @@
-"""Todo entity — one per Flavorplan shopping list (task-1367)."""
+"""Todo entity — one per Culiplan shopping list (task-1367)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import FlavorplanCoordinator
+from .coordinator import CuliplanCoordinator
 from .helpers import _build_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,16 +28,16 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Flavorplan todo (shopping list) entities."""
-    coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    """Set up Culiplan todo (shopping list) entities."""
+    coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     shopping_lists = (coordinator.data or {}).get("shopping_lists", [])
     async_add_entities(
-        FlavorplanShoppingList(coordinator, sl, entry) for sl in shopping_lists
+        CuliplanShoppingList(coordinator, sl, entry) for sl in shopping_lists
     )
 
 
-class FlavorplanShoppingList(CoordinatorEntity[FlavorplanCoordinator], TodoListEntity):
-    """Todo entity for a Flavorplan shopping list."""
+class CuliplanShoppingList(CoordinatorEntity[CuliplanCoordinator], TodoListEntity):
+    """Todo entity for a Culiplan shopping list."""
 
     _attr_has_entity_name = True
     _attr_supported_features = (
@@ -48,7 +48,7 @@ class FlavorplanShoppingList(CoordinatorEntity[FlavorplanCoordinator], TodoListE
 
     def __init__(
         self,
-        coordinator: FlavorplanCoordinator,
+        coordinator: CuliplanCoordinator,
         shopping_list: dict[str, Any],
         entry: ConfigEntry,
     ) -> None:

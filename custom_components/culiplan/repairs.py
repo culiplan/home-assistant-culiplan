@@ -1,11 +1,11 @@
 """
-Flavorplan HA Repairs UI — premium upsell deep-link (task-1395).
+Culiplan HA Repairs UI — premium upsell deep-link (task-1395).
 
-When the Flavorplan backend returns a 403 {error: 'premium_required', feature, upgradeUrl}
+When the Culiplan backend returns a 403 {error: 'premium_required', feature, upgradeUrl}
 response, the integration creates a HA Repairs issue that:
 
   1. Shows a plain-language title and description for the blocked feature.
-  2. Offers an 'Upgrade on Flavorplan' action that opens upgradeUrl in the user's
+  2. Offers an 'Upgrade on Culiplan' action that opens upgradeUrl in the user's
      browser, with an `ha_install_id` query parameter so the billing page can
      identify the install.
   3. Auto-resolves when the same feature call succeeds (caller invokes
@@ -39,54 +39,54 @@ _LOGGER = logging.getLogger(__name__)
 # ─── Feature-to-human-readable copy ───────────────────────────────────────────
 
 _FEATURE_TITLES: dict[str, str] = {
-    "ai.suggestion":      "AI meal suggestions need Flavorplan Premium",
-    "ai.shopping_fill":   "AI shopping list fill needs Flavorplan Premium",
-    "ai.blueprint":       "AI automation blueprints need Flavorplan Premium",
-    "cooking_mode":       "Guided cooking mode needs Flavorplan Premium",
-    "smart_appliance":    "Smart appliance integration needs Flavorplan Premium",
-    "recipe_image_gen":   "Recipe image generation needs Flavorplan Premium",
-    "smart_pantry":       "Smart pantry recommendations need Flavorplan Premium",
+    "ai.suggestion":      "AI meal suggestions need Culiplan Premium",
+    "ai.shopping_fill":   "AI shopping list fill needs Culiplan Premium",
+    "ai.blueprint":       "AI automation blueprints need Culiplan Premium",
+    "cooking_mode":       "Guided cooking mode needs Culiplan Premium",
+    "smart_appliance":    "Smart appliance integration needs Culiplan Premium",
+    "recipe_image_gen":   "Recipe image generation needs Culiplan Premium",
+    "smart_pantry":       "Smart pantry recommendations need Culiplan Premium",
 }
 
 _FEATURE_DESCRIPTIONS: dict[str, str] = {
     "ai.suggestion": (
-        "You asked Flavorplan for an AI meal suggestion, but this feature requires "
-        "a Flavorplan Premium subscription. Upgrade to unlock AI-powered meal ideas "
+        "You asked Culiplan for an AI meal suggestion, but this feature requires "
+        "a Culiplan Premium subscription. Upgrade to unlock AI-powered meal ideas "
         "in Home Assistant."
     ),
     "ai.shopping_fill": (
-        "You asked Flavorplan to fill your shopping list automatically, but this feature "
-        "requires a Flavorplan Premium subscription. Upgrade to let AI handle your "
+        "You asked Culiplan to fill your shopping list automatically, but this feature "
+        "requires a Culiplan Premium subscription. Upgrade to let AI handle your "
         "grocery planning."
     ),
     "ai.blueprint": (
-        "AI-composed Home Assistant automation blueprints require a Flavorplan Premium "
+        "AI-composed Home Assistant automation blueprints require a Culiplan Premium "
         "subscription. Upgrade to create custom kitchen automations with AI."
     ),
     "cooking_mode": (
-        "Guided step-by-step voice cooking mode requires a Flavorplan Premium "
+        "Guided step-by-step voice cooking mode requires a Culiplan Premium "
         "subscription. Upgrade to get hands-free cooking guidance in Home Assistant."
     ),
     "smart_appliance": (
-        "Smart appliance integration requires a Flavorplan Premium subscription. "
+        "Smart appliance integration requires a Culiplan Premium subscription. "
         "Upgrade to connect your kitchen appliances."
     ),
     "recipe_image_gen": (
-        "Recipe image generation requires a Flavorplan Premium subscription."
+        "Recipe image generation requires a Culiplan Premium subscription."
     ),
     "smart_pantry": (
-        "Smart pantry recommendations require a Flavorplan Premium subscription."
+        "Smart pantry recommendations require a Culiplan Premium subscription."
     ),
 }
 
 
 def _default_title(feature: str) -> str:
-    return f"'{feature}' requires Flavorplan Premium"
+    return f"'{feature}' requires Culiplan Premium"
 
 
 def _default_description(feature: str) -> str:
     return (
-        f"The feature '{feature}' requires a Flavorplan Premium subscription. "
+        f"The feature '{feature}' requires a Culiplan Premium subscription. "
         "Upgrade to unlock this capability in Home Assistant."
     )
 
@@ -104,7 +104,7 @@ def _repair_issue_id(feature: str) -> str:
 
 def _append_ha_install_id(upgrade_url: str, hass: HomeAssistant) -> str:
     """
-    Append ha_install_id to the upgrade URL so the Flavorplan billing page
+    Append ha_install_id to the upgrade URL so the Culiplan billing page
     can identify the Home Assistant install and show context-aware messaging.
 
     Uses hass.data["core.uuid"] if available (set by HA core since 2022.6);

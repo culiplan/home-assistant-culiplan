@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Conectar Flavorplan"
+        "title": "Conectar Culiplan"
       },
       "ai_provider": {
         "title": "Proveedor de IA",
-        "description": "Elige cómo se ejecutan las funciones de IA de Flavorplan en Home Assistant.\n\n**Cloud IA** — Flavorplan procesa las solicitudes (se requiere suscripción Premium).\n**BYOK** — Tu clave API se almacena localmente y se envía directamente al proveedor de IA; Flavorplan nunca la ve.\n**IA local** — Las solicitudes van a tu punto de conexión local de Ollama o LM Studio.",
+        "description": "Elige cómo se ejecutan las funciones de IA de Culiplan en Home Assistant.\n\n**Cloud IA** — Culiplan procesa las solicitudes (se requiere suscripción Premium).\n**BYOK** — Tu clave API se almacena localmente y se envía directamente al proveedor de IA; Culiplan nunca la ve.\n**IA local** — Las solicitudes van a tu punto de conexión local de Ollama o LM Studio.",
         "data": {
           "ai_mode": "Modo de IA",
           "byok_provider": "Proveedor de IA",
@@ -15,24 +15,24 @@
           "local_model": "Nombre del modelo"
         },
         "data_description": {
-          "byok_api_key": "Almacenada solo en Home Assistant — nunca se envía a Flavorplan.",
+          "byok_api_key": "Almacenada solo en Home Assistant — nunca se envía a Culiplan.",
           "local_endpoint": "ej. http://localhost:11434",
           "local_model": "ej. llama3.2"
         }
       },
       "reauth_confirm": {
-        "title": "Volver a autenticar Flavorplan",
-        "description": "Tu sesión de Flavorplan ha expirado. Haz clic en Enviar para volver a autenticarte."
+        "title": "Volver a autenticar Culiplan",
+        "description": "Tu sesión de Culiplan ha expirado. Haz clic en Enviar para volver a autenticarte."
       }
     },
     "error": {
-      "cannot_connect": "No se puede conectar a Flavorplan",
+      "cannot_connect": "No se puede conectar a Culiplan",
       "invalid_api_key": "Clave API no válida — por favor comprueba la clave e inténtalo de nuevo.",
       "invalid_endpoint": "No se pudo alcanzar el punto de conexión de IA local. Comprueba la URL y que el servicio esté en ejecución.",
       "unknown": "Error inesperado"
     },
     "abort": {
-      "already_configured": "Flavorplan ya está configurado",
+      "already_configured": "Culiplan ya está configurado",
       "oauth_error": "Error OAuth: {error}",
       "missing_configuration": "Integración no configurada. Por favor, configúrala en la interfaz de usuario."
     }

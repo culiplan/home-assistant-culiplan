@@ -1,4 +1,4 @@
-"""Shared helpers for the Flavorplan integration."""
+"""Shared helpers for the Culiplan integration."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ _MANIFEST_PATH = Path(__file__).parent / "manifest.json"
 
 
 def _build_device_info(entry: ConfigEntry) -> DeviceInfo:
-    """Return a canonical DeviceInfo for all Flavorplan entities.
+    """Return a canonical DeviceInfo for all Culiplan entities.
 
     Reads ``version`` from ``manifest.json`` so sw_version stays in sync
     automatically when the manifest is bumped.
@@ -28,7 +28,7 @@ def _build_device_info(entry: ConfigEntry) -> DeviceInfo:
 
     return DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
-        name="Flavorplan",
+        name="Culiplan",
         manufacturer="Culiplan",
         model="Meal Planner",
         sw_version=sw_version,

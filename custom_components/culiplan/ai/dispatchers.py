@@ -1,5 +1,5 @@
 """
-AI provider dispatchers for the Flavorplan Home Assistant integration (task-1387).
+AI provider dispatchers for the Culiplan Home Assistant integration (task-1387).
 
 Three dispatcher classes, one per SDK family:
 
@@ -8,7 +8,7 @@ Three dispatcher classes, one per SDK family:
     GoogleDispatcher            — Google Gemini Direct
 
 Each dispatcher:
-  1. Accepts a PromptEnvelope (built by the Flavorplan backend).
+  1. Accepts a PromptEnvelope (built by the Culiplan backend).
   2. Translates it to the provider's native API format.
   3. Executes the call locally (API key NEVER leaves HA).
   4. Returns DispatchResult { text, tool_calls[] }.
@@ -163,7 +163,7 @@ class OpenAICompatibleDispatcher:
         Initialise the dispatcher.
 
         Args:
-            api_key:    Provider API key (stored in HA secrets, never sent to Flavorplan).
+            api_key:    Provider API key (stored in HA secrets, never sent to Culiplan).
             base_url:   Override the default OpenAI base URL.
             debug:      If True, log prompt content (client-side only, 24h TTL).
             config_dir: HA config directory for debug log files (task-1410).
@@ -186,7 +186,7 @@ class OpenAICompatibleDispatcher:
 
         Args:
             envelope:     Prompt envelope from the backend.
-            tool_results: Results from Flavorplan tool calls (for multi-turn loops).
+            tool_results: Results from Culiplan tool calls (for multi-turn loops).
 
         Returns:
             DispatchResult with text and/or tool_calls for next turn.
@@ -281,12 +281,12 @@ class OpenAICompatibleDispatcher:
         """
         Execute the full multi-turn function-calling loop.
 
-        Calls dispatch() → executes tool calls via Flavorplan API → loops
+        Calls dispatch() → executes tool calls via Culiplan API → loops
         until the model produces a final text response or _MAX_TOOL_TURNS reached.
 
-        Note: this method does NOT call Flavorplan tool endpoints directly.
+        Note: this method does NOT call Culiplan tool endpoints directly.
         It raises NotImplementedError because tool execution must be provided
-        by the caller (which has access to the Flavorplan API client).
+        by the caller (which has access to the Culiplan API client).
 
         Use dispatch() directly and handle the tool-call loop in the service
         layer (see services.py).
@@ -311,7 +311,7 @@ class AnthropicDispatcher:
     ) -> None:
         """
         Args:
-            api_key:    Anthropic API key (stored in HA secrets, never sent to Flavorplan).
+            api_key:    Anthropic API key (stored in HA secrets, never sent to Culiplan).
             debug:      If True, log prompt content (client-side only, 24h TTL).
             config_dir: HA config directory for debug log files (task-1410).
         """
@@ -427,7 +427,7 @@ class GoogleDispatcher:
     Dispatcher for Google Gemini via the google-genai SDK.
 
     This uses the direct Gemini API (not Vertex AI).  The user provides their
-    own Google API key — this is distinct from Flavorplan's own Vertex AI usage.
+    own Google API key — this is distinct from Culiplan's own Vertex AI usage.
 
     Requires: google-genai Python package (bundled in manifest.json requirements).
     """

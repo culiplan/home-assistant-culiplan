@@ -1,4 +1,4 @@
-"""WebSocket-backed DataUpdateCoordinator for the Flavorplan integration."""
+"""WebSocket-backed DataUpdateCoordinator for the Culiplan integration."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .const import BASE_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,13 +28,13 @@ _RECONNECT_MAX_DELAY = 120.0
 _RECONNECT_FACTOR = 2.0
 
 
-class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Push-first coordinator backed by the /ha-events Socket.IO namespace."""
 
     def __init__(
         self,
         hass: HomeAssistant,
-        client: FlavorplanApiClient,
+        client: CuliplanApiClient,
         entry: ConfigEntry,
     ) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
@@ -82,7 +82,7 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
-            raise UpdateFailed(f"Flavorplan REST fetch failed: {err}") from err
+            raise UpdateFailed(f"Culiplan REST fetch failed: {err}") from err
 
         return {
             "meal_plans": meal_plans,
@@ -109,14 +109,14 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         @sio.event(namespace=HA_NAMESPACE)
         async def connect() -> None:
-            _LOGGER.info("Connected to Flavorplan /ha-events")
+            _LOGGER.info("Connected to Culiplan /ha-events")
             self._connected = True
             self._miss_count = 0
             await self.async_refresh()
 
         @sio.event(namespace=HA_NAMESPACE)
         async def disconnect(reason: str | None = None) -> None:
-            _LOGGER.warning("Disconnected from Flavorplan /ha-events: %s", reason)
+            _LOGGER.warning("Disconnected from Culiplan /ha-events: %s", reason)
             self._connected = False
             self._miss_count += 1
             if self._miss_count >= _MAX_HEARTBEAT_MISSES:
@@ -244,7 +244,7 @@ class FlavorplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         async def _reconnect_loop(initial_delay: float) -> None:
             wait = initial_delay
             while not self._connected and not self._stopped:
-                _LOGGER.info("Reconnecting to Flavorplan in %.0f s…", wait)
+                _LOGGER.info("Reconnecting to Culiplan in %.0f s…", wait)
                 await asyncio.sleep(wait)
                 if self._stopped:
                     return

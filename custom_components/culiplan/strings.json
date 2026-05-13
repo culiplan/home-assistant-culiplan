@@ -2,20 +2,34 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Connect Flavorplan"
+        "title": "Connect Culiplan"
       },
       "ai_provider": {
         "title": "AI Provider",
-        "description": "Choose how Flavorplan AI features run in Home Assistant.\n\n**Cloud AI** — Flavorplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Flavorplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.\n\n> **Debug mode**: When enabled, AI prompt content is written to `culiplan_ai_debug.log` inside your HA config folder. These logs are stored **client-side only** and are automatically deleted after **24 hours**. Disable debug mode when not actively troubleshooting.",
+        "description": "Choose how Culiplan AI features run in Home Assistant.\n\n**Cloud AI** — Culiplan processes requests on your behalf. Free users get the standard set; Premium unlocks the advanced features (e.g. AI shopping list fill).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Culiplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.",
         "data": {
-          "ai_mode": "AI Mode",
+          "ai_mode": "AI Mode"
+        }
+      },
+      "ai_byok": {
+        "title": "Bring Your Own Key",
+        "description": "Enter the provider and API key Culiplan should use. The key is stored in Home Assistant only — Culiplan never sees it.",
+        "data": {
           "byok_provider": "AI Provider",
-          "byok_api_key": "API Key",
+          "byok_api_key": "API Key"
+        },
+        "data_description": {
+          "byok_api_key": "Stored in Home Assistant only — never sent to Culiplan."
+        }
+      },
+      "ai_local": {
+        "title": "Local AI",
+        "description": "Point Culiplan at your local Ollama or LM Studio instance.\n\n{detected_endpoints}",
+        "data": {
           "local_endpoint": "Local AI Endpoint URL",
           "local_model": "Model Name"
         },
         "data_description": {
-          "byok_api_key": "Stored in Home Assistant only — never sent to Flavorplan.",
           "local_endpoint": "e.g. http://localhost:11434",
           "local_model": "e.g. llama3.2"
         }
@@ -29,7 +43,7 @@
       },
       "mealie_offer": {
         "title": "Import from Mealie",
-        "description": "Flavorplan can import your existing Mealie recipe library in one click. This is optional — you can always import later from the integration settings.",
+        "description": "Culiplan can import your existing Mealie recipe library in one click. This is optional — you can always import later from the integration settings.",
         "data": {
           "migrate_mealie": "Import my Mealie recipe library now"
         }
@@ -48,18 +62,18 @@
       },
       "mealie_preview": {
         "title": "Import Preview",
-        "description": "Flavorplan found the following in your Mealie library:\n\n- **{will_import}** recipes ready to import\n- **{will_flag}** recipes that need review\n- **{will_skip}** recipes that will be skipped (duplicates)\n\nSample titles: {samples}\n\nConfirm to start the import. You can undo this within 24 hours from the integration settings.",
+        "description": "Culiplan found the following in your Mealie library:\n\n- **{will_import}** recipes ready to import\n- **{will_flag}** recipes that need review\n- **{will_skip}** recipes that will be skipped (duplicates)\n\nSample titles: {samples}\n\nConfirm to start the import. You can undo this within 24 hours from the integration settings.",
         "data": {
           "confirm_import": "Start import"
         }
       },
       "mealie_done": {
         "title": "Import Complete",
-        "description": "Your Mealie recipe library has been imported into Flavorplan.\n\n- **Job ID**: {job_id}\n- **Errors**: {errors} recipes could not be imported\n\nYou can roll back this import within 24 hours from the integration settings (Settings → Integrations → Flavorplan → Configure)."
+        "description": "Your Mealie recipe library has been imported into Culiplan.\n\n- **Job ID**: {job_id}\n- **Errors**: {errors} recipes could not be imported\n\nYou can roll back this import within 24 hours from the integration settings (Settings → Integrations → Culiplan → Configure)."
       },
       "reauth_confirm": {
-        "title": "Re-authenticate Flavorplan",
-        "description": "Your Flavorplan session has expired. Click **Submit** to re-authenticate."
+        "title": "Re-authenticate Culiplan",
+        "description": "Your Culiplan session has expired. Click **Submit** to re-authenticate."
       }
     },
     "error": {
@@ -86,8 +100,8 @@
   "options": {
     "step": {
       "init": {
-        "title": "Flavorplan Settings",
-        "description": "Manage your Flavorplan integration.",
+        "title": "Culiplan Settings",
+        "description": "Manage your Culiplan integration.",
         "data": {
           "rollback": "Roll back Mealie import (available within 24 hours of import)"
         }
@@ -95,8 +109,8 @@
     },
     "abort": {
       "no_action": "No changes were made.",
-      "rollback_complete": "The Mealie import has been rolled back. Your Flavorplan recipe library has been restored to its previous state.",
-      "rollback_failed": "The rollback request failed. Please try again or contact Flavorplan support."
+      "rollback_complete": "The Mealie import has been rolled back. Your Culiplan recipe library has been restored to its previous state.",
+      "rollback_failed": "The rollback request failed. Please try again or contact Culiplan support."
     }
   },
   "services": {
@@ -130,7 +144,7 @@
     },
     "generate_blueprint": {
       "name": "Generate automation blueprint",
-      "description": "Generates a Home Assistant automation blueprint YAML from a natural language description using Flavorplan AI. Cloud AI mode requires Flavorplan Premium; BYOK and Local AI modes are free.",
+      "description": "Generates a Home Assistant automation blueprint YAML from a natural language description using Culiplan AI. Cloud AI mode requires Culiplan Premium; BYOK and Local AI modes are free.",
       "fields": {
         "prompt": {
           "name": "Prompt",
@@ -149,17 +163,17 @@
   },
   "issues": {
     "reauth_required": {
-      "title": "Re-authentication required for Flavorplan",
-      "description": "Your Flavorplan session has expired. [Re-authenticate your account]({url})."
+      "title": "Re-authentication required for Culiplan",
+      "description": "Your Culiplan session has expired. [Re-authenticate your account]({url})."
     },
     "premium_required": {
       "title": "{title}",
-      "description": "{description}\n\n[Upgrade on Flavorplan]({upgrade_url})",
+      "description": "{description}\n\n[Upgrade on Culiplan]({upgrade_url})",
       "fix_flow": {
         "step": {
           "confirm": {
-            "title": "Upgrade Flavorplan",
-            "description": "To use **{feature}**, you need a Flavorplan Premium subscription.\n\n[Open upgrade page]({upgrade_url})"
+            "title": "Upgrade Culiplan",
+            "description": "To use **{feature}**, you need a Culiplan Premium subscription.\n\n[Open upgrade page]({upgrade_url})"
           }
         }
       }

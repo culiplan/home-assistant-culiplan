@@ -36,7 +36,7 @@ class PromptEnvelope:
     Prompt envelope returned by POST /api/ai/envelope.
 
     The backend builds this; the dispatcher executes it locally against
-    the AI provider.  API keys never transit Flavorplan infrastructure.
+    the AI provider.  API keys never transit Culiplan infrastructure.
     """
     messages: list[Message]
     tools: list[ToolSpec]
@@ -71,7 +71,7 @@ class DispatchResult:
     Normalised result from an AI provider call.
 
     If tool_calls is non-empty, the caller should execute the tools via the
-    Flavorplan API and loop back to the dispatcher with the results appended.
+    Culiplan API and loop back to the dispatcher with the results appended.
     """
     text: str | None
     tool_calls: list[ToolCall] = field(default_factory=list)
@@ -86,7 +86,7 @@ class DispatchResult:
 
 @dataclass
 class ToolResult:
-    """Result of a Flavorplan tool call, forwarded back to the model."""
+    """Result of a Culiplan tool call, forwarded back to the model."""
     call_id: str
     tool_name: str
     content: Any   # JSON-serialisable
@@ -116,7 +116,7 @@ class PremiumRequiredError(_HomeAssistantError):
     """
     Raised when a premium-gated feature is invoked by a free-tier user.
 
-    Populated from the structured 403 body returned by the Flavorplan backend:
+    Populated from the structured 403 body returned by the Culiplan backend:
         {"error": "premium_required", "feature": "ai.suggestion",
          "upgradeUrl": "https://culiplan.com/premium?source=ha"}
 
@@ -128,5 +128,5 @@ class PremiumRequiredError(_HomeAssistantError):
         self.feature = feature
         self.upgrade_url = upgrade_url
         super().__init__(
-            f"'{feature}' requires Flavorplan Premium. Upgrade at: {upgrade_url}"
+            f"'{feature}' requires Culiplan Premium. Upgrade at: {upgrade_url}"
         )

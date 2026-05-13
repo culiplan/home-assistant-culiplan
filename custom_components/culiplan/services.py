@@ -1,17 +1,17 @@
 """
-Flavorplan HA services — merged AI dispatcher chain + pantry/household automations.
+Culiplan HA services — merged AI dispatcher chain + pantry/household automations.
 
 AI services (tasks 1388, 1389):
-    flavorplan.suggest_meal              — 3-mode AI meal suggestion
-    flavorplan.fill_shopping_list        — 3-mode AI shopping list fill
+    culiplan.suggest_meal              — 3-mode AI meal suggestion
+    culiplan.fill_shopping_list        — 3-mode AI shopping list fill
 
 Pantry / household services (tasks 1376, 1378, 1379):
-    flavorplan.pantry_decrement          — barcode-scan decrement (free)
-    flavorplan.pantry_expiring_items     — list expiring items (free)
-    flavorplan.scale_tonight_servings    — presence-based serving scale (PREMIUM)
+    culiplan.pantry_decrement          — barcode-scan decrement (free)
+    culiplan.pantry_expiring_items     — list expiring items (free)
+    culiplan.scale_tonight_servings    — presence-based serving scale (PREMIUM)
 
 Blueprint generation service (task 1400):
-    flavorplan.generate_blueprint        — AI-composed HA blueprint (PREMIUM for Cloud AI)
+    culiplan.generate_blueprint        — AI-composed HA blueprint (PREMIUM for Cloud AI)
 
 Architecture:
     - Tier rules live ONLY on the backend (§11.1.5). Premium-gated services
@@ -46,7 +46,7 @@ from .ai.debug_logger import setup_debug_log_purge
 from .ai.key_store import BYOKKeyStore
 from .ai.service import AIDispatchService
 from .ai.types import PremiumRequiredError
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .repairs import async_create_premium_repair, async_resolve_premium_repair
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ class PantryItemNotFoundError(HomeAssistantError):
         self.barcode = barcode
         super().__init__(
             f"No pantry item with barcode '{barcode}' found. "
-            "Add the item to your pantry in Flavorplan first."
+            "Add the item to your pantry in Culiplan first."
         )
 
 
@@ -148,11 +148,11 @@ def _resolve_barcode_repair(hass: HomeAssistant, barcode: str) -> None:
 
 
 async def _run_cloud_intent(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     intent: str,
     params: dict[str, Any],
 ) -> str:
-    """Execute a Cloud AI intent via the Flavorplan backend."""
+    """Execute a Cloud AI intent via the Culiplan backend."""
     try:
         result = await client.async_call_voice_tool(intent, params)
         return result.get("speakable") or result.get("message") or "Done."
@@ -161,14 +161,14 @@ async def _run_cloud_intent(
         # Repairs upsell issue (task-1416: no string parsing needed).
         raise
     except Exception as exc:
-        raise HomeAssistantError(f"Flavorplan AI request failed: {exc}") from exc
+        raise HomeAssistantError(f"Culiplan AI request failed: {exc}") from exc
 
 
 async def _run_byok_or_local_intent(
     hass: HomeAssistant,
     entry_data: dict[str, Any],
     entry_config: dict[str, Any],
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     intent: str,
     params: dict[str, Any],
 ) -> str:
@@ -192,7 +192,7 @@ async def _run_byok_or_local_intent(
         if not api_key:
             raise HomeAssistantError(
                 f"No BYOK key found for provider '{provider}'. "
-                "Please reconfigure the Flavorplan integration."
+                "Please reconfigure the Culiplan integration."
             )
     elif ai_mode == AI_MODE_LOCAL:
         endpoint = entry_config.get(CONF_LOCAL_ENDPOINT, "")
@@ -201,7 +201,7 @@ async def _run_byok_or_local_intent(
 
     service = AIDispatchService(
         mode=ai_mode,
-        flavorplan_client=client,
+        culiplan_client=client,
         api_key=api_key,
         base_url=base_url,
         debug=debug,
@@ -221,7 +221,7 @@ def _ensure_v1_path(endpoint: str) -> str:
 
 
 async def _call_pantry_decrement(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     barcode: str,
     qty: float,
 ) -> dict[str, Any]:
@@ -249,7 +249,7 @@ async def _call_pantry_decrement(
 
 
 async def _call_pantry_expiring(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     window_hours: int,
 ) -> dict[str, Any]:
     """Call GET /api/ha/pantry/expiring?window_hours=N."""
@@ -262,7 +262,7 @@ async def _call_pantry_expiring(
 
 
 async def _call_scale_servings(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     present_count: int,
     plan_date: str | None,
 ) -> dict[str, Any]:
@@ -283,14 +283,14 @@ async def _call_scale_servings(
 
 
 def async_register_services(hass: HomeAssistant) -> None:
-    """Register ALL Flavorplan HA services (AI + pantry/household)."""
+    """Register ALL Culiplan HA services (AI + pantry/household)."""
 
     async def handle_suggest_meal(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
+            raise HomeAssistantError("Culiplan is not configured.")
         entry_data = hass.data[DOMAIN][entry_id]
-        client: FlavorplanApiClient = entry_data["client"]
+        client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
         entry = next((e for e in entries if e.entry_id == entry_id), None)
         entry_config = entry.data if entry else {}
@@ -320,7 +320,7 @@ def async_register_services(hass: HomeAssistant) -> None:
         await hass.services.async_call(
             "persistent_notification", "create",
             {
-                "title": "Flavorplan Meal Suggestion",
+                "title": "Culiplan Meal Suggestion",
                 "message": text,
                 "notification_id": f"{DOMAIN}_suggest_meal",
             },
@@ -329,9 +329,9 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_fill_shopping_list(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
+            raise HomeAssistantError("Culiplan is not configured.")
         entry_data = hass.data[DOMAIN][entry_id]
-        client: FlavorplanApiClient = entry_data["client"]
+        client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
         entry = next((e for e in entries if e.entry_id == entry_id), None)
         entry_config = entry.data if entry else {}
@@ -359,7 +359,7 @@ def async_register_services(hass: HomeAssistant) -> None:
         await hass.services.async_call(
             "persistent_notification", "create",
             {
-                "title": "Flavorplan Shopping List",
+                "title": "Culiplan Shopping List",
                 "message": text,
                 "notification_id": f"{DOMAIN}_fill_shopping_list",
             },
@@ -368,8 +368,8 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_pantry_decrement(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
-        client: FlavorplanApiClient = hass.data[DOMAIN][entry_id]["client"]
+            raise HomeAssistantError("Culiplan is not configured.")
+        client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         barcode: str = call.data["barcode"]
         qty: float = call.data["qty"]
         try:
@@ -386,8 +386,8 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_pantry_expiring(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
-        client: FlavorplanApiClient = hass.data[DOMAIN][entry_id]["client"]
+            raise HomeAssistantError("Culiplan is not configured.")
+        client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         window_hours: int = call.data["window_hours"]
         result = await _call_pantry_expiring(client, window_hours)
         hass.bus.async_fire(
@@ -405,8 +405,8 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_scale_tonight_servings(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
-        client: FlavorplanApiClient = hass.data[DOMAIN][entry_id]["client"]
+            raise HomeAssistantError("Culiplan is not configured.")
+        client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         present_count: int = call.data["present_count"]
         plan_date: str | None = call.data.get("plan_date")
         try:
@@ -428,7 +428,7 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_generate_blueprint(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
+            raise HomeAssistantError("Culiplan is not configured.")
         await _handle_bp_gen(hass, call, entry_id)
 
     registrations = [
@@ -445,7 +445,7 @@ def async_register_services(hass: HomeAssistant) -> None:
 
 
 def async_unregister_services(hass: HomeAssistant) -> None:
-    """Unregister all Flavorplan HA services."""
+    """Unregister all Culiplan HA services."""
     for name in (
         SERVICE_SUGGEST_MEAL,
         SERVICE_FILL_SHOPPING_LIST,
@@ -464,6 +464,6 @@ async_unregister_phase2_services = async_unregister_services
 
 
 def _find_entry_id(hass: HomeAssistant) -> str | None:
-    """Return the first active Flavorplan config entry ID, or None."""
+    """Return the first active Culiplan config entry ID, or None."""
     entries = hass.data.get(DOMAIN, {})
     return next(iter(entries), None)

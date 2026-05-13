@@ -1,4 +1,4 @@
-"""OAuth-aware async HTTP client for the Flavorplan API."""
+"""OAuth-aware async HTTP client for the Culiplan API."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from .const import BASE_URL
 _LOGGER = logging.getLogger(__name__)
 
 
-class FlavorplanApiClient:
-    """Client for the Flavorplan REST API."""
+class CuliplanApiClient:
+    """Client for the Culiplan REST API."""
 
     def __init__(self, session: ClientSession, access_token: str) -> None:
         self._session = session
@@ -38,35 +38,62 @@ class FlavorplanApiClient:
         return await self._get("/api/meal-plans")
 
     async def async_get_shopping_lists(self) -> list[dict[str, Any]]:
-        return await self._get("/api/shopping-lists")
+        """
+        Return the user's shopping list as a single-element list, matching the
+        HA todo entity model.
+
+        The Culiplan backend has one shopping list per user (or one
+        household-shared list); the REST endpoint returns a flat array of
+        ``ShoppingListItem`` records. We wrap that into a single synthetic
+        list with id ``"default"`` so coordinator/todo can keep using a
+        ``list[dict]`` shape without leaking the impedance mismatch.
+        """
+        items = await self._get("/api/shopping-list")
+        return [{"id": "default", "name": "Shopping List", "items": items}]
 
     async def async_get_pantry_items(self) -> list[dict[str, Any]]:
-        return await self._get("/api/pantry")
+        """Return the user's pantry stock as a flat list.
+
+        Backend endpoint is paginated (``GET /api/pantry/stock``); we ask for
+        the maximum page size (100) and unwrap ``data``. For typical home
+        pantries 100 items is well above the actual count; sensors that need
+        finer slicing (e.g. expiring-within-N-days) can still filter the
+        returned list client-side.
+        """
+        response = await self._get("/api/pantry/stock?limit=100")
+        if isinstance(response, dict) and isinstance(response.get("data"), list):
+            return response["data"]
+        return response if isinstance(response, list) else []
 
     async def async_get_energy_today(self) -> dict[str, Any]:
         """Fetch today's estimated kWh for planned recipes (task-1399)."""
         return await self._get("/api/ha/energy/today")
 
     # ─── Shopping list mutations ─────────────────────────────────────────────
+    # The backend exposes a flat, single-list API (POST /api/shopping-list
+    # accepts {items: [...]}, PATCH/DELETE target /api/shopping-list/:id).
+    # ``list_id`` is preserved in the signatures for callers in todo.py but
+    # is ignored — see async_get_shopping_lists for context.
 
     async def async_add_shopping_item(
         self, list_id: str, name: str, quantity: str | None = None
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {"name": name}
+        item: dict[str, Any] = {"name": name}
         if quantity:
-            payload["quantity"] = quantity
-        return await self._post(f"/api/shopping-lists/{list_id}/items", payload)
+            item["quantity"] = quantity
+        created = await self._post("/api/shopping-list", {"items": [item]})
+        return created[0] if isinstance(created, list) and created else created
 
     async def async_update_shopping_item(
         self, list_id: str, item_id: str, completed: bool
     ) -> dict[str, Any]:
         return await self._patch(
-            f"/api/shopping-lists/{list_id}/items/{item_id}",
-            {"completed": completed},
+            f"/api/shopping-list/{item_id}",
+            {"checked": completed},
         )
 
     async def async_remove_shopping_item(self, list_id: str, item_id: str) -> None:
-        await self._delete(f"/api/shopping-lists/{list_id}/items/{item_id}")
+        await self._delete(f"/api/shopping-list/{item_id}")
 
     async def async_call_voice_tool(
         self, tool_name: str, params: dict[str, Any]
@@ -118,7 +145,7 @@ class FlavorplanApiClient:
                     )
                 # Non-premium 403 (e.g. forbidden scope) — raise as generic HA error
                 raise HomeAssistantError(
-                    f"Flavorplan API returned 403 on {path}: {body}"
+                    f"Culiplan API returned 403 on {path}: {body}"
                 )
             resp.raise_for_status()
             return await resp.json()
@@ -163,5 +190,5 @@ class FlavorplanApiClient:
         """Convert 401 to ConfigEntryAuthFailed so HA triggers re-auth flow."""
         if status == 401:
             raise ConfigEntryAuthFailed(
-                f"Flavorplan token expired or revoked (401 on {path})"
+                f"Culiplan token expired or revoked (401 on {path})"
             )

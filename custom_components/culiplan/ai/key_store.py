@@ -2,21 +2,21 @@
 BYOK key storage using HA's homeassistant.helpers.storage (task-1390).
 
 Per §13.2 zero-custody: BYOK API keys are stored ONLY in HA's local storage.
-They are NEVER transmitted to Flavorplan infrastructure.
+They are NEVER transmitted to Culiplan infrastructure.
 
 Storage contract:
     - Keys stored in HA's .storage/culiplan_byok_keys file
     - HA's Store class handles persistence and encryption on supported installs
     - Keys are identified by provider name (e.g. "openai", "anthropic", "google")
     - Stored value: the raw API key string
-    - No Flavorplan server ever sees or validates key content
+    - No Culiplan server ever sees or validates key content
 
 Validation contract (§13.6):
     - One cheap test call per provider on entry (1-token completion or embedding)
     - Cost per validation: < €0.01
     - On success: key is persisted
     - On failure: key is NOT persisted; user sees a clear error
-    - Flavorplan backend records {user_id, mode='byok-<provider>', validated=True}
+    - Culiplan backend records {user_id, mode='byok-<provider>', validated=True}
       with NO key fingerprint or content
 """
 

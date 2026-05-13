@@ -2,26 +2,26 @@
 # Source: api.culiplan.com/api/voice/tools?tag=ha-assist:eligible&lang=nl
 language: "nl"
 intents:
-  FlavorplanWhatsDinnerTonight:
+  CuliplanWhatsDinnerTonight:
     data:
       - sentences:
           - "wat eet ik vanavond"
           - "wat staat er op het menu vandaag"
           - "wat heb ik gepland voor vandaag"
           - "wat eet ik vandaag"
-  FlavorplanGetWeekMeals:
+  CuliplanGetWeekMeals:
     data:
       - sentences:
           - "wat staat er deze week gepland"
           - "wat kook ik deze week"
           - "wat is het menu voor morgen"
-  FlavorplanGetShoppingList:
+  CuliplanGetShoppingList:
     data:
       - sentences:
           - "wat moet ik nog kopen"
           - "wat staat er op mijn boodschappenlijstje"
           - "toon mijn boodschappenlijst"
-  FlavorplanAddToShoppingList:
+  CuliplanAddToShoppingList:
     data:
       - sentences:
           - "voeg {item} toe aan [mijn] boodschappenlijst"
@@ -29,26 +29,26 @@ intents:
           - "zet {item} op [mijn] lijst"
         slots:
           item: "{item}"
-  FlavorplanWhatsInPantry:
+  CuliplanWhatsInPantry:
     data:
       - sentences:
           - "wat heb ik in de voorraadkast"
           - "wat heb ik thuis"
           - "wat kan ik maken met wat ik heb"
-  FlavorplanWhatsExpiringSoon:
+  CuliplanWhatsExpiringSoon:
     data:
       - sentences:
           - "wat verloopt er binnenkort"
           - "wat moet ik snel gebruiken"
           - "wat is bijna verlopen"
-  FlavorplanNextCookingStep:
+  CuliplanNextCookingStep:
     data:
       - sentences:
           - "volgende stap"
           - "ga naar de volgende stap"
           - "wat is de volgende stap"
           - "verder koken"
-  FlavorplanSetRecipeTimer:
+  CuliplanSetRecipeTimer:
     data:
       - sentences:
           - "start [de] {label} timer [van] {duration_sec} seconden"
@@ -58,7 +58,7 @@ intents:
         slots:
           label: "{label}"
           duration_sec: "{duration_sec}"
-  FlavorplanCancelRecipeTimer:
+  CuliplanCancelRecipeTimer:
     data:
       - sentences:
           - "stop [de] {label} timer"
@@ -68,12 +68,12 @@ intents:
 
 responses:
   intents:
-    FlavorplanWhatsDinnerTonight: "{{ response }}"
-    FlavorplanGetWeekMeals: "{{ response }}"
-    FlavorplanGetShoppingList: "{{ response }}"
-    FlavorplanAddToShoppingList: "{{ slots.item }} toegevoegd aan je boodschappenlijst."
-    FlavorplanWhatsInPantry: "{{ response }}"
-    FlavorplanWhatsExpiringSoon: "{{ response }}"
-    FlavorplanNextCookingStep: "Naar de volgende kookstap."
-    FlavorplanSetRecipeTimer: "De {{ slots.label }} timer gestart."
-    FlavorplanCancelRecipeTimer: "De {{ slots.label }} timer gestopt."
+    CuliplanWhatsDinnerTonight: "{{ response }}"
+    CuliplanGetWeekMeals: "{{ response }}"
+    CuliplanGetShoppingList: "{{ response }}"
+    CuliplanAddToShoppingList: "{{ slots.item }} toegevoegd aan je boodschappenlijst."
+    CuliplanWhatsInPantry: "{{ response }}"
+    CuliplanWhatsExpiringSoon: "{{ response }}"
+    CuliplanNextCookingStep: "Naar de volgende kookstap."
+    CuliplanSetRecipeTimer: "De {{ slots.label }} timer gestart."
+    CuliplanCancelRecipeTimer: "De {{ slots.label }} timer gestopt."

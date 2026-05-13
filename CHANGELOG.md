@@ -1,6 +1,22 @@
 # Changelog
 
-All notable changes to the Flavorplan Home Assistant integration are documented here.
+All notable changes to the Culiplan Home Assistant integration are documented here.
+
+## [Unreleased]
+
+### Fixed
+- OAuth config flow now sends PKCE (`code_challenge` S256 + `code_verifier`) as required
+  by the Culiplan OAuth 2.1 backend for the public `ha-core` client. HA's default
+  `LocalOAuth2Implementation` omits PKCE, which caused `invalid_request:
+  code_challenge is required (PKCE S256)` on first link.
+- OAuth config flow now requests the required scopes (`calendar:read`, `todo:read/write`,
+  `pantry:*`, `meals:*`, `shopping:*`, `recipes:read`, `profile:read`, `household:read`,
+  `subscription:read`, `ai:suggestions`, `blueprints:generate`, `openid`, `offline_access`).
+  Scope list lives in `const.py:OAUTH2_SCOPES` as a single source of truth, mirroring
+  `ha-core`'s `allowedScopes` in the backend seed.
+
+### Changed
+- Brand rename across all user-facing strings: Flavorplan → Culiplan.
 
 ## [0.1.0] — 2026-04-25
 

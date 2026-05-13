@@ -6,7 +6,7 @@ a dedicated rotating log file under HA's config directory.  Files older than
 24 hours are automatically purged on a periodic timer.
 
 Architecture (§13.2):
-    - Logs are stored ONLY on the local HA install — never sent to Flavorplan.
+    - Logs are stored ONLY on the local HA install — never sent to Culiplan.
     - The file rotates at midnight; backupCount=1 keeps at most two files on disk
       (today's and yesterday's).
     - An HA async_track_time_interval job removes files older than 24h.

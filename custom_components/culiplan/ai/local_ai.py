@@ -6,7 +6,7 @@ Per §13.4: when the user enters the AI provider config flow, probe:
   - localhost:1234  (default LM Studio port)
 
 If a compatible endpoint responds, surface:
-  "Detected Ollama at localhost:11434 — use it for Flavorplan AI?"
+  "Detected Ollama at localhost:11434 — use it for Culiplan AI?"
   with explicit opt-in required (§13.4 rationale: HA users run multiple
   unrelated services on the same host).
 
@@ -17,7 +17,7 @@ constrained intent set (simple suggestions but not tool-calling intents).
 
 Privacy guarantee (AC#5): the probe is purely local-network.  Nothing is
 transmitted beyond localhost (or the LAN if the user specifies a custom host).
-The result of the probe is never reported to Flavorplan.
+The result of the probe is never reported to Culiplan.
 """
 
 from __future__ import annotations

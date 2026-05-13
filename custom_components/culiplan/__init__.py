@@ -1,4 +1,4 @@
-"""The Flavorplan integration."""
+"""The Culiplan integration."""
 
 from __future__ import annotations
 
@@ -38,40 +38,46 @@ _LOVELACE_RESOURCES: tuple[dict[str, str], ...] = (
     },
 )
 
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .const import DOMAIN, PLATFORMS
-from .coordinator import FlavorplanCoordinator
+from .coordinator import CuliplanCoordinator
 from .cooking_services import (
     async_register_cooking_services,
     async_unregister_cooking_services,
 )
+from .launch_view import CuliplanLaunchView
 from .services import async_register_services, async_unregister_services
+
+# Sidebar panel identifiers — kept module-level so register/unregister
+# refer to the same names.
+PANEL_URL_PATH = "culiplan"
+LAUNCH_VIEW_URL = "/api/culiplan/launch"
 
 _LOGGER = logging.getLogger(__name__)
 
 _INTENTS_DIR = Path(__file__).parent / "intents"
 
 _INTENT_TO_TOOL: dict[str, str] = {
-    "FlavorplanWhatsDinnerTonight": "whats_for_dinner",
-    "FlavorplanGetWeekMeals": "get_week_meals",
-    "FlavorplanGetShoppingList": "get_shopping_list",
-    "FlavorplanAddToShoppingList": "add_to_shopping_list",
-    "FlavorplanWhatsInPantry": "whats_in_pantry",
-    "FlavorplanWhatsExpiringSoon": "get_expiring_pantry",
+    "CuliplanWhatsDinnerTonight": "whats_for_dinner",
+    "CuliplanGetWeekMeals": "get_week_meals",
+    "CuliplanGetShoppingList": "get_shopping_list",
+    "CuliplanAddToShoppingList": "add_to_shopping_list",
+    "CuliplanWhatsInPantry": "whats_in_pantry",
+    "CuliplanWhatsExpiringSoon": "get_expiring_pantry",
 }
 
 # Cooking-mode intents that map directly to HA services (task-1397).
 # These call the local service rather than the remote voice-tool endpoint.
 _COOKING_INTENT_TO_SERVICE: dict[str, str] = {
-    "FlavorplanNextCookingStep": "advance_cooking_step",
-    "FlavorplanSetRecipeTimer": "set_recipe_timer",
-    "FlavorplanCancelRecipeTimer": "cancel_recipe_timer",
+    "CuliplanNextCookingStep": "advance_cooking_step",
+    "CuliplanSetRecipeTimer": "set_recipe_timer",
+    "CuliplanCancelRecipeTimer": "cancel_recipe_timer",
 }
 
 
 async def _async_register_lovelace_resources(hass: HomeAssistant) -> None:
     """
-    Register Flavorplan Lovelace card resources idempotently (task-1408).
+    Register Culiplan Lovelace card resources idempotently (task-1408).
 
     Uses HA's internal Lovelace ResourceStorageCollection when available.
     Falls back gracefully if the Lovelace component is not yet loaded or
@@ -146,7 +152,7 @@ async def _async_register_lovelace_resources(hass: HomeAssistant) -> None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Flavorplan from a config entry."""
+    """Set up Culiplan from a config entry."""
     implementation = (
         await config_entry_oauth2_flow.async_get_config_entry_implementation(
             hass, entry
@@ -156,12 +162,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
     await session.async_ensure_token_valid()
 
-    client = FlavorplanApiClient(
+    client = CuliplanApiClient(
         session=aiohttp_client.async_get_clientsession(hass),
         access_token=session.token["access_token"],
     )
 
-    coordinator = FlavorplanCoordinator(hass, client, entry)
+    coordinator = CuliplanCoordinator(hass, client, entry)
     await coordinator.async_config_entry_first_refresh()
     await coordinator.async_start()
 
@@ -178,10 +184,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async_register_services(hass)
     async_register_cooking_services(hass)
     await _async_register_lovelace_resources(hass)
+    await _async_register_sidebar_panel(hass)
     entry.async_on_unload(coordinator.async_stop)
     entry.async_on_unload(lambda: async_unregister_services(hass))
     entry.async_on_unload(lambda: async_unregister_cooking_services(hass))
     return True
+
+
+async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
+    """Register the launch view + iframe sidebar entry.
+
+    Idempotent: HA's ``register_view`` accepts re-registration; the panel
+    registration raises ``ValueError`` on a duplicate path which we treat as
+    success.
+    """
+    # Imported lazily to avoid pulling the frontend module on integration
+    # import (it pulls heavy dependencies that are not needed until setup).
+    from homeassistant.components.frontend import (
+        async_register_built_in_panel,
+    )
+
+    # 1. HTTP view that issues the one-time SSO code and redirects to
+    #    culiplan.com/ha-bridge. ``register_view`` is idempotent — calling it
+    #    again replaces the existing route.
+    hass.http.register_view(CuliplanLaunchView(hass))
+
+    # 2. iframe panel in the sidebar pointing at that view. HA's iframe panel
+    #    serves the URL inside an <iframe>; our launch view 302-redirects to
+    #    culiplan.com/ha-bridge so the iframe's final src is the web app.
+    try:
+        async_register_built_in_panel(
+            hass,
+            component_name="iframe",
+            sidebar_title="Culiplan",
+            sidebar_icon="mdi:silverware-fork-knife",
+            frontend_url_path=PANEL_URL_PATH,
+            config={"url": LAUNCH_VIEW_URL},
+            require_admin=False,
+        )
+    except ValueError:
+        # Panel already registered (HA reload / second config entry) — fine.
+        pass
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -192,6 +235,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
         async_unregister_services(hass)
+
+        # Remove sidebar panel only when the *last* config entry is unloaded;
+        # if other entries remain, keep the panel so they keep working.
+        if not hass.config_entries.async_entries(DOMAIN):
+            try:
+                from homeassistant.components.frontend import async_remove_panel
+                async_remove_panel(hass, PANEL_URL_PATH)
+            except (KeyError, ValueError, ImportError):
+                pass
+
     return unload_ok
 
 
@@ -199,7 +252,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Register Flavorplan Assist intents for the HA language."""
+    """Register Culiplan Assist intents for the HA language."""
     lang = hass.config.language.split("-")[0].lower()
     if lang not in ("en", "nl", "de", "fr", "es"):
         lang = "en"
@@ -211,7 +264,7 @@ def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
     try:
         data = yaml.safe_load(intents_file.read_text(encoding="utf-8"))
     except Exception as err:
-        _LOGGER.error("Failed to load Flavorplan intents YAML: %s", err)
+        _LOGGER.error("Failed to load Culiplan intents YAML: %s", err)
         return
 
     intents_data = data.get("intents", {})
@@ -225,14 +278,14 @@ def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
         intent.async_register(hass, handler)
 
     _LOGGER.debug(
-        "Registered %d Flavorplan Assist intents (lang=%s)",
+        "Registered %d Culiplan Assist intents (lang=%s)",
         len(intents_data),
         lang,
     )
 
 
 def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentHandler:
-    """Return an IntentHandler for a single Flavorplan intent.
+    """Return an IntentHandler for a single Culiplan intent.
 
     We create a fresh class per intent so that `intent_type` is a proper
     class-level attribute (HA asserts it via getattr and stores by type).
@@ -246,8 +299,8 @@ def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentH
         ) -> intent.IntentResponse:
             data = intent_obj.hass.data.get(DOMAIN, {}).get(entry.entry_id)
             if not data:
-                return _speech(intent_obj, "Flavorplan is not connected.")
-            client: FlavorplanApiClient = data["client"]
+                return _speech(intent_obj, "Culiplan is not connected.")
+            client: CuliplanApiClient = data["client"]
             tool = _INTENT_TO_TOOL.get(intent_name)
             if not tool:
                 return _speech(intent_obj, "That intent is not configured.")
@@ -259,7 +312,7 @@ def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentH
                 text = result.get("speakable") or result.get("message") or "Done."
             except Exception as err:
                 _LOGGER.error("Voice tool '%s' failed: %s", tool, err)
-                text = "Sorry, Flavorplan couldn't complete that request."
+                text = "Sorry, Culiplan couldn't complete that request."
             return _speech(intent_obj, text)
 
     return _Handler()
@@ -323,7 +376,7 @@ def _make_cooking_intent_handler(
                     service_name,
                     err,
                 )
-                text = f"Sorry, Flavorplan couldn't complete that cooking action."
+                text = f"Sorry, Culiplan couldn't complete that cooking action."
             return _speech(intent_obj, text)
 
     return _CookingHandler()

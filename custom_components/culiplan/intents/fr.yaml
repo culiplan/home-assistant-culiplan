@@ -2,25 +2,25 @@
 # Source: api.culiplan.com/api/voice/tools?tag=ha-assist:eligible&lang=fr
 language: "fr"
 intents:
-  FlavorplanWhatsDinnerTonight:
+  CuliplanWhatsDinnerTonight:
     data:
       - sentences:
           - "qu'est-ce qu'on mange ce soir"
           - "qu'est-ce que je cuisine aujourd'hui"
           - "quel est le menu du jour"
-  FlavorplanGetWeekMeals:
+  CuliplanGetWeekMeals:
     data:
       - sentences:
           - "qu'est-ce qui est prévu cette semaine"
           - "quel est le menu de cette semaine"
           - "qu'est-ce qu'on mange demain"
-  FlavorplanGetShoppingList:
+  CuliplanGetShoppingList:
     data:
       - sentences:
           - "qu'est-ce que je dois acheter"
           - "montrez-moi ma liste de courses"
           - "qu'est-ce qui est sur ma liste"
-  FlavorplanAddToShoppingList:
+  CuliplanAddToShoppingList:
     data:
       - sentences:
           - "ajoutez {item} à [ma] liste de courses"
@@ -28,25 +28,25 @@ intents:
           - "mettez {item} sur [ma] liste"
         slots:
           item: "{item}"
-  FlavorplanWhatsInPantry:
+  CuliplanWhatsInPantry:
     data:
       - sentences:
           - "qu'est-ce que j'ai dans mon garde-manger"
           - "qu'est-ce que j'ai à la maison"
           - "que puis-je cuisiner avec ce que j'ai"
-  FlavorplanWhatsExpiringSoon:
+  CuliplanWhatsExpiringSoon:
     data:
       - sentences:
           - "qu'est-ce qui expire bientôt"
           - "qu'est-ce que je dois utiliser rapidement"
-  FlavorplanNextCookingStep:
+  CuliplanNextCookingStep:
     data:
       - sentences:
           - "étape suivante"
           - "prochaine étape"
           - "quelle est la prochaine étape"
           - "continuer à cuisiner"
-  FlavorplanSetRecipeTimer:
+  CuliplanSetRecipeTimer:
     data:
       - sentences:
           - "démarrer le minuteur {label} [pour] {duration_sec} secondes"
@@ -56,7 +56,7 @@ intents:
         slots:
           label: "{label}"
           duration_sec: "{duration_sec}"
-  FlavorplanCancelRecipeTimer:
+  CuliplanCancelRecipeTimer:
     data:
       - sentences:
           - "annuler le minuteur {label}"
@@ -66,12 +66,12 @@ intents:
 
 responses:
   intents:
-    FlavorplanWhatsDinnerTonight: "{{ response }}"
-    FlavorplanGetWeekMeals: "{{ response }}"
-    FlavorplanGetShoppingList: "{{ response }}"
-    FlavorplanAddToShoppingList: "{{ slots.item }} ajouté à ta liste de courses."
-    FlavorplanWhatsInPantry: "{{ response }}"
-    FlavorplanWhatsExpiringSoon: "{{ response }}"
-    FlavorplanNextCookingStep: "Passage à l'étape suivante."
-    FlavorplanSetRecipeTimer: "Minuteur {{ slots.label }} démarré."
-    FlavorplanCancelRecipeTimer: "Minuteur {{ slots.label }} annulé."
+    CuliplanWhatsDinnerTonight: "{{ response }}"
+    CuliplanGetWeekMeals: "{{ response }}"
+    CuliplanGetShoppingList: "{{ response }}"
+    CuliplanAddToShoppingList: "{{ slots.item }} ajouté à ta liste de courses."
+    CuliplanWhatsInPantry: "{{ response }}"
+    CuliplanWhatsExpiringSoon: "{{ response }}"
+    CuliplanNextCookingStep: "Passage à l'étape suivante."
+    CuliplanSetRecipeTimer: "Minuteur {{ slots.label }} démarré."
+    CuliplanCancelRecipeTimer: "Minuteur {{ slots.label }} annulé."

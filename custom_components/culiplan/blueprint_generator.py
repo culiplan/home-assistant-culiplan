@@ -1,5 +1,5 @@
 """
-Flavorplan Blueprint Generator (task-1400, Phase 3 stretch).
+Culiplan Blueprint Generator (task-1400, Phase 3 stretch).
 
 Implements `culiplan.generate_blueprint`:
     - Cloud AI mode: backend generates YAML (premium-gated)
@@ -9,7 +9,7 @@ Implements `culiplan.generate_blueprint`:
 
 Architecture:
     - Tier rules ONLY on backend (§11.1.5). 403 → PremiumRequiredError → Repairs.
-    - BYOK keys NEVER transit Flavorplan infrastructure (§13.2).
+    - BYOK keys NEVER transit Culiplan infrastructure (§13.2).
     - Audit log is metadata-only (§13.6) — logged on backend.
 
 Fires HA event: ``culiplan_blueprint_generated`` with payload:
@@ -39,7 +39,7 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .ai.dispatchers import create_dispatcher
 from .ai.key_store import BYOKKeyStore
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .const import (
     AI_MODE_BYOK,
     AI_MODE_CLOUD,
@@ -99,7 +99,7 @@ async def _install_blueprint(hass: HomeAssistant, name: str, yaml_content: str) 
 
 
 async def _cloud_generate_blueprint(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     prompt: str,
     available_entities: list[str] | None,
 ) -> dict[str, Any]:
@@ -113,7 +113,7 @@ async def _cloud_generate_blueprint(
     """
     payload: dict[str, Any] = {
         "prompt": prompt,
-        "aiProviderMode": "flavorplan-cloud",
+        "aiProviderMode": "culiplan-cloud",
     }
     if available_entities:
         payload["context"] = {"available_entities": available_entities[:100]}
@@ -139,7 +139,7 @@ async def _byok_local_generate_blueprint(
     hass: HomeAssistant,
     entry_data: dict[str, Any],
     entry_config: dict[str, Any],
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     prompt: str,
     available_entities: list[str] | None,
 ) -> dict[str, Any]:
@@ -149,7 +149,7 @@ async def _byok_local_generate_blueprint(
     Returns a blueprint-shaped dict:
         { yaml, name, description, validation: { valid, warnings } }
 
-    BYOK keys never transit Flavorplan (§13.2) — the key is used only in the
+    BYOK keys never transit Culiplan (§13.2) — the key is used only in the
     local AIDispatchService.execute() call.
     """
     ai_mode = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
@@ -165,7 +165,7 @@ async def _byok_local_generate_blueprint(
         if not api_key:
             raise HomeAssistantError(
                 f"No BYOK key found for provider '{provider}'. "
-                "Please reconfigure the Flavorplan integration."
+                "Please reconfigure the Culiplan integration."
             )
     elif ai_mode == AI_MODE_LOCAL:
         endpoint = entry_config.get(CONF_LOCAL_ENDPOINT, "")
@@ -187,7 +187,7 @@ async def _byok_local_generate_blueprint(
         model_name = entry_config.get(CONF_LOCAL_MODEL, "")
         backend_mode = "local-lmstudio" if "lmstudio" in (model_name or "").lower() else "local-ollama"
     else:
-        backend_mode = "flavorplan-cloud"
+        backend_mode = "culiplan-cloud"
 
     # Fetch prompt envelope from backend
     envelope_payload: dict[str, Any] = {
@@ -258,7 +258,7 @@ async def handle_generate_blueprint(
     entry = next((e for e in entries if e.entry_id == entry_id), None)
     entry_config = entry.data if entry else {}
 
-    client: FlavorplanApiClient = entry_data["client"]
+    client: CuliplanApiClient = entry_data["client"]
     ai_mode: str = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
 
     prompt: str = call.data["prompt"]

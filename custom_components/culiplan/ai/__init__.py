@@ -1,4 +1,4 @@
-"""AI provider dispatcher package for the Flavorplan integration.
+"""AI provider dispatcher package for the Culiplan integration.
 
 Three dispatcher classes — one per provider SDK family — accept a normalised
 prompt envelope (fetched from POST /api/ai/envelope) and return a structured
@@ -9,10 +9,10 @@ Provider families:
                                    and LM Studio.
     AnthropicDispatcher         — Anthropic Claude models.
     GoogleDispatcher            — Google Gemini Direct API (distinct from
-                                   Flavorplan's own Vertex AI usage).
+                                   Culiplan's own Vertex AI usage).
 
 Architecture note (§13.2 zero-custody):
-    API keys NEVER leave Home Assistant.  Flavorplan's backend only builds the
+    API keys NEVER leave Home Assistant.  Culiplan's backend only builds the
     prompt envelope; the AI call itself is made directly from this module to
     the AI provider.  Tool-call results are routed back through the existing
     OAuth-scoped REST endpoints on api.culiplan.com.
@@ -23,5 +23,5 @@ Streaming:
 Debug mode (§13.2):
     If CONF_DEBUG_AI is set in the config entry options, prompts are logged at
     DEBUG level on the HA side with a 24-hour auto-purge TTL note.  They are
-    NEVER sent to Flavorplan.
+    NEVER sent to Culiplan.
 """

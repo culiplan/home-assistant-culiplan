@@ -1,4 +1,4 @@
-"""Calendar entity — one per Flavorplan meal plan (task-1366)."""
+"""Calendar entity — one per Culiplan meal plan (task-1366)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import FlavorplanCoordinator
+from .coordinator import CuliplanCoordinator
 from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,20 +25,20 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Flavorplan calendar entities."""
-    coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    """Set up Culiplan calendar entities."""
+    coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     meal_plans = (coordinator.data or {}).get("meal_plans", [])
-    async_add_entities(FlavorplanCalendar(coordinator, plan, entry) for plan in meal_plans)
+    async_add_entities(CuliplanCalendar(coordinator, plan, entry) for plan in meal_plans)
 
 
-class FlavorplanCalendar(CoordinatorEntity[FlavorplanCoordinator], CalendarEntity):
-    """Calendar entity for a single Flavorplan meal plan."""
+class CuliplanCalendar(CoordinatorEntity[CuliplanCoordinator], CalendarEntity):
+    """Calendar entity for a single Culiplan meal plan."""
 
     _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: FlavorplanCoordinator,
+        coordinator: CuliplanCoordinator,
         plan: dict[str, Any],
         entry: ConfigEntry,
     ) -> None:

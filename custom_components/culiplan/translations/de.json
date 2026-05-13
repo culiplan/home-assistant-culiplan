@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Flavorplan verbinden"
+        "title": "Culiplan verbinden"
       },
       "ai_provider": {
         "title": "KI-Anbieter",
-        "description": "Wähle aus, wie Flavorplan KI-Funktionen in Home Assistant ausführt.\n\n**Cloud-KI** — Flavorplan verarbeitet Anfragen (Premium-Abonnement erforderlich).\n**BYOK** — Dein API-Schlüssel wird lokal gespeichert und direkt an den KI-Anbieter gesendet; Flavorplan sieht ihn nie.\n**Lokale KI** — Anfragen gehen an deinen lokalen Ollama- oder LM Studio-Endpunkt.",
+        "description": "Wähle aus, wie Culiplan KI-Funktionen in Home Assistant ausführt.\n\n**Cloud-KI** — Culiplan verarbeitet Anfragen (Premium-Abonnement erforderlich).\n**BYOK** — Dein API-Schlüssel wird lokal gespeichert und direkt an den KI-Anbieter gesendet; Culiplan sieht ihn nie.\n**Lokale KI** — Anfragen gehen an deinen lokalen Ollama- oder LM Studio-Endpunkt.",
         "data": {
           "ai_mode": "KI-Modus",
           "byok_provider": "KI-Anbieter",
@@ -15,24 +15,24 @@
           "local_model": "Modellname"
         },
         "data_description": {
-          "byok_api_key": "Nur in Home Assistant gespeichert — wird nie an Flavorplan gesendet.",
+          "byok_api_key": "Nur in Home Assistant gespeichert — wird nie an Culiplan gesendet.",
           "local_endpoint": "z. B. http://localhost:11434",
           "local_model": "z. B. llama3.2"
         }
       },
       "reauth_confirm": {
-        "title": "Flavorplan erneut authentifizieren",
-        "description": "Deine Flavorplan-Sitzung ist abgelaufen. Klicke auf Senden, um dich erneut zu authentifizieren."
+        "title": "Culiplan erneut authentifizieren",
+        "description": "Deine Culiplan-Sitzung ist abgelaufen. Klicke auf Senden, um dich erneut zu authentifizieren."
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zu Flavorplan nicht möglich",
+      "cannot_connect": "Verbindung zu Culiplan nicht möglich",
       "invalid_api_key": "Ungültiger API-Schlüssel — bitte prüfe den Schlüssel und versuche es erneut.",
       "invalid_endpoint": "Der lokale KI-Endpunkt ist nicht erreichbar. Überprüfe die URL und ob der Dienst läuft.",
       "unknown": "Unerwarteter Fehler"
     },
     "abort": {
-      "already_configured": "Flavorplan ist bereits konfiguriert",
+      "already_configured": "Culiplan ist bereits konfiguriert",
       "oauth_error": "OAuth-Fehler: {error}",
       "missing_configuration": "Integration nicht konfiguriert. Bitte in der Benutzeroberfläche konfigurieren."
     }

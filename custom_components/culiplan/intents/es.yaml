@@ -2,25 +2,25 @@
 # Source: api.culiplan.com/api/voice/tools?tag=ha-assist:eligible&lang=es
 language: "es"
 intents:
-  FlavorplanWhatsDinnerTonight:
+  CuliplanWhatsDinnerTonight:
     data:
       - sentences:
           - "¿qué hay para cenar esta noche?"
           - "¿qué cocino hoy?"
           - "¿qué tengo planeado para hoy?"
-  FlavorplanGetWeekMeals:
+  CuliplanGetWeekMeals:
     data:
       - sentences:
           - "¿qué está planeado esta semana?"
           - "¿qué cocino esta semana?"
           - "¿qué hay para mañana?"
-  FlavorplanGetShoppingList:
+  CuliplanGetShoppingList:
     data:
       - sentences:
           - "¿qué necesito comprar?"
           - "muéstrame mi lista de compras"
           - "¿qué hay en mi lista?"
-  FlavorplanAddToShoppingList:
+  CuliplanAddToShoppingList:
     data:
       - sentences:
           - "agregar {item} a [mi] lista de compras"
@@ -28,26 +28,26 @@ intents:
           - "pon {item} en [mi] lista"
         slots:
           item: "{item}"
-  FlavorplanWhatsInPantry:
+  CuliplanWhatsInPantry:
     data:
       - sentences:
           - "¿qué tengo en mi despensa?"
           - "¿qué tengo en casa?"
           - "¿qué puedo cocinar con lo que tengo?"
-  FlavorplanWhatsExpiringSoon:
+  CuliplanWhatsExpiringSoon:
     data:
       - sentences:
           - "¿qué vence pronto?"
           - "¿qué debo usar pronto?"
           - "¿qué está a punto de caducar?"
-  FlavorplanNextCookingStep:
+  CuliplanNextCookingStep:
     data:
       - sentences:
           - "siguiente paso"
           - "próximo paso"
           - "¿cuál es el siguiente paso?"
           - "continuar cocinando"
-  FlavorplanSetRecipeTimer:
+  CuliplanSetRecipeTimer:
     data:
       - sentences:
           - "iniciar el temporizador {label} [de] {duration_sec} segundos"
@@ -57,7 +57,7 @@ intents:
         slots:
           label: "{label}"
           duration_sec: "{duration_sec}"
-  FlavorplanCancelRecipeTimer:
+  CuliplanCancelRecipeTimer:
     data:
       - sentences:
           - "cancelar el temporizador {label}"
@@ -67,12 +67,12 @@ intents:
 
 responses:
   intents:
-    FlavorplanWhatsDinnerTonight: "{{ response }}"
-    FlavorplanGetWeekMeals: "{{ response }}"
-    FlavorplanGetShoppingList: "{{ response }}"
-    FlavorplanAddToShoppingList: "{{ slots.item }} agregado a tu lista de compras."
-    FlavorplanWhatsInPantry: "{{ response }}"
-    FlavorplanWhatsExpiringSoon: "{{ response }}"
-    FlavorplanNextCookingStep: "Avanzando al siguiente paso de cocina."
-    FlavorplanSetRecipeTimer: "Temporizador {{ slots.label }} iniciado."
-    FlavorplanCancelRecipeTimer: "Temporizador {{ slots.label }} cancelado."
+    CuliplanWhatsDinnerTonight: "{{ response }}"
+    CuliplanGetWeekMeals: "{{ response }}"
+    CuliplanGetShoppingList: "{{ response }}"
+    CuliplanAddToShoppingList: "{{ slots.item }} agregado a tu lista de compras."
+    CuliplanWhatsInPantry: "{{ response }}"
+    CuliplanWhatsExpiringSoon: "{{ response }}"
+    CuliplanNextCookingStep: "Avanzando al siguiente paso de cocina."
+    CuliplanSetRecipeTimer: "Temporizador {{ slots.label }} iniciado."
+    CuliplanCancelRecipeTimer: "Temporizador {{ slots.label }} cancelado."

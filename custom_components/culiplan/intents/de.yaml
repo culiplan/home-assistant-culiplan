@@ -2,25 +2,25 @@
 # Source: api.culiplan.com/api/voice/tools?tag=ha-assist:eligible&lang=de
 language: "de"
 intents:
-  FlavorplanWhatsDinnerTonight:
+  CuliplanWhatsDinnerTonight:
     data:
       - sentences:
           - "was gibt es heute zum Abendessen"
           - "was koche ich heute"
           - "was steht heute auf dem Speiseplan"
-  FlavorplanGetWeekMeals:
+  CuliplanGetWeekMeals:
     data:
       - sentences:
           - "was ist diese Woche geplant"
           - "was koche ich diese Woche"
           - "was gibt es morgen"
-  FlavorplanGetShoppingList:
+  CuliplanGetShoppingList:
     data:
       - sentences:
           - "was muss ich einkaufen"
           - "was steht auf meiner Einkaufsliste"
           - "zeig mir meine Einkaufsliste"
-  FlavorplanAddToShoppingList:
+  CuliplanAddToShoppingList:
     data:
       - sentences:
           - "füge {item} zur Einkaufsliste hinzu"
@@ -28,26 +28,26 @@ intents:
           - "setze {item} auf [meine] Liste"
         slots:
           item: "{item}"
-  FlavorplanWhatsInPantry:
+  CuliplanWhatsInPantry:
     data:
       - sentences:
           - "was habe ich in der Speisekammer"
           - "was habe ich zuhause"
           - "was kann ich mit dem kochen was ich habe"
-  FlavorplanWhatsExpiringSoon:
+  CuliplanWhatsExpiringSoon:
     data:
       - sentences:
           - "was läuft bald ab"
           - "was sollte ich bald verwenden"
           - "was ist fast abgelaufen"
-  FlavorplanNextCookingStep:
+  CuliplanNextCookingStep:
     data:
       - sentences:
           - "nächster Schritt"
           - "zum nächsten Schritt"
           - "was ist der nächste Schritt"
           - "weiter kochen"
-  FlavorplanSetRecipeTimer:
+  CuliplanSetRecipeTimer:
     data:
       - sentences:
           - "starte [den] {label} Timer [für] {duration_sec} Sekunden"
@@ -57,7 +57,7 @@ intents:
         slots:
           label: "{label}"
           duration_sec: "{duration_sec}"
-  FlavorplanCancelRecipeTimer:
+  CuliplanCancelRecipeTimer:
     data:
       - sentences:
           - "stoppe [den] {label} Timer"
@@ -67,12 +67,12 @@ intents:
 
 responses:
   intents:
-    FlavorplanWhatsDinnerTonight: "{{ response }}"
-    FlavorplanGetWeekMeals: "{{ response }}"
-    FlavorplanGetShoppingList: "{{ response }}"
-    FlavorplanAddToShoppingList: "{{ slots.item }} zu deiner Einkaufsliste hinzugefügt."
-    FlavorplanWhatsInPantry: "{{ response }}"
-    FlavorplanWhatsExpiringSoon: "{{ response }}"
-    FlavorplanNextCookingStep: "Zum nächsten Kochschritt."
-    FlavorplanSetRecipeTimer: "Der {{ slots.label }} Timer gestartet."
-    FlavorplanCancelRecipeTimer: "Der {{ slots.label }} Timer gestoppt."
+    CuliplanWhatsDinnerTonight: "{{ response }}"
+    CuliplanGetWeekMeals: "{{ response }}"
+    CuliplanGetShoppingList: "{{ response }}"
+    CuliplanAddToShoppingList: "{{ slots.item }} zu deiner Einkaufsliste hinzugefügt."
+    CuliplanWhatsInPantry: "{{ response }}"
+    CuliplanWhatsExpiringSoon: "{{ response }}"
+    CuliplanNextCookingStep: "Zum nächsten Kochschritt."
+    CuliplanSetRecipeTimer: "Der {{ slots.label }} Timer gestartet."
+    CuliplanCancelRecipeTimer: "Der {{ slots.label }} Timer gestoppt."

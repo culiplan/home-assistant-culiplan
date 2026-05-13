@@ -1,4 +1,4 @@
-"""Diagnostics support for the Flavorplan integration (task-1501, Gold target).
+"""Diagnostics support for the Culiplan integration (task-1501, Gold target).
 
 Returns integration health data for troubleshooting while deliberately
 redacting sensitive values (OAuth tokens, personal data).

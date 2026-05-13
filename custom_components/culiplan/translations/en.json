@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Connect Flavorplan"
+        "title": "Connect Culiplan"
       },
       "ai_provider": {
         "title": "AI Provider",
-        "description": "Choose how Flavorplan AI features run in Home Assistant.\n\n**Cloud AI** — Flavorplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Flavorplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.",
+        "description": "Choose how Culiplan AI features run in Home Assistant.\n\n**Cloud AI** — Culiplan processes requests (Premium subscription required).\n**BYOK** — Your API key is stored locally and sent directly to the AI provider; Culiplan never sees it.\n**Local AI** — Requests go to your local Ollama or LM Studio endpoint.",
         "data": {
           "ai_mode": "AI Mode",
           "byok_provider": "AI Provider",
@@ -15,7 +15,7 @@
           "local_model": "Model Name"
         },
         "data_description": {
-          "byok_api_key": "Stored in Home Assistant only — never sent to Flavorplan.",
+          "byok_api_key": "Stored in Home Assistant only — never sent to Culiplan.",
           "local_endpoint": "e.g. http://localhost:11434",
           "local_model": "e.g. llama3.2"
         }
@@ -29,48 +29,48 @@
       },
       "mealie_credentials": {
         "title": "Mealie Connection",
-        "description": "Enter your Mealie URL and an API token. Flavorplan will perform a dry run to preview what will be imported before any data is written.",
+        "description": "Enter your Mealie URL and an API token. Culiplan will perform a dry run to preview what will be imported before any data is written.",
         "data": {
           "mealie_url": "Mealie URL",
           "mealie_token": "Mealie API Token"
         },
         "data_description": {
           "mealie_url": "e.g. http://192.168.1.10:9000",
-          "mealie_token": "Long-lived API token from Mealie Settings > API Tokens. This is NOT stored by Flavorplan after the import."
+          "mealie_token": "Long-lived API token from Mealie Settings > API Tokens. This is NOT stored by Culiplan after the import."
         }
       },
       "mealie_preview": {
         "title": "Import Preview",
-        "description": "Flavorplan analysed your Mealie library:\n\n- **{will_import}** recipes ready to import\n- **{will_flag}** recipes flagged for review (servings, nutrition or ingredient headings need attention)\n- **{will_skip}** recipes skipped (no name)\n\nUnparseable ingredient samples: {samples}\n\nConfirm to start the import. You can roll back within 24 hours from the integration options.",
+        "description": "Culiplan analysed your Mealie library:\n\n- **{will_import}** recipes ready to import\n- **{will_flag}** recipes flagged for review (servings, nutrition or ingredient headings need attention)\n- **{will_skip}** recipes skipped (no name)\n\nUnparseable ingredient samples: {samples}\n\nConfirm to start the import. You can roll back within 24 hours from the integration options.",
         "data": {
           "confirm_import": "Start import"
         }
       },
       "mealie_progress": {
         "title": "Importing from Mealie",
-        "description": "Import in progress. This may take a few minutes depending on the size of your library. Flavorplan will notify Home Assistant when complete."
+        "description": "Import in progress. This may take a few minutes depending on the size of your library. Culiplan will notify Home Assistant when complete."
       },
       "mealie_done": {
         "title": "Import Complete",
-        "description": "Your Mealie data has been imported into Flavorplan.\n\nJob ID: {job_id}\nErrors: {errors}\n\nYou can roll back this import from the integration options within 24 hours.",
+        "description": "Your Mealie data has been imported into Culiplan.\n\nJob ID: {job_id}\nErrors: {errors}\n\nYou can roll back this import from the integration options within 24 hours.",
         "data": {}
       },
       "reauth_confirm": {
-        "title": "Re-authenticate Flavorplan",
-        "description": "Your Flavorplan session has expired. Click Submit to re-authenticate."
+        "title": "Re-authenticate Culiplan",
+        "description": "Your Culiplan session has expired. Click Submit to re-authenticate."
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to Flavorplan",
+      "cannot_connect": "Cannot connect to Culiplan",
       "invalid_api_key": "Invalid API key — please check the key and try again.",
       "invalid_endpoint": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
       "invalid_mealie_url": "Could not connect to the Mealie instance. Check the URL and that Mealie is running.",
-      "mealie_unreachable": "Flavorplan could not reach your Mealie instance. Check that the URL is accessible from the Flavorplan server.",
+      "mealie_unreachable": "Culiplan could not reach your Mealie instance. Check that the URL is accessible from the Culiplan server.",
       "mealie_timeout": "The Mealie import timed out. Try again or check your Mealie instance.",
       "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Flavorplan is already configured",
+      "already_configured": "Culiplan is already configured",
       "oauth_error": "OAuth error: {error}",
       "missing_configuration": "Integration not configured. Please configure it in the UI."
     }
@@ -78,7 +78,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "Flavorplan Options",
+        "title": "Culiplan Options",
         "description": "Rollback available: {rollback_available}",
         "data": {
           "rollback": "Roll back Mealie import (removes all imported data within 24 h)"
@@ -93,16 +93,16 @@
   },
   "issues": {
     "reauth_required": {
-      "title": "Re-authentication required for Flavorplan",
-      "description": "Your Flavorplan session has expired. Re-authenticate your account."
+      "title": "Re-authentication required for Culiplan",
+      "description": "Your Culiplan session has expired. Re-authenticate your account."
     },
     "pantry_barcode_not_found": {
-      "title": "Flavorplan: Barcode not found in pantry",
-      "description": "The barcode '{barcode}' was scanned but no matching item was found in your Flavorplan pantry. Open Flavorplan and add an item with this barcode, then scanning it again will resolve this issue."
+      "title": "Culiplan: Barcode not found in pantry",
+      "description": "The barcode '{barcode}' was scanned but no matching item was found in your Culiplan pantry. Open Culiplan and add an item with this barcode, then scanning it again will resolve this issue."
     },
     "premium_required": {
-      "title": "Flavorplan Premium required",
-      "description": "The Flavorplan feature '{feature}' requires a Premium subscription. Upgrade your account at: {upgrade_url}"
+      "title": "Culiplan Premium required",
+      "description": "The Culiplan feature '{feature}' requires a Premium subscription. Upgrade your account at: {upgrade_url}"
     }
   }
 }

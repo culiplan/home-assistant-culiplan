@@ -1,4 +1,4 @@
-# Flavorplan HA service descriptions
+# Culiplan HA service descriptions
 # Phase 2: tasks 1376, 1378, 1379 — pantry / household
 # Phase 3: task-1397 — cooking-mode + timer mirroring; task-1400 — AI blueprint generation
 # Used by the Home Assistant UI to show service descriptions and field hints.
@@ -8,8 +8,8 @@ pantry_decrement:
   description: >
     Decrements stock for the pantry item identified by the given barcode.
     Uses FEFO (First Expired First Out) logic. If the item is not found, a
-    Repairs issue is created prompting you to add it in Flavorplan.
-    Free tier — no Flavorplan Premium required.
+    Repairs issue is created prompting you to add it in Culiplan.
+    Free tier — no Culiplan Premium required.
   fields:
     barcode:
       name: Barcode
@@ -36,7 +36,7 @@ pantry_expiring_items:
   description: >
     Fetches the list of pantry items expiring within the given window and fires
     a `culiplan_pantry_expiring_result` HA event with the item IDs.
-    Free tier — no Flavorplan Premium required.
+    Free tier — no Culiplan Premium required.
   fields:
     window_hours:
       name: Expiry window (hours)
@@ -56,9 +56,9 @@ scale_tonight_servings:
   name: Scale tonight's servings
   description: >
     Records the number of household members currently home and updates tonight's
-    meal plan so Flavorplan can display ingredient quantities scaled to the
+    meal plan so Culiplan can display ingredient quantities scaled to the
     present count.
-    **Requires Flavorplan Premium.** Free users will see a Repairs upsell issue.
+    **Requires Culiplan Premium.** Free users will see a Repairs upsell issue.
   fields:
     present_count:
       name: Present count
@@ -83,16 +83,16 @@ scale_tonight_servings:
 start_cooking_mode:
   name: Start cooking mode
   description: >
-    Starts a guided cooking session for the given recipe in Flavorplan.
+    Starts a guided cooking session for the given recipe in Culiplan.
     Any previously active session is automatically completed first.
     Fires a `culiplan_cooking_session_started` HA event on success.
-    **May require Flavorplan Premium** depending on recipe type.
+    **May require Culiplan Premium** depending on recipe type.
   fields:
     recipe_id:
       name: Recipe ID
       description: >
-        The Flavorplan recipe identifier to cook. You can find it in the
-        Flavorplan app under the recipe detail URL.
+        The Culiplan recipe identifier to cook. You can find it in the
+        Culiplan app under the recipe detail URL.
       required: true
       selector:
         text: {}
@@ -100,7 +100,7 @@ start_cooking_mode:
       name: Servings (optional)
       description: >
         Override the default serving count for this session. Ingredient
-        quantities in Flavorplan are scaled accordingly.
+        quantities in Culiplan are scaled accordingly.
       required: false
       selector:
         number:
@@ -202,10 +202,10 @@ generate_blueprint:
   name: Generate automation blueprint
   description: >
     Generates a Home Assistant automation blueprint YAML from a natural language
-    description using Flavorplan AI.
+    description using Culiplan AI.
 
-    **Cloud AI mode**: Flavorplan generates the YAML server-side.
-    **Requires Flavorplan Premium** for Cloud AI mode; free for BYOK / Local AI.
+    **Cloud AI mode**: Culiplan generates the YAML server-side.
+    **Requires Culiplan Premium** for Cloud AI mode; free for BYOK / Local AI.
 
     **BYOK / Local AI mode**: The backend returns a prompt envelope only; your
     locally-configured AI model generates the YAML. Your API key never leaves

@@ -1,10 +1,35 @@
-"""Constants for the Flavorplan integration."""
+"""Constants for the Culiplan integration."""
 
 DOMAIN = "culiplan"
 OAUTH_CLIENT_ID = "ha-core"
 BASE_URL = "https://api.culiplan.com"
+WEB_URL = "https://culiplan.com"
 OAUTH2_AUTHORIZE = f"{BASE_URL}/api/oauth/authorize"
 OAUTH2_TOKEN = f"{BASE_URL}/api/oauth/token"
+
+# OAuth scopes requested for the ha-core client. Must be a subset of the
+# `allowedScopes` registered for `ha-core` in the backend
+# (packages/backend/src/scripts/seed/seedOAuthClients.ts). Single source of
+# truth — referenced from application_credentials.py and (future) reauth flows.
+OAUTH2_SCOPES: tuple[str, ...] = (
+    "calendar:read",
+    "todo:read",
+    "todo:write",
+    "pantry:read",
+    "pantry:write",
+    "meals:read",
+    "meals:write",
+    "shopping:read",
+    "shopping:write",
+    "recipes:read",
+    "profile:read",
+    "household:read",
+    "subscription:read",
+    "ai:suggestions",
+    "blueprints:generate",
+    "openid",
+    "offline_access",
+)
 
 # AI provider modes
 AI_MODE_CLOUD = "cloud"

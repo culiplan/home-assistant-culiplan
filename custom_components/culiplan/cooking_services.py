@@ -1,5 +1,5 @@
 """
-Flavorplan HA cooking-mode services — Phase 3 (task-1397).
+Culiplan HA cooking-mode services — Phase 3 (task-1397).
 
 Seven services that wrap the /api/cooking-sessions backend:
     culiplan.start_cooking_mode     — POST /api/cooking-sessions
@@ -32,7 +32,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .ai.types import PremiumRequiredError
 from .const import DOMAIN
 from .repairs import async_create_premium_repair, async_resolve_premium_repair
@@ -93,7 +93,7 @@ COMPLETE_COOKING_MODE_SCHEMA = vol.Schema({})
 
 
 async def _get_active_session(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
 ) -> dict[str, Any]:
     """
     Fetch the active cooking session for the authenticated user.
@@ -123,7 +123,7 @@ async def _get_active_session(
 
 
 async def _patch_session(
-    client: FlavorplanApiClient,
+    client: CuliplanApiClient,
     session_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
@@ -222,9 +222,9 @@ async def sync_ha_timers(
 def async_register_cooking_services(hass: HomeAssistant) -> None:
     """Register all cooking-mode HA services."""
 
-    def _get_client(entry_id: str | None) -> FlavorplanApiClient:
+    def _get_client(entry_id: str | None) -> CuliplanApiClient:
         if not entry_id:
-            raise HomeAssistantError("Flavorplan is not configured.")
+            raise HomeAssistantError("Culiplan is not configured.")
         return hass.data[DOMAIN][entry_id]["client"]
 
     def _find_entry_id() -> str | None:

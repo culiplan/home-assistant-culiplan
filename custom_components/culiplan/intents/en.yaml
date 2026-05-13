@@ -3,7 +3,7 @@
 # Phase 3 cooking-mode intents added manually (task-1397).
 language: "en"
 intents:
-  FlavorplanWhatsDinnerTonight:
+  CuliplanWhatsDinnerTonight:
     data:
       - sentences:
           - "what's for dinner [tonight]"
@@ -11,7 +11,7 @@ intents:
           - "what's on the menu [today]"
           - "what did I plan for dinner"
           - "what's for lunch [today]"
-  FlavorplanGetWeekMeals:
+  CuliplanGetWeekMeals:
     data:
       - sentences:
           - "what's planned this week"
@@ -19,14 +19,14 @@ intents:
           - "show me this week's meal plan"
           - "what about tomorrow"
           - "what's for dinner tomorrow"
-  FlavorplanGetShoppingList:
+  CuliplanGetShoppingList:
     data:
       - sentences:
           - "what do I need to buy"
           - "show my shopping list"
           - "what's on my shopping list"
           - "what should I get at the store"
-  FlavorplanAddToShoppingList:
+  CuliplanAddToShoppingList:
     data:
       - sentences:
           - "add {item} to [my] shopping list"
@@ -34,19 +34,19 @@ intents:
           - "put {item} on [my] list"
         slots:
           item: "{item}"
-  FlavorplanWhatsInPantry:
+  CuliplanWhatsInPantry:
     data:
       - sentences:
           - "what's in my pantry"
           - "what do I have at home"
           - "what can I cook with what I have"
-  FlavorplanWhatsExpiringSoon:
+  CuliplanWhatsExpiringSoon:
     data:
       - sentences:
           - "what's expiring soon"
           - "what food is about to expire"
           - "what should I use up"
-  FlavorplanNextCookingStep:
+  CuliplanNextCookingStep:
     data:
       - sentences:
           - "next step"
@@ -54,7 +54,7 @@ intents:
           - "what's the next step"
           - "go to the next step"
           - "continue cooking"
-  FlavorplanSetRecipeTimer:
+  CuliplanSetRecipeTimer:
     data:
       - sentences:
           - "start [the] {label} timer [for] {duration_sec} seconds"
@@ -64,7 +64,7 @@ intents:
         slots:
           label: "{label}"
           duration_sec: "{duration_sec}"
-  FlavorplanCancelRecipeTimer:
+  CuliplanCancelRecipeTimer:
     data:
       - sentences:
           - "cancel [the] {label} timer"
@@ -74,12 +74,12 @@ intents:
 
 responses:
   intents:
-    FlavorplanWhatsDinnerTonight: "{{ response }}"
-    FlavorplanGetWeekMeals: "This week you have {{ slots.totalMealsPlanned }} meals planned."
-    FlavorplanGetShoppingList: "{{ response }}"
-    FlavorplanAddToShoppingList: "Added {{ slots.item }} to your shopping list."
-    FlavorplanWhatsInPantry: "{{ response }}"
-    FlavorplanWhatsExpiringSoon: "{{ response }}"
-    FlavorplanNextCookingStep: "Moving to the next cooking step."
-    FlavorplanSetRecipeTimer: "Starting the {{ slots.label }} timer."
-    FlavorplanCancelRecipeTimer: "Cancelled the {{ slots.label }} timer."
+    CuliplanWhatsDinnerTonight: "{{ response }}"
+    CuliplanGetWeekMeals: "This week you have {{ slots.totalMealsPlanned }} meals planned."
+    CuliplanGetShoppingList: "{{ response }}"
+    CuliplanAddToShoppingList: "Added {{ slots.item }} to your shopping list."
+    CuliplanWhatsInPantry: "{{ response }}"
+    CuliplanWhatsExpiringSoon: "{{ response }}"
+    CuliplanNextCookingStep: "Moving to the next cooking step."
+    CuliplanSetRecipeTimer: "Starting the {{ slots.label }} timer."
+    CuliplanCancelRecipeTimer: "Cancelled the {{ slots.label }} timer."

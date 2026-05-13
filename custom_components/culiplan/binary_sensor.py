@@ -1,17 +1,17 @@
 """
-Flavorplan binary sensor entities — Phase 2 (tasks 1378 + 1380).
+Culiplan binary sensor entities — Phase 2 (tasks 1378 + 1380).
 
 Entities registered here:
-    binary_sensor.flavorplan_pantry_has_expiring
+    binary_sensor.culiplan_pantry_has_expiring
         — True when any pantry item expires within the configured window.
         — task-1378 AC#1
 
-    binary_sensor.flavorplan_dinner_party_active
+    binary_sensor.culiplan_dinner_party_active
         — True when a dinner party is scheduled for today (status PLANNED/VOTING).
         — Attributes: guest_count, course_count, start_at, recipe_ids (IDs only, §14.3)
         — task-1380 AC#1+2+3
 
-Both sensors update in real-time via the FlavorplanCoordinator Socket.IO feed:
+Both sensors update in real-time via the CuliplanCoordinator Socket.IO feed:
     pantry.item.updated / pantry.item.depleted  → re-evaluate pantry sensor
     dinner_party.updated                         → re-fetch active party via REST
 
@@ -34,9 +34,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .api import FlavorplanApiClient
+from .api import CuliplanApiClient
 from .const import DOMAIN
-from .coordinator import FlavorplanCoordinator
+from .coordinator import CuliplanCoordinator
 from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,10 +49,10 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Flavorplan binary sensor entities."""
+    """Set up Culiplan binary sensor entities."""
     data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: FlavorplanCoordinator = data["coordinator"]
-    client: FlavorplanApiClient = data["client"]
+    coordinator: CuliplanCoordinator = data["coordinator"]
+    client: CuliplanApiClient = data["client"]
 
     expiry_hours: int = entry.options.get("expiry_hours", DEFAULT_EXPIRY_HOURS)
 
@@ -67,12 +67,12 @@ async def async_setup_entry(
 # ─── Pantry expiry binary sensor ─────────────────────────────────────────────
 
 class PantryHasExpiringBinarySensor(
-    CoordinatorEntity[FlavorplanCoordinator], BinarySensorEntity
+    CoordinatorEntity[CuliplanCoordinator], BinarySensorEntity
 ):
     """
     Binary sensor: True when any pantry item expires within the configured window.
 
-    task-1378 AC#1 — binary_sensor.flavorplan_pantry_has_expiring exposed.
+    task-1378 AC#1 — binary_sensor.culiplan_pantry_has_expiring exposed.
 
     State:
         on  — at least one pantry item expires within expiry_hours
@@ -89,7 +89,7 @@ class PantryHasExpiringBinarySensor(
 
     def __init__(
         self,
-        coordinator: FlavorplanCoordinator,
+        coordinator: CuliplanCoordinator,
         device: DeviceInfo,
         expiry_hours: int,
     ) -> None:
@@ -130,12 +130,12 @@ class PantryHasExpiringBinarySensor(
 # ─── Dinner party active binary sensor ──────────────────────────────────────
 
 class DinnerPartyActiveBinarySensor(
-    CoordinatorEntity[FlavorplanCoordinator], BinarySensorEntity
+    CoordinatorEntity[CuliplanCoordinator], BinarySensorEntity
 ):
     """
     Binary sensor: True when a dinner party is active today.
 
-    task-1380 AC#2 — binary_sensor.flavorplan_dinner_party_active with attributes
+    task-1380 AC#2 — binary_sensor.culiplan_dinner_party_active with attributes
         {guest_count, course_count, start_at, recipe_ids}.
 
     task-1380 AC#3 — updates live via dinner_party.updated Socket.IO events
@@ -159,8 +159,8 @@ class DinnerPartyActiveBinarySensor(
 
     def __init__(
         self,
-        coordinator: FlavorplanCoordinator,
-        client: FlavorplanApiClient,
+        coordinator: CuliplanCoordinator,
+        client: CuliplanApiClient,
         device: DeviceInfo,
     ) -> None:
         super().__init__(coordinator)
@@ -222,5 +222,5 @@ class DinnerPartyActiveBinarySensor(
         try:
             self._active_party = await self._client.async_get("/api/ha/dinner-party/active")
         except Exception as err:
-            _LOGGER.warning("[flavorplan] Could not fetch active dinner party: %s", err)
+            _LOGGER.warning("[culiplan] Could not fetch active dinner party: %s", err)
             # Keep the last known state on transient failures

@@ -1,4 +1,4 @@
-"""Sensor entities for the Flavorplan integration (task-1368, task-1399)."""
+"""Sensor entities for the Culiplan integration (task-1368, task-1399)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import FlavorplanCoordinator
+from .coordinator import CuliplanCoordinator
 from .helpers import _build_device_info, parse_dt
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,8 +27,8 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Flavorplan sensor entities."""
-    coordinator: FlavorplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    """Set up Culiplan sensor entities."""
+    coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     expiry_days: int = entry.options.get("expiry_days", DEFAULT_EXPIRY_DAYS)
     device = _build_device_info(entry)
     async_add_entities([
@@ -39,19 +39,19 @@ async def async_setup_entry(
     ])
 
 
-class _FlavorplanSensor(CoordinatorEntity[FlavorplanCoordinator], SensorEntity):
+class _CuliplanSensor(CoordinatorEntity[CuliplanCoordinator], SensorEntity):
     """Base class that binds sensors to the shared device."""
 
     _attr_has_entity_name = True
 
     def __init__(
-        self, coordinator: FlavorplanCoordinator, device: DeviceInfo
+        self, coordinator: CuliplanCoordinator, device: DeviceInfo
     ) -> None:
         super().__init__(coordinator)
         self._attr_device_info = device
 
 
-class MealsPlanedThisWeekSensor(_FlavorplanSensor):
+class MealsPlanedThisWeekSensor(_CuliplanSensor):
     """Number of meals planned in the current ISO week."""
 
     _attr_name = "Meals planned this week"
@@ -59,7 +59,7 @@ class MealsPlanedThisWeekSensor(_FlavorplanSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "meals"
 
-    def __init__(self, coordinator: FlavorplanCoordinator, device: DeviceInfo) -> None:
+    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
         super().__init__(coordinator, device)
         self._attr_unique_id = f"{DOMAIN}_meals_planned_this_week"
 
@@ -83,7 +83,7 @@ class MealsPlanedThisWeekSensor(_FlavorplanSensor):
         return {}
 
 
-class ShoppingItemsCountSensor(_FlavorplanSensor):
+class ShoppingItemsCountSensor(_CuliplanSensor):
     """Total unchecked items across all shopping lists."""
 
     _attr_name = "Shopping items"
@@ -91,7 +91,7 @@ class ShoppingItemsCountSensor(_FlavorplanSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "items"
 
-    def __init__(self, coordinator: FlavorplanCoordinator, device: DeviceInfo) -> None:
+    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
         super().__init__(coordinator, device)
         self._attr_unique_id = f"{DOMAIN}_shopping_items"
 
@@ -109,7 +109,7 @@ class ShoppingItemsCountSensor(_FlavorplanSensor):
         return {}
 
 
-class ExpiringPantrySensor(_FlavorplanSensor):
+class ExpiringPantrySensor(_CuliplanSensor):
     """Number of pantry items expiring within the configured window."""
 
     _attr_name = "Expiring pantry items"
@@ -119,7 +119,7 @@ class ExpiringPantrySensor(_FlavorplanSensor):
 
     def __init__(
         self,
-        coordinator: FlavorplanCoordinator,
+        coordinator: CuliplanCoordinator,
         device: DeviceInfo,
         expiry_days: int,
     ) -> None:
@@ -155,7 +155,7 @@ class ExpiringPantrySensor(_FlavorplanSensor):
         return ids
 
 
-class PlannedKwhTodaySensor(_FlavorplanSensor):
+class PlannedKwhTodaySensor(_CuliplanSensor):
     """Estimated kWh for today's planned recipes — task-1399 (Phase 3 Tier 3).
 
     Exposes the sum of estimated energy consumption across all meal plan
@@ -179,7 +179,7 @@ class PlannedKwhTodaySensor(_FlavorplanSensor):
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = "kWh"
 
-    def __init__(self, coordinator: FlavorplanCoordinator, device: DeviceInfo) -> None:
+    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
         super().__init__(coordinator, device)
         self._attr_unique_id = f"{DOMAIN}_planned_kwh_today"
 
