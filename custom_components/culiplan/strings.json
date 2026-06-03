@@ -114,6 +114,34 @@
     }
   },
   "services": {
+    "suggest_meal": {
+      "name": "Suggest a meal",
+      "description": "Asks Culiplan AI to suggest a meal. Fires culiplan_suggest_meal_result event and creates a persistent notification.",
+      "fields": {
+        "constraints": {
+          "name": "Constraints",
+          "description": "Free-text dietary or preference constraints, e.g. \"vegetarian, under 30 minutes\"."
+        },
+        "meal_slot": {
+          "name": "Meal slot",
+          "description": "Which meal of the day to suggest for (breakfast, lunch, dinner, snack)."
+        },
+        "max_time_minutes": {
+          "name": "Max cooking time (minutes)",
+          "description": "Maximum total cooking time in minutes."
+        }
+      }
+    },
+    "fill_shopping_list": {
+      "name": "Fill shopping list",
+      "description": "Asks Culiplan AI to populate the active shopping list for the planned meals of the given week. Fires culiplan_fill_shopping_list_result event.",
+      "fields": {
+        "week_offset": {
+          "name": "Week offset",
+          "description": "Which week to fill for (0 = this week, 1 = next week, -1 = last week)."
+        }
+      }
+    },
     "start_cooking_mode": {
       "name": "Start cooking mode",
       "description": "Starts a guided cooking session for the given recipe."

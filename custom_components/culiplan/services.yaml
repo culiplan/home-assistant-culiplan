@@ -1,7 +1,73 @@
 # Culiplan HA service descriptions
 # Phase 2: tasks 1376, 1378, 1379 — pantry / household
 # Phase 3: task-1397 — cooking-mode + timer mirroring; task-1400 — AI blueprint generation
+# AI services: tasks 1388, 1389 — suggest_meal + fill_shopping_list
 # Used by the Home Assistant UI to show service descriptions and field hints.
+
+suggest_meal:
+  name: Suggest a meal
+  description: >
+    Asks Culiplan AI to suggest a meal based on optional constraints (dietary
+    preferences, time budget, meal slot). The suggestion is returned as a
+    `culiplan_suggest_meal_result` HA event and as a persistent notification.
+    **Cloud AI mode requires Culiplan Premium.** BYOK and Local AI are free.
+  fields:
+    constraints:
+      name: Constraints
+      description: >
+        Free-text dietary or preference constraints, e.g. "vegetarian, under 30 minutes".
+        Leave empty for an unrestricted suggestion.
+      required: false
+      selector:
+        text: {}
+    meal_slot:
+      name: Meal slot
+      description: >
+        Which meal of the day to suggest for.
+        Defaults to the next upcoming slot based on the current time.
+      required: false
+      selector:
+        select:
+          options:
+            - breakfast
+            - lunch
+            - dinner
+            - snack
+    max_time_minutes:
+      name: Max cooking time (minutes)
+      description: >
+        Maximum total cooking time in minutes. Leave empty for no time limit.
+      required: false
+      selector:
+        number:
+          min: 5
+          max: 480
+          step: 5
+          unit_of_measurement: min
+          mode: box
+
+fill_shopping_list:
+  name: Fill shopping list
+  description: >
+    Asks Culiplan AI to populate the active shopping list with items needed for
+    the planned meals of the given week. Already-present items are not
+    duplicated. The result is returned as a `culiplan_fill_shopping_list_result`
+    HA event and as a persistent notification.
+    **Cloud AI mode requires Culiplan Premium.** BYOK and Local AI are free.
+  fields:
+    week_offset:
+      name: Week offset
+      description: >
+        Which week to fill for relative to the current week.
+        0 = this week (default), 1 = next week, -1 = last week.
+      required: false
+      default: 0
+      selector:
+        number:
+          min: -4
+          max: 4
+          step: 1
+          mode: box
 
 pantry_decrement:
   name: Decrement pantry item
