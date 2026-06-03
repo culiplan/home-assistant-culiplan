@@ -6,6 +6,15 @@ All notable changes to the Culiplan Home Assistant integration are documented he
 
 ## [0.2.0] - 2026-06-03
 
+### Breaking Changes
+
+**Entity IDs, service names, and Lovelace card identifiers renamed from `flavorplan*` to `culiplan*`.**
+Beta users upgrading from v0.1.x must: remove the integration from Settings → Integrations, then
+re-add it via HACS or manually. Re-import any blueprints from `blueprints/automation/culiplan/`.
+Recreate Lovelace dashboards from the bundled YAML files in `lovelace/dashboards/` — replace all
+`custom:flavorplan-*` card types with `custom:culiplan-*` and update any entity_id references
+(e.g. `calendar.flavorplan_meal_plan` → `calendar.culiplan_meal_plan`).
+
 ### Fixed
 - OAuth config flow now sends PKCE (`code_challenge` S256 + `code_verifier`) as required
   by the Culiplan OAuth 2.1 backend for the public `ha-core` client. HA's default
