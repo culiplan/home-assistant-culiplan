@@ -1,17 +1,17 @@
 blueprint:
-  name: "Flavorplan: Add to shopping list when pantry item depleted"
+  name: "Culiplan: Add to shopping list when pantry item depleted"
   description: >
-    When Flavorplan emits a `pantry.item.depleted` event (stock crossed below
+    When Culiplan emits a `pantry.item.depleted` event (stock crossed below
     the configured threshold), this automation appends the item to your active
     shopping list and optionally sends a push notification to the household.
 
-    The threshold is configured per-item in the Flavorplan app. This blueprint
+    The threshold is configured per-item in the Culiplan app. This blueprint
     wires the event to your preferred notification target.
 
-    **Prerequisites**: Flavorplan integration installed and connected.
-    **Free tier**: Yes — no Flavorplan Premium required.
+    **Prerequisites**: Culiplan integration installed and connected.
+    **Free tier**: Yes — no Culiplan Premium required.
   domain: automation
-  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-zero-shopping.yaml
+  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-zero-shopping.yaml
   input:
     notify_target:
       name: Notification target (optional)
@@ -24,7 +24,7 @@ blueprint:
     notify_title:
       name: Notification title
       description: Title of the push notification.
-      default: "Flavorplan — Pantry low"
+      default: "Culiplan — Pantry low"
       selector:
         text: {}
     notify_message:
@@ -32,7 +32,7 @@ blueprint:
       description: >
         Message body. You may use `{{ trigger.event.data.id }}` to include the
         item ID (detail available via the Flavorplan app).
-      default: "A pantry item is running low. Check your Flavorplan app."
+      default: "A pantry item is running low. Check your Culiplan app."
       selector:
         text: {}
 
@@ -54,7 +54,7 @@ action:
           data:
             url: "https://culiplan.com/pantry"
             push:
-              category: "flavorplan_pantry_low"
+              category: "culiplan_pantry_low"
 
 mode: queued
 max: 10

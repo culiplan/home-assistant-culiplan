@@ -34,7 +34,7 @@ needs to begin. No more cold ovens; no energy wasted when the house is empty.
 start/end times, presence sensor, appliance entity (climate or switch),
 target temperature, optional push notification.
 
-**Marketing copy (for flavorplan.com/home-assistant/blueprints):**
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
 Stop waiting for the oven. Culiplan knows when dinner starts — this
 blueprint bridges that knowledge to your smart appliance. Set your pre-heat
 lead time once, point it at any climate or smart-plug entity, and your
@@ -61,7 +61,7 @@ when the house is empty, and fan-out to multiple `notify.*` services
 **Configurable inputs:** shopping list entity, one or more notification
 services, optional presence gate.
 
-**Marketing copy (for flavorplan.com/home-assistant/blueprints):**
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
 Your pantry talks directly to your shopping list. When Culiplan detects that
 an ingredient has run out, this blueprint adds it to the HA shopping list and
 pings every device in the household instantly — no manual logging, no
@@ -88,7 +88,7 @@ or a spoken kitchen announcement. Change the trigger weekday to Friday for a
 **Configurable inputs:** trigger time, day of week, notification service,
 message title, optional shopping item count, optional pantry expiry warning.
 
-**Marketing copy (for flavorplan.com/home-assistant/blueprints):**
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
 Every Sunday evening your household tablet shows next week's full meal plan
 — without anyone lifting a finger. Shopping list count, pantry expiry
 warnings, and a deep-link back into Culiplan are all included in a single
@@ -115,7 +115,7 @@ Culiplan AI dispatcher propose a specific recipe (requires Culiplan premium).
 check time, notification service, optional in-app swap trigger, recipe tag
 for alternatives.
 
-**Marketing copy (for flavorplan.com/home-assistant/blueprints):**
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
 Cook smarter, not just cheaper. This blueprint watches your spot electricity
 price and nudges the household toward an energy-light dinner on peak-price
 days — before anyone fires up the oven. Compatible with every major European
@@ -144,7 +144,7 @@ trigger to let the Culiplan AI dispatcher automatically propose a substitute
 check time, quick-cook recipe tag, notification service, optional in-app
 swap trigger.
 
-**Marketing copy (for flavorplan.com/home-assistant/blueprints):**
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
 No more arriving home at 19:30 to find someone halfway through a slow roast.
 This blueprint checks your shared calendar every afternoon and fires a
 household notification the moment it spots a late night coming — before prep

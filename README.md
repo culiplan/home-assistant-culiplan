@@ -1,12 +1,12 @@
-# Flavorplan for Home Assistant
+# Culiplan for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/culiplan/home-assistant-culiplan.svg)](https://github.com/culiplan/home-assistant-culiplan/releases)
 [![License](https://img.shields.io/github/license/culiplan/home-assistant-culiplan.svg)](LICENSE)
 
-Bring your [Flavorplan](https://flavorplan.com) meal planning account into Home Assistant.
+Bring your [Culiplan](https://culiplan.com) meal planning account into Home Assistant.
 
-> **Phase 3** — Cooking Mode card (`flavorplan-cooking-mode`) is now live. Calendar, to-do,
+> **Phase 3** — Cooking Mode card (`culiplan-cooking-mode`) is now live. Calendar, to-do,
 > sensor entities, Assist intents and the full Lovelace card pack (Kitchen Dashboard + Pantry
 > Tracker + Cooking Mode) are available. Report issues at [GitHub Issues](https://github.com/culiplan/home-assistant-culiplan/issues).
 
@@ -34,9 +34,9 @@ the integration. See [lovelace/README.md](lovelace/README.md) for installation d
 
 | Card | Type | Description |
 |---|---|---|
-| Kitchen Dashboard | `custom:flavorplan-kitchen-dashboard` | Today's meals with recipe image, servings, time and shopping shortcut |
-| Pantry Tracker | `custom:flavorplan-pantry-tracker` | Tile grid with expiry warnings, low-stock indicator and inline actions |
-| Cooking Mode | `custom:flavorplan-cooking-mode` | Step-by-step cooking session: step list, active timers, voice "next step" shortcut |
+| Kitchen Dashboard | `custom:culiplan-kitchen-dashboard` | Today's meals with recipe image, servings, time and shopping shortcut |
+| Pantry Tracker | `custom:culiplan-pantry-tracker` | Tile grid with expiry warnings, low-stock indicator and inline actions |
+| Cooking Mode | `custom:culiplan-cooking-mode` | Step-by-step cooking session: step list, active timers, voice "next step" shortcut |
 
 **Four pre-configured dashboard YAMLs** ship in `lovelace/dashboards/`:
 - `kitchen-tablet.yaml` — 10" landscape tablet, three-column layout
@@ -55,9 +55,9 @@ colour and any token via [card-mod](https://github.com/thomasloven/lovelace-card
 
 1. In Home Assistant, go to **HACS → Integrations → ⋮ → Custom repositories**.
 2. Add `https://github.com/culiplan/home-assistant-culiplan` as an **Integration**.
-3. Search for **Flavorplan** and install.
+3. Search for **Culiplan** and install.
 4. Restart Home Assistant.
-5. Go to **Settings → Devices & Services → Add Integration → Flavorplan**.
+5. Go to **Settings → Devices & Services → Add Integration → Culiplan**.
 
 ### Manual
 
@@ -67,8 +67,8 @@ Copy `custom_components/culiplan/` into your HA `custom_components/` directory a
 
 ## Setup
 
-1. Click **Add Integration** and search for **Flavorplan**.
-2. A browser window opens — log in with your Flavorplan account and approve the requested scopes.
+1. Click **Add Integration** and search for **Culiplan**.
+2. A browser window opens — log in with your Culiplan account and approve the requested scopes.
 3. Choose your AI mode (see below).
 4. Done — entities appear within a few seconds.
 
@@ -76,24 +76,24 @@ Copy `custom_components/culiplan/` into your HA `custom_components/` directory a
 
 ## AI Modes
 
-Flavorplan supports three AI execution modes, selectable during setup and changeable later via **Configure**:
+Culiplan supports three AI execution modes, selectable during setup and changeable later via **Configure**:
 
 ### Cloud AI (default)
 
-Flavorplan's servers process AI requests on your behalf.
+Culiplan's servers process AI requests on your behalf.
 
-- **Requires:** Active Flavorplan Premium subscription.
-- **Privacy:** Prompt content (your voice commands) travels to `api.culiplan.com`. No data is sold or shared with third parties. See the [privacy policy](https://flavorplan.com/privacy).
+- **Requires:** Active Culiplan Premium subscription.
+- **Privacy:** Prompt content (your voice commands) travels to `api.culiplan.com`. No data is sold or shared with third parties. See the [privacy policy](https://culiplan.com/privacy).
 - **Cost:** Included in the Premium subscription; no additional AI API costs.
 
 ### Bring Your Own Key (BYOK)
 
-Your API key is stored exclusively in Home Assistant's local secrets store. AI calls go directly from your HA install to the AI provider — Flavorplan is not in the network path.
+Your API key is stored exclusively in Home Assistant's local secrets store. AI calls go directly from your HA install to the AI provider — Culiplan is not in the network path.
 
 - **Requires:** An account with OpenAI, Anthropic, or Google AI Studio.
-- **Privacy:** Your API key and prompt content never reach Flavorplan's servers. Zero-custody — Flavorplan has nothing to lose.
+- **Privacy:** Your API key and prompt content never reach Culiplan's servers. Zero-custody — Culiplan has nothing to lose.
 - **Cost:** You pay the AI provider directly at their published token rates. For typical household use this is a few euro cents per month.
-- **Free to use** — no Flavorplan Premium required.
+- **Free to use** — no Culiplan Premium required.
 
 ### Local AI
 
@@ -102,20 +102,20 @@ Requests go to your own Ollama or LM Studio instance on your local network.
 - **Requires:** A running local LLM server (e.g., `ollama serve`).
 - **Privacy:** All AI processing stays on your hardware. Nothing leaves your home network.
 - **Cost:** Your electricity and hardware costs only.
-- **Free to use** — no Flavorplan Premium required.
+- **Free to use** — no Culiplan Premium required.
 
-> **Note on premium features:** The tier line is on capability, not on AI provider. If a feature requires Premium (e.g., Cloud AI recipe generation), it requires Premium with BYOK too — BYOK doesn't unlock premium features for free. It only removes Flavorplan's AI infrastructure costs from the equation for features that are otherwise AI-provider-neutral.
+> **Note on premium features:** The tier line is on capability, not on AI provider. If a feature requires Premium (e.g., Cloud AI recipe generation), it requires Premium with BYOK too — BYOK doesn't unlock premium features for free. It only removes Culiplan's AI infrastructure costs from the equation for features that are otherwise AI-provider-neutral.
 
 ---
 
 ## Privacy
 
-Flavorplan is a European company (Belgium) built with privacy-by-design as a first principle.
+Culiplan is a European company (Belgium) built with privacy-by-design as a first principle.
 
-- **Telemetry:** The only signal sent to Flavorplan beyond normal API traffic is a single boolean (`homeAssistantLinked: true`) set when OAuth completes. No install metrics, no usage statistics, no version reporting.
+- **Telemetry:** The only signal sent to Culiplan beyond normal API traffic is a single boolean (`homeAssistantLinked: true`) set when OAuth completes. No install metrics, no usage statistics, no version reporting.
 - **HA event payloads:** Socket.IO events carry entity IDs only — no recipe titles, no ingredient lists, no personal content — the integration refetches details via OAuth-scoped REST calls.
-- **BYOK keys:** Never transmitted to or stored on Flavorplan infrastructure.
-- **Full policy:** [flavorplan.com/privacy](https://flavorplan.com/privacy)
+- **BYOK keys:** Never transmitted to or stored on Culiplan infrastructure.
+- **Full policy:** [culiplan.com/privacy](https://culiplan.com/privacy)
 
 ---
 
@@ -127,7 +127,7 @@ Example: notify when dinner is in 30 minutes.
 trigger:
   - platform: calendar
     event: start
-    entity_id: calendar.flavorplan_meal_plan
+    entity_id: calendar.culiplan_meal_plan
     offset: "-0:30:00"
 action:
   - service: notify.mobile_app_my_phone

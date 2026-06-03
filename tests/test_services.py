@@ -1,17 +1,17 @@
 """
-Tests for flavorplan.suggest_meal and flavorplan.fill_shopping_list HA services
+Tests for culiplan.suggest_meal and culiplan.fill_shopping_list HA services
 (task-1388 + task-1389).
 
 AC coverage:
   task-1388:
-    AC#1 — Service flavorplan.suggest_meal registered
+    AC#1 — Service culiplan.suggest_meal registered
     AC#2 — Cloud mode: backend executes, returns suggestion
     AC#3 — BYOK / Local: HA fetches envelope, dispatcher executes
     AC#4 — Free user calling Cloud mode receives 403 → PremiumRequiredError
-    AC#5 — Fires flavorplan_suggest_meal_result event + persistent notification
+    AC#5 — Fires culiplan_suggest_meal_result event + persistent notification
 
   task-1389:
-    AC#1 — Service flavorplan.fill_shopping_list registered
+    AC#1 — Service culiplan.fill_shopping_list registered
     AC#2 — Cloud mode: backend executes fill, returns summary
     AC#3 — Idempotency: items already on list not duplicated (tested via envelope)
     AC#4 — Summary notification shown to user

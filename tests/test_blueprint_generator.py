@@ -183,7 +183,7 @@ class TestCloudAIMode:
         client.async_post.assert_called_once()
         path, payload = client.async_post.call_args[0]
         assert path == "/api/blueprints/generate"
-        assert payload["aiProviderMode"] == "flavorplan-cloud"
+        assert payload["aiProviderMode"] == "culiplan-cloud"
         assert "prompt" in payload
 
         # Event was fired
@@ -220,7 +220,7 @@ class TestCloudAIMode:
         hass, entry_data, entry = make_hass(AI_MODE_CLOUD)
         client = entry_data["client"]
         client.async_post.return_value = CLOUD_RESPONSE
-        entities = ["calendar.flavorplan_meal_plan", "light.kitchen"]
+        entities = ["calendar.culiplan_meal_plan", "light.kitchen"]
 
         with patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"):
             await handle_generate_blueprint(

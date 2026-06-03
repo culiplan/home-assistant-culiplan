@@ -10,7 +10,7 @@
  * Design tokens: all visual values come from ../tokens.css (loaded globally
  * by __init__.py). Brand source: mobile/theme.ts orange/green palette.
  *
- * Registration: flavorplan-pantry-tracker
+ * Registration: culiplan-pantry-tracker
  */
 
 import { LitElement, html, css } from "lit";
@@ -829,12 +829,12 @@ class FlavorplanPantryTracker extends LitElement {
   }
 }
 
-customElements.define("flavorplan-pantry-tracker", FlavorplanPantryTracker);
+customElements.define("culiplan-pantry-tracker", FlavorplanPantryTracker);
 
 (window as any).customCards = (window as any).customCards ?? [];
 (window as any).customCards.push({
-  type: "flavorplan-pantry-tracker",
-  name: "Flavorplan Pantry Tracker",
+  type: "culiplan-pantry-tracker",
+  name: "Culiplan Pantry Tracker",
   description: "Track pantry stock levels with expiry warnings and low-stock indicators. Part of the Culiplan integration card pack.",
   preview: true,
   documentationURL: "https://github.com/culiplan/home-assistant-culiplan/tree/main/lovelace",

@@ -10,13 +10,13 @@ the integration is installed.
 
 | Card element | Description | Source |
 |---|---|---|
-| `flavorplan-kitchen-dashboard` | Today's meal plan with recipe image, servings, time and a shopping-list shortcut | `cards/dist/kitchen-dashboard.js` |
-| `flavorplan-pantry-tracker` | Pantry tile grid with expiry warnings (red < 48 h, amber < 7 d), low-stock indicator, filter chips, and inline actions | `cards/dist/pantry-tracker.js` |
-| `flavorplan-cooking-mode` | Step-by-step cooking session: step list, active timers with HA-native countdown, voice "next step" shortcut, graceful idle fallback | `cards/dist/cooking-mode.js` |
+| `culiplan-kitchen-dashboard` | Today's meal plan with recipe image, servings, time and a shopping-list shortcut | `cards/dist/kitchen-dashboard.js` |
+| `culiplan-pantry-tracker` | Pantry tile grid with expiry warnings (red < 48 h, amber < 7 d), low-stock indicator, filter chips, and inline actions | `cards/dist/pantry-tracker.js` |
+| `culiplan-cooking-mode` | Step-by-step cooking session: step list, active timers with HA-native countdown, voice "next step" shortcut, graceful idle fallback | `cards/dist/cooking-mode.js` |
 
 ### Cooking Mode card
 
-The `flavorplan-cooking-mode` card (Phase 3, task-1383) reads the active cooking session from
+The `culiplan-cooking-mode` card (Phase 3, task-1383) reads the active cooking session from
 `sensor.culiplan_active_cooking_session`. It requires:
 - The Culiplan backend `/api/cooking-sessions` endpoint (task-1396, shipped in Phase 3).
 - The `culiplan.advance_cooking_step` HA service (task-1397, shipped in Phase 3).
@@ -193,7 +193,7 @@ each acceptance criterion:
 
 1. Add a new manual card to any dashboard:
    ```yaml
-   type: custom:flavorplan-kitchen-dashboard
+   type: custom:culiplan-kitchen-dashboard
    entity: calendar.culiplan_meal_plan
    shopping_entity: todo.culiplan_shopping_list
    ```
@@ -206,7 +206,7 @@ each acceptance criterion:
 
 1. Add a new manual card:
    ```yaml
-   type: custom:flavorplan-pantry-tracker
+   type: custom:culiplan-pantry-tracker
    entity: sensor.culiplan_expiring_pantry
    shopping_entity: todo.culiplan_shopping_list
    ```
@@ -273,9 +273,9 @@ lovelace/
 ├── README.md                     # This file
 ├── build.mjs                     # esbuild pipeline — builds all cards to dist/
 ├── cards/
-│   ├── kitchen-dashboard.ts      # LitElement source — flavorplan-kitchen-dashboard
-│   ├── pantry-tracker.ts         # LitElement source — flavorplan-pantry-tracker
-│   ├── cooking-mode.ts           # LitElement source — flavorplan-cooking-mode (Phase 3)
+│   ├── kitchen-dashboard.ts      # LitElement source — culiplan-kitchen-dashboard
+│   ├── pantry-tracker.ts         # LitElement source — culiplan-pantry-tracker
+│   ├── cooking-mode.ts           # LitElement source — culiplan-cooking-mode (Phase 3)
 │   └── dist/
 │       ├── kitchen-dashboard.js  # Pre-built distribution bundle (commit to repo)
 │       ├── pantry-tracker.js     # Pre-built distribution bundle (commit to repo)

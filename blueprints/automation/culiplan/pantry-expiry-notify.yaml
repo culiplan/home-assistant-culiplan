@@ -1,17 +1,17 @@
 blueprint:
-  name: "Flavorplan: Daily pantry expiry reminder"
+  name: "Culiplan: Daily pantry expiry reminder"
   description: >
     Every morning at the configured time, this automation checks whether any
     pantry items expire within the next 48 hours. If so, it sends a push
-    notification prompting you to check the Flavorplan app.
+    notification prompting you to check the Culiplan app.
 
-    Uses the `binary_sensor.flavorplan_pantry_has_expiring` entity that ships
-    with the Flavorplan integration.
+    Uses the `binary_sensor.culiplan_pantry_has_expiring` entity that ships
+    with the Culiplan integration.
 
-    **Prerequisites**: Flavorplan integration installed and connected.
-    **Free tier**: Yes — no Flavorplan Premium required.
+    **Prerequisites**: Culiplan integration installed and connected.
+    **Free tier**: Yes — no Culiplan Premium required.
   domain: automation
-  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-expiry-notify.yaml
+  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-expiry-notify.yaml
   input:
     reminder_time:
       name: Daily reminder time
@@ -27,7 +27,7 @@ blueprint:
         text: {}
     notify_title:
       name: Notification title
-      default: "Flavorplan — Items expiring soon"
+      default: "Culiplan — Items expiring soon"
       selector:
         text: {}
     notify_message:
@@ -35,12 +35,12 @@ blueprint:
       description: >
         Message sent when expiring items are found. The `{{ expiring_count }}`
         variable is available for the number of expiring items.
-      default: "{{ expiring_count }} pantry item(s) expire within 48 hours. Check your Flavorplan app."
+      default: "{{ expiring_count }} pantry item(s) expire within 48 hours. Check your Culiplan app."
       selector:
         text: {}
 
 variables:
-  expiring_count: "{{ state_attr('binary_sensor.flavorplan_pantry_has_expiring', 'expiring_item_ids') | default([]) | count }}"
+  expiring_count: "{{ state_attr('binary_sensor.culiplan_pantry_has_expiring', 'expiring_item_ids') | default([]) | count }}"
 
 trigger:
   - platform: time
@@ -48,7 +48,7 @@ trigger:
 
 condition:
   - condition: state
-    entity_id: binary_sensor.flavorplan_pantry_has_expiring
+    entity_id: binary_sensor.culiplan_pantry_has_expiring
     state: "on"
 
 action:
@@ -59,6 +59,6 @@ action:
       data:
         url: "https://culiplan.com/pantry"
         push:
-          category: "flavorplan_pantry_expiry"
+          category: "culiplan_pantry_expiry"
 
 mode: single

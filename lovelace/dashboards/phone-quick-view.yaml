@@ -26,7 +26,7 @@ views:
 
     cards:
       # Today's meal plan — primary card, top of scroll
-      - type: custom:flavorplan-kitchen-dashboard
+      - type: custom:culiplan-kitchen-dashboard
         entity: calendar.culiplan_meal_plan
         shopping_entity: todo.culiplan_shopping_list
         title: "What's for Dinner?"
@@ -52,14 +52,14 @@ views:
 
       # Cooking Mode — Phase 3 (task-1383)
       # Shows step list + timers when cooking. Falls back to "Start cooking" CTA.
-      - type: custom:flavorplan-cooking-mode
+      - type: custom:culiplan-cooking-mode
         entity: sensor.culiplan_active_cooking_session
         title: "Cooking"
         show_step_numbers: true
         max_timers: 2
 
       # Pantry — compact view for phone (max 6 tiles)
-      - type: custom:flavorplan-pantry-tracker
+      - type: custom:culiplan-pantry-tracker
         entity: sensor.culiplan_expiring_pantry
         shopping_entity: todo.culiplan_shopping_list
         title: "Pantry"

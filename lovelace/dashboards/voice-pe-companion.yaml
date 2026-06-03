@@ -50,7 +50,7 @@ views:
                 # Remove this card if no satellite is configured.
 
               # Today's meals — large font, high-contrast for wall display
-              - type: custom:flavorplan-kitchen-dashboard
+              - type: custom:culiplan-kitchen-dashboard
                 entity: calendar.culiplan_meal_plan
                 shopping_entity: todo.culiplan_shopping_list
                 title: "Today's plan"
@@ -88,7 +88,7 @@ views:
                     icon: mdi:clock-alert-outline
 
               # Pantry — expiry-focused for voice PE companion
-              - type: custom:flavorplan-pantry-tracker
+              - type: custom:culiplan-pantry-tracker
                 entity: sensor.culiplan_expiring_pantry
                 shopping_entity: todo.culiplan_shopping_list
                 title: "Pantry watch"
@@ -102,7 +102,7 @@ views:
               # Cooking Mode card — Phase 3 (task-1383 + task-1396)
               # Voice PE companion: timers + steps always visible while cooking.
               # Falls back gracefully to "Start cooking from a recipe" CTA.
-              - type: custom:flavorplan-cooking-mode
+              - type: custom:culiplan-cooking-mode
                 entity: sensor.culiplan_active_cooking_session
                 title: "Cooking"
                 show_step_numbers: true

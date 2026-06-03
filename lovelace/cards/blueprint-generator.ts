@@ -11,7 +11,7 @@
  * States: idle → loading → result (yaml preview) | error
  * Listens for culiplan_blueprint_generated HA event to display the result.
  *
- * Registration: flavorplan-blueprint-generator
+ * Registration: culiplan-blueprint-generator
  */
 
 import { LitElement, html, css } from "lit";
@@ -531,12 +531,12 @@ class FlavorplanBlueprintGeneratorCard extends LitElement {
 }
 
 customElements.define(
-  "flavorplan-blueprint-generator",
+  "culiplan-blueprint-generator",
   FlavorplanBlueprintGeneratorCard,
 );
 
 declare global {
   interface HTMLElementTagNameMap {
-    "flavorplan-blueprint-generator": FlavorplanBlueprintGeneratorCard;
+    "culiplan-blueprint-generator": FlavorplanBlueprintGeneratorCard;
   }
 }

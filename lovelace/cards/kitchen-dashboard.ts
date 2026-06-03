@@ -8,7 +8,7 @@
  * Design tokens: all visual values come from ../tokens.css (loaded globally by
  * __init__.py as a Lovelace resource). Brand source: mobile/theme.ts orange/green.
  *
- * Registration: flavorplan-kitchen-dashboard
+ * Registration: culiplan-kitchen-dashboard
  * Auto-loaded: custom_components/culiplan/__init__.py registers
  *              lovelace/cards/dist/kitchen-dashboard.js as a resource.
  */
@@ -634,13 +634,13 @@ class FlavorplanKitchenDashboard extends LitElement {
 }
 
 // Register as a custom element
-customElements.define("flavorplan-kitchen-dashboard", FlavorplanKitchenDashboard);
+customElements.define("culiplan-kitchen-dashboard", FlavorplanKitchenDashboard);
 
 // Tell HA the custom card exists (enables it in the card picker UI)
 (window as any).customCards = (window as any).customCards ?? [];
 (window as any).customCards.push({
-  type: "flavorplan-kitchen-dashboard",
-  name: "Flavorplan Kitchen Dashboard",
+  type: "culiplan-kitchen-dashboard",
+  name: "Culiplan Kitchen Dashboard",
   description: "Today's meal plan with shopping list shortcut. Part of the Culiplan integration card pack.",
   preview: true,
   documentationURL: "https://github.com/culiplan/home-assistant-culiplan/tree/main/lovelace",

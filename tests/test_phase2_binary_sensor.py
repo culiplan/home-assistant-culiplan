@@ -33,7 +33,7 @@ def _make_device():
 # ─── PantryHasExpiringBinarySensor ────────────────────────────────────────────
 
 class TestPantryHasExpiringBinarySensor:
-    """task-1378 AC#1 — binary_sensor.flavorplan_pantry_has_expiring"""
+    """task-1378 AC#1 — binary_sensor.culiplan_pantry_has_expiring"""
 
     def _make_sensor(self, pantry_items=None, expiry_hours=48):
         from custom_components.culiplan.binary_sensor import PantryHasExpiringBinarySensor
@@ -90,7 +90,7 @@ class TestPantryHasExpiringBinarySensor:
 # ─── DinnerPartyActiveBinarySensor ────────────────────────────────────────────
 
 class TestDinnerPartyActiveBinarySensor:
-    """task-1380 AC#1+2+3 — binary_sensor.flavorplan_dinner_party_active"""
+    """task-1380 AC#1+2+3 — binary_sensor.culiplan_dinner_party_active"""
 
     def _make_sensor(self, coordinator=None):
         from custom_components.culiplan.binary_sensor import DinnerPartyActiveBinarySensor

@@ -79,7 +79,7 @@ async def test_tool_error_sanitized_payload_retryable():
     mock_client = AsyncMock()
     # Simulate a 5xx-ish server error leaking internal details
     internal_error = Exception(
-        "500 Internal Server Error: culiplanadmin@172.24.0.9/flavorplan_db query failed"
+        "500 Internal Server Error: culiplanadmin@172.24.0.9/culiplan_db query failed"
     )
     mock_client.async_call_voice_tool = AsyncMock(side_effect=internal_error)
     mock_client.async_post = AsyncMock(return_value={
@@ -117,7 +117,7 @@ async def test_tool_error_sanitized_payload_retryable():
     # AC#3: internal details must NOT be present
     assert "172.24.0.9" not in str(content)
     assert "culiplanadmin" not in str(content)
-    assert "flavorplan_db" not in str(content)
+    assert "culiplan_db" not in str(content)
     assert "query failed" not in str(content)
 
 

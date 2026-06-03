@@ -163,7 +163,7 @@ def test_factory_unknown_mode_raises():
 def test_factory_cloud_mode_raises():
     """Cloud mode is not dispatched from HA — raises ValueError."""
     with pytest.raises(ValueError, match="Unknown AI mode"):
-        create_dispatcher("flavorplan-cloud")
+        create_dispatcher("culiplan-cloud")
 
 
 # ─── OpenAICompatibleDispatcher ───────────────────────────────────────────────

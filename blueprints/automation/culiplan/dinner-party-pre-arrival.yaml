@@ -1,23 +1,23 @@
 blueprint:
-  name: "Flavorplan: Dinner party pre-arrival ambiance"
+  name: "Culiplan: Dinner party pre-arrival ambiance"
   description: >
-    15 minutes before your Flavorplan dinner party starts, this automation
+    15 minutes before your Culiplan dinner party starts, this automation
     dims the lights and starts your dinner playlist — setting the mood before
     guests arrive.
 
-    Uses the `binary_sensor.flavorplan_dinner_party_active` entity and the
+    Uses the `binary_sensor.culiplan_dinner_party_active` entity and the
     `start_at` attribute to calculate the exact trigger time.
 
-    **Prerequisites**: Flavorplan integration installed and connected.
-    **Free tier**: Yes — no Flavorplan Premium required.
+    **Prerequisites**: Culiplan integration installed and connected.
+    **Free tier**: Yes — no Culiplan Premium required.
 
     **How it works**:
-    1. At the time stored in `binary_sensor.flavorplan_dinner_party_active`'s
+    1. At the time stored in `binary_sensor.culiplan_dinner_party_active`'s
        `start_at` attribute minus 15 minutes, the automation fires.
     2. Lights dim to the configured brightness level.
     3. Your chosen media player starts the specified playlist.
   domain: automation
-  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/dinner-party-pre-arrival.yaml
+  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/dinner-party-pre-arrival.yaml
   input:
     light_target:
       name: Lights to dim
@@ -71,7 +71,7 @@ blueprint:
           unit_of_measurement: min
 
 variables:
-  start_at: "{{ state_attr('binary_sensor.flavorplan_dinner_party_active', 'start_at') }}"
+  start_at: "{{ state_attr('binary_sensor.culiplan_dinner_party_active', 'start_at') }}"
   trigger_time: >
     {% if start_at %}
       {{ (as_datetime(start_at) - timedelta(minutes=pre_arrival_minutes)).isoformat() }}
@@ -94,7 +94,7 @@ trigger:
 
 condition:
   - condition: state
-    entity_id: binary_sensor.flavorplan_dinner_party_active
+    entity_id: binary_sensor.culiplan_dinner_party_active
     state: "on"
 
 action:

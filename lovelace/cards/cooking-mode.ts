@@ -22,7 +22,7 @@
  *
  * Design tokens: all visual values from ../tokens.css (auto-loaded by __init__.py).
  *
- * Registration: flavorplan-cooking-mode
+ * Registration: culiplan-cooking-mode
  */
 
 import { LitElement, html, css } from "lit";
@@ -969,6 +969,6 @@ class FlavorplanCookingMode extends LitElement {
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
-if (!customElements.get("flavorplan-cooking-mode")) {
-  customElements.define("flavorplan-cooking-mode", FlavorplanCookingMode);
+if (!customElements.get("culiplan-cooking-mode")) {
+  customElements.define("culiplan-cooking-mode", FlavorplanCookingMode);
 }

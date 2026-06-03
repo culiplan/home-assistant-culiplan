@@ -12,9 +12,9 @@
 #     manually add lovelace resources (see README)
 #
 # Custom cards used:
-#   - flavorplan-kitchen-dashboard (today's plan)
-#   - flavorplan-pantry-tracker    (pantry with expiry tiles)
-#   - flavorplan-cooking-mode      (step-by-step cooking — Phase 3)
+#   - culiplan-kitchen-dashboard (today's plan)
+#   - culiplan-pantry-tracker    (pantry with expiry tiles)
+#   - culiplan-cooking-mode      (step-by-step cooking — Phase 3)
 # ============================================================
 
 title: "Kitchen"
@@ -37,7 +37,7 @@ views:
           # ── Left column — Today's plan ────────────────────────
           - type: vertical-stack
             cards:
-              - type: custom:flavorplan-kitchen-dashboard
+              - type: custom:culiplan-kitchen-dashboard
                 entity: calendar.culiplan_meal_plan
                 shopping_entity: todo.culiplan_shopping_list
                 title: "What's for Dinner?"
@@ -75,7 +75,7 @@ views:
               # Cooking Mode card — Phase 3 (task-1383 + task-1396)
               # Shows active cooking session: step list, timers, voice shortcut.
               # Gracefully shows "Start cooking from a recipe" when idle.
-              - type: custom:flavorplan-cooking-mode
+              - type: custom:culiplan-cooking-mode
                 entity: sensor.culiplan_active_cooking_session
                 title: "Cooking"
                 show_step_numbers: true
@@ -84,7 +84,7 @@ views:
           # ── Right column — Pantry ─────────────────────────────
           - type: vertical-stack
             cards:
-              - type: custom:flavorplan-pantry-tracker
+              - type: custom:culiplan-pantry-tracker
                 entity: sensor.culiplan_expiring_pantry
                 shopping_entity: todo.culiplan_shopping_list
                 title: "Pantry"

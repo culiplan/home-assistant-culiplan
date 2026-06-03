@@ -1,18 +1,18 @@
 blueprint:
-  name: "Flavorplan: Scale tonight's servings from household presence"
+  name: "Culiplan: Scale tonight's servings from household presence"
   description: >
     When the number of household members home changes, this automation calls
-    `flavorplan.scale_tonight_servings` with the current count so Flavorplan
+    `culiplan.scale_tonight_servings` with the current count so Culiplan
     can adjust the recipe quantities for tonight's dinner.
 
-    **Requires Flavorplan Premium** — free users will see a HA Repairs upsell
+    **Requires Culiplan Premium** — free users will see a HA Repairs upsell
     issue with an upgrade link.
 
     Wire your `person.*` entities (or a custom sensor that counts them) to this
     blueprint. Example: use a template sensor that counts how many `person.*`
     entities are `home`.
   domain: automation
-  source_url: https://github.com/flavorplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/presence-scale-servings.yaml
+  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/presence-scale-servings.yaml
   input:
     presence_sensor:
       name: Household presence count sensor
@@ -44,7 +44,7 @@ condition:
     value_template: "{{ trigger.to_state.state | int(0) > 0 }}"
 
 action:
-  - service: flavorplan.scale_tonight_servings
+  - service: culiplan.scale_tonight_servings
     data:
       present_count: "{{ trigger.to_state.state | int }}"
 
