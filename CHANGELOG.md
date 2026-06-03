@@ -4,6 +4,8 @@ All notable changes to the Culiplan Home Assistant integration are documented he
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-03
+
 ### Fixed
 - OAuth config flow now sends PKCE (`code_challenge` S256 + `code_verifier`) as required
   by the Culiplan OAuth 2.1 backend for the public `ha-core` client. HA's default
@@ -16,7 +18,13 @@ All notable changes to the Culiplan Home Assistant integration are documented he
   `ha-core`'s `allowedScopes` in the backend seed.
 
 ### Changed
-- Brand rename across all user-facing strings: Flavorplan → Culiplan.
+- Brand rename across all user-facing strings: Flavorplan → Culiplan. `hacs.json` name
+  field updated to `"Culiplan"`.
+- Iframe sidebar panel added for embedded Culiplan web UI within Home Assistant.
+
+### Added
+- OAuth PKCE (S256 code challenge/verifier) support for OAuth 2.1 compliance.
+- Scoped OAuth: explicit scope list in `const.py:OAUTH2_SCOPES` matching backend seed.
 
 ## [0.1.0] — 2026-04-25
 

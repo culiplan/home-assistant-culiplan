@@ -1,5 +1,5 @@
 {
-  "name": "Flavorplan",
+  "name": "Culiplan",
   "render_readme": true,
   "iot_class": "cloud_push",
   "country": ["BE", "NL", "DE", "FR", "ES", "GB", "US", "AU"],
