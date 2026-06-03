@@ -32,7 +32,7 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
+from typing import Any, Awaitable, Callable, Union
 
 from .debug_logger import get_debug_logger
 from .types import (
@@ -58,7 +58,11 @@ _MAX_TOOL_TURNS = 10
 _RETRY_BACKOFF_SECONDS = 1.0  # one second between attempt 1 and the single retry
 
 
-async def _retry_once_on_5xx(coro_factory, *, provider: str) -> Any:
+async def _retry_once_on_5xx(
+    coro_factory: Callable[[], Awaitable[Any]],
+    *,
+    provider: str,
+) -> Any:
     """
     Call ``coro_factory()`` once.  If it raises ``ProviderUnavailableError``
     (5xx), wait ``_RETRY_BACKOFF_SECONDS`` and try once more.  Any other
@@ -95,7 +99,10 @@ async def _retry_once_on_5xx(coro_factory, *, provider: str) -> Any:
 
 
 def _tool_specs_to_openai(tools: list[ToolSpec]) -> list[dict[str, Any]]:
-    """Convert ToolSpec list to OpenAI function-calling format."""
+    """Convert ToolSpec list to OpenAI function-calling format.
+
+    Returns a list of function-tool dicts accepted by the OpenAI chat completions API.
+    """
     return [
         {
             "type": "function",
@@ -110,7 +117,10 @@ def _tool_specs_to_openai(tools: list[ToolSpec]) -> list[dict[str, Any]]:
 
 
 def _tool_specs_to_anthropic(tools: list[ToolSpec]) -> list[dict[str, Any]]:
-    """Convert ToolSpec list to Anthropic tool format."""
+    """Convert ToolSpec list to Anthropic tool format.
+
+    Returns a list of tool dicts accepted by the Anthropic messages API.
+    """
     return [
         {
             "name": t.name,
@@ -122,7 +132,10 @@ def _tool_specs_to_anthropic(tools: list[ToolSpec]) -> list[dict[str, Any]]:
 
 
 def _tool_specs_to_google(tools: list[ToolSpec]) -> list[dict[str, Any]]:
-    """Convert ToolSpec list to Google Gemini function declaration format."""
+    """Convert ToolSpec list to Google Gemini function declaration format.
+
+    Returns a list of function-declaration dicts for the google-genai SDK.
+    """
     return [
         {
             "name": t.name,
@@ -134,7 +147,10 @@ def _tool_specs_to_google(tools: list[ToolSpec]) -> list[dict[str, Any]]:
 
 
 def _messages_to_openai(messages: list[Message]) -> list[dict[str, str]]:
-    """Convert Message list to OpenAI messages format."""
+    """Convert Message list to OpenAI messages format.
+
+    Returns a list of ``{"role": ..., "content": ...}`` dicts for the OpenAI API.
+    """
     return [{"role": m.role, "content": m.content} for m in messages]
 
 
@@ -214,7 +230,7 @@ class OpenAICompatibleDispatcher:
                 json.dumps(messages),
             )
 
-        async def _call() -> Any:
+        async def _call() -> Any:  # return type is Any: openai SDK ships no py.typed
             try:
                 from openai import APIStatusError
 
@@ -245,6 +261,7 @@ class OpenAICompatibleDispatcher:
                     f"OpenAI-compatible provider error: {exc.message}"
                 ) from exc
 
+        # _call is Callable[[], Awaitable[Any]] — matches _retry_once_on_5xx signature
         # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
         response = await _retry_once_on_5xx(_call, provider="openai-compat")
 
@@ -366,7 +383,7 @@ class AnthropicDispatcher:
                 json.dumps(conversation),
             )
 
-        async def _call() -> Any:
+        async def _call() -> Any:  # return type is Any: anthropic SDK ships no py.typed
             try:
                 from anthropic import APIStatusError
 
@@ -396,6 +413,7 @@ class AnthropicDispatcher:
                     ) from exc
                 raise DispatcherError(f"Anthropic error: {exc.message}") from exc
 
+        # _call is Callable[[], Awaitable[Any]] — matches _retry_once_on_5xx signature
         # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
         response = await _retry_once_on_5xx(_call, provider="anthropic")
 
@@ -499,7 +517,7 @@ class GoogleDispatcher:
                 json.dumps(contents),
             )
 
-        async def _call() -> Any:
+        async def _call() -> Any:  # return type is Any: google-genai SDK ships no py.typed
             try:
                 config_kwargs: dict[str, Any] = {}
                 if system_instruction:
@@ -518,7 +536,7 @@ class GoogleDispatcher:
                     if config_kwargs
                     else None,
                 )
-            except Exception as exc:  # google-genai uses generic exceptions
+            except Exception as exc:  # google-genai uses generic exceptions  # noqa: BLE001
                 msg = str(exc)
                 _LOGGER.error("[culiplan][google] Provider error: %s", msg)
                 if "401" in msg or "API_KEY_INVALID" in msg:
@@ -535,6 +553,7 @@ class GoogleDispatcher:
                     ) from exc
                 raise DispatcherError(f"Gemini error: {msg}") from exc
 
+        # _call is Callable[[], Awaitable[Any]] — matches _retry_once_on_5xx signature
         # AC#1: retry once on 5xx with 1s backoff; fail fast on 4xx (task-1411)
         response = await _retry_once_on_5xx(_call, provider="google")
 
@@ -573,7 +592,7 @@ def create_dispatcher(
     base_url: str | None = None,
     debug: bool = False,
     config_dir: str | None = None,
-) -> "OpenAICompatibleDispatcher | AnthropicDispatcher | GoogleDispatcher":
+) -> Union[OpenAICompatibleDispatcher, AnthropicDispatcher, GoogleDispatcher]:
     """
     Factory: return the correct dispatcher for the given AI mode.
 
