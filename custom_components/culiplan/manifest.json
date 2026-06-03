@@ -14,5 +14,5 @@
   "codeowners": ["@culiplan"],
   "iot_class": "cloud_push",
   "config_flow": true,
-  "quality_scale": "silver"
+  "quality_scale": "gold"
 }
