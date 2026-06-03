@@ -1,4 +1,4 @@
-"""Tests for the Flavorplan config flow (OAuth + AI provider selection)."""
+"""Tests for the Culiplan config flow (OAuth + AI provider selection)."""
 
 from __future__ import annotations
 
@@ -52,8 +52,12 @@ async def test_config_flow_cloud_ai_happy_path(hass):
 
 
 @pytest.mark.asyncio
-async def test_ai_provider_step_cloud_creates_entry(hass):
-    """The ai_provider step with Cloud AI creates the config entry."""
+async def test_ai_provider_step_cloud_leads_to_mealie_offer(hass):
+    """The ai_provider step with Cloud AI leads to mealie_offer form.
+
+    task-1626: Cloud AI no longer creates the entry directly — mealie_offer
+    is always shown to give the user a chance to import from Mealie.
+    """
     from custom_components.culiplan.config_flow import OAuth2FlowHandler
 
     flow = OAuth2FlowHandler()
@@ -64,13 +68,14 @@ async def test_ai_provider_step_cloud_creates_entry(hass):
         user_input={CONF_AI_MODE: AI_MODE_CLOUD}
     )
 
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_AI_MODE] == AI_MODE_CLOUD
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "mealie_offer"
+    assert flow._entry_data[CONF_AI_MODE] == AI_MODE_CLOUD
 
 
 @pytest.mark.asyncio
-async def test_ai_provider_step_byok_stores_key_locally(hass):
-    """BYOK mode stores the API key; it stays in HA config only."""
+async def test_ai_provider_step_byok_routes_to_byok_form(hass):
+    """BYOK mode from ai_provider step routes to the ai_byok sub-step form."""
     from custom_components.culiplan.config_flow import OAuth2FlowHandler
 
     flow = OAuth2FlowHandler()
@@ -78,22 +83,17 @@ async def test_ai_provider_step_byok_stores_key_locally(hass):
     flow._oauth_data = _mock_oauth_data()
 
     result = await flow.async_step_ai_provider(
-        user_input={
-            CONF_AI_MODE: AI_MODE_BYOK,
-            CONF_BYOK_PROVIDER: "openai",
-            CONF_BYOK_API_KEY: "sk-test-key",
-        }
+        user_input={CONF_AI_MODE: AI_MODE_BYOK}
     )
 
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_AI_MODE] == AI_MODE_BYOK
-    assert result["data"][CONF_BYOK_PROVIDER] == "openai"
-    assert result["data"][CONF_BYOK_API_KEY] == "sk-test-key"
+    # Should show the ai_byok sub-form, not create the entry
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "ai_byok"
 
 
 @pytest.mark.asyncio
-async def test_ai_provider_step_local_ai(hass):
-    """Local AI mode stores endpoint and model name."""
+async def test_ai_provider_step_local_routes_to_local_form(hass):
+    """Local AI mode from ai_provider step routes to the ai_local sub-step form."""
     from custom_components.culiplan.config_flow import OAuth2FlowHandler
 
     flow = OAuth2FlowHandler()
@@ -101,17 +101,12 @@ async def test_ai_provider_step_local_ai(hass):
     flow._oauth_data = _mock_oauth_data()
 
     result = await flow.async_step_ai_provider(
-        user_input={
-            CONF_AI_MODE: AI_MODE_LOCAL,
-            CONF_LOCAL_ENDPOINT: "http://localhost:11434",
-            CONF_LOCAL_MODEL: "llama3.2",
-        }
+        user_input={CONF_AI_MODE: AI_MODE_LOCAL}
     )
 
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_AI_MODE] == AI_MODE_LOCAL
-    assert result["data"][CONF_LOCAL_ENDPOINT] == "http://localhost:11434"
-    assert result["data"][CONF_LOCAL_MODEL] == "llama3.2"
+    # Should show the ai_local sub-form, not create the entry
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "ai_local"
 
 
 @pytest.mark.asyncio

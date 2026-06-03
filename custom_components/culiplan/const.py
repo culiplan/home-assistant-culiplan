@@ -47,6 +47,9 @@ CONF_BYOK_API_KEY = "byok_api_key"
 CONF_LOCAL_ENDPOINT = "local_endpoint"
 CONF_LOCAL_MODEL = "local_model"
 
+# OptionsFlow: "Advanced AI settings" toggle
+CONF_ADVANCED_AI = "advanced_ai"
+
 # binary_sensor added in Phase 2 (tasks 1378 + 1380)
 PLATFORMS: list[str] = ["binary_sensor", "calendar", "sensor", "todo"]
 

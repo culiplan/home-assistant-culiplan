@@ -4,6 +4,7 @@ task-1390: BYOK key validation + HA local secret store
 task-1391: Local AI auto-detection (Ollama + LM Studio)
 task-1413: Non-loopback Local AI endpoint warning
 task-1422: Mealie config_flow wizard steps + OptionsFlow rollback
+task-1626: Default to Cloud AI on first run; BYOK/Local behind OptionsFlow Advanced
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from .const import (
     AI_MODES,
     BASE_URL,
     BYOK_PROVIDERS,
+    CONF_ADVANCED_AI,
     CONF_AI_MODE,
     CONF_BYOK_API_KEY,
     CONF_BYOK_PROVIDER,
@@ -126,7 +128,11 @@ class OAuth2FlowHandler(
         return MealieOptionsFlow(config_entry)
 
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Handle successful OAuth completion; proceed to AI provider step.
+        """Handle successful OAuth completion; default to Cloud AI and proceed.
+
+        task-1626: The AI mode step is skipped on first run. Cloud AI is the
+        implicit default and is stored in entry.data. BYOK / Local AI are
+        available via OptionsFlow → Advanced AI settings.
 
         Captures the HA user id of whoever drove the OAuth flow into
         ``data["ha_user_id"]`` so the launch view can later distinguish
@@ -138,10 +144,10 @@ class OAuth2FlowHandler(
         ha_user_id = self.context.get("user_id")
         if ha_user_id:
             self._oauth_data["ha_user_id"] = ha_user_id
-        # Probe local AI endpoints before showing the AI provider form
-        # (AC#1: probe runs on entering AI provider config flow step)
-        self._detected_endpoints = await probe_local_ai_endpoints()
-        return await self.async_step_ai_provider()
+        # task-1626: Default to Cloud AI — skip the ai_provider step entirely.
+        # Users who want BYOK / Local AI can reconfigure via OptionsFlow.
+        self._entry_data = {**self._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
+        return await self.async_step_mealie_offer()
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: ai_provider
@@ -536,21 +542,29 @@ class OAuth2FlowHandler(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Options Flow — Mealie rollback  (task-1422)
+# Options Flow — Mealie rollback (task-1422) + Advanced AI (task-1626)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class MealieOptionsFlow(config_entries.OptionsFlow):
-    """Options flow: allow rolling back a Mealie import within 24 hours."""
+    """Options flow: Mealie rollback + Advanced AI settings.
+
+    task-1422: Allow rolling back a Mealie import within 24 hours.
+    task-1626: Expose BYOK / Local AI mode selection under "Advanced AI settings".
+    """
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         super().__init__()
         self._config_entry = config_entry
+        # Temporary store for AI config changes during the Advanced AI sub-flow
+        self._advanced_ai_data: dict[str, Any] = {}
+        # Auto-detected Local AI endpoints (populated on entering advanced_ai_local)
+        self._detected_endpoints: list[LocalAIEndpoint] = []
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        """Show rollback option if within the 24-hour window."""
+        """Show main options: rollback (if applicable) + Advanced AI settings."""
         job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID)
         import_at = self._config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
         elapsed = int(time.time()) - import_at
@@ -561,20 +575,200 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             if user_input.get("rollback") and rollback_available:
                 return await self.async_step_mealie_rollback()
+            if user_input.get(CONF_ADVANCED_AI):
+                # Probe local endpoints before entering Advanced AI step
+                self._detected_endpoints = await probe_local_ai_endpoints()
+                return await self.async_step_advanced_ai()
             return self.async_create_entry(title="", data={})
 
-        schema: dict[Any, Any] = {}
+        schema: dict[Any, Any] = {
+            # task-1626: Toggle to enter the Advanced AI sub-flow
+            vol.Optional(CONF_ADVANCED_AI, default=False): bool,
+        }
         if rollback_available:
             schema[vol.Optional("rollback", default=False)] = bool
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(schema) if schema else None,
+            data_schema=vol.Schema(schema),
             description_placeholders={
                 "rollback_available": str(rollback_available).lower(),
                 "job_id": job_id or "",
+                "current_ai_mode": self._config_entry.data.get(
+                    CONF_AI_MODE, AI_MODE_CLOUD
+                ),
             },
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Advanced AI settings sub-flow (task-1626)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_advanced_ai(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Select AI mode (Cloud / BYOK / Local).
+
+        Free users get the standard set; Premium unlocks advanced features.
+        """
+        if user_input is not None:
+            ai_mode = user_input[CONF_AI_MODE]
+            self._advanced_ai_data = {CONF_AI_MODE: ai_mode}
+
+            if ai_mode == AI_MODE_BYOK:
+                return await self.async_step_advanced_ai_byok()
+            if ai_mode == AI_MODE_LOCAL:
+                return await self.async_step_advanced_ai_local()
+            # Cloud AI — commit immediately
+            return self.async_create_entry(
+                title="",
+                data={CONF_AI_MODE: AI_MODE_CLOUD},
+            )
+
+        current_mode = self._config_entry.data.get(CONF_AI_MODE, AI_MODE_CLOUD)
+        return self.async_show_form(
+            step_id="advanced_ai",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_AI_MODE, default=current_mode): vol.In(AI_MODES)
+                }
+            ),
+        )
+
+    async def async_step_advanced_ai_byok(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Collect BYOK provider + API key for reconfiguration."""
+        errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
+
+        if user_input is not None:
+            provider = user_input.get(CONF_BYOK_PROVIDER, "")
+            api_key = user_input.get(CONF_BYOK_API_KEY, "").strip()
+
+            if not provider:
+                errors[CONF_BYOK_PROVIDER] = "byok_provider_required"
+            elif not api_key:
+                errors[CONF_BYOK_API_KEY] = "byok_key_required"
+            else:
+                try:
+                    await validate_byok_key(provider, api_key)
+                except ProviderAuthError as exc:
+                    _LOGGER.warning(
+                        "[culiplan][options][byok] Key validation failed for '%s': %s",
+                        provider, exc,
+                    )
+                    errors[CONF_BYOK_API_KEY] = "byok_key_invalid"
+                    description_placeholders["error_detail"] = str(exc)
+                except Exception as exc:  # noqa: BLE001
+                    _LOGGER.error(
+                        "[culiplan][options][byok] Unexpected validation error: %s", exc
+                    )
+                    errors["base"] = "byok_validation_error"
+                    description_placeholders["error_detail"] = str(exc)
+
+                if not errors:
+                    key_store = BYOKKeyStore(self.hass)
+                    await key_store.async_load()
+                    await key_store.async_set_key(provider, api_key)
+                    _LOGGER.info(
+                        "[culiplan][options][byok] Stored validated key for '%s'",
+                        provider,
+                    )
+                    return self.async_create_entry(
+                        title="",
+                        data={
+                            CONF_AI_MODE: AI_MODE_BYOK,
+                            CONF_BYOK_PROVIDER: provider,
+                            # Key NOT in options data — zero-custody §13.2
+                        },
+                    )
+
+        return self.async_show_form(
+            step_id="advanced_ai_byok",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
+                    vol.Required(CONF_BYOK_API_KEY): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders=description_placeholders,
+        )
+
+    async def async_step_advanced_ai_local(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Collect Local AI endpoint + model for reconfiguration."""
+        errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
+
+        if user_input is not None:
+            local_endpoint = user_input.get(CONF_LOCAL_ENDPOINT, "").strip()
+            local_model = user_input.get(CONF_LOCAL_MODEL, "").strip()
+
+            if local_endpoint == _MANUAL_ENTRY or not local_endpoint:
+                local_endpoint = user_input.get("local_endpoint_manual", "").strip()
+
+            if local_endpoint and local_endpoint != _MANUAL_ENTRY:
+                try:
+                    _host, _port_str = _parse_local_endpoint(local_endpoint)
+                    _port = int(_port_str)
+                    provider_hint = "lmstudio" if _port == 1234 else "ollama"
+                    probed = await probe_custom_endpoint(_host, _port, provider_hint)
+                    if probed is None:
+                        errors[CONF_LOCAL_ENDPOINT] = "local_endpoint_unreachable"
+                    else:
+                        self._advanced_ai_data[CONF_LOCAL_ENDPOINT] = local_endpoint
+                        self._advanced_ai_data[CONF_LOCAL_MODEL] = local_model
+                except (ValueError, Exception):  # noqa: BLE001
+                    errors[CONF_LOCAL_ENDPOINT] = "local_endpoint_invalid"
+            else:
+                self._advanced_ai_data[CONF_LOCAL_ENDPOINT] = local_endpoint
+                self._advanced_ai_data[CONF_LOCAL_MODEL] = local_model
+
+            if not errors:
+                return self.async_create_entry(
+                    title="",
+                    data={
+                        CONF_AI_MODE: AI_MODE_LOCAL,
+                        CONF_LOCAL_ENDPOINT: self._advanced_ai_data.get(
+                            CONF_LOCAL_ENDPOINT, ""
+                        ),
+                        CONF_LOCAL_MODEL: self._advanced_ai_data.get(
+                            CONF_LOCAL_MODEL, ""
+                        ),
+                    },
+                )
+
+        detected: list[LocalAIEndpoint] = getattr(self, "_detected_endpoints", [])
+        schema_fields: dict[Any, Any] = {}
+        if detected:
+            endpoint_options = [
+                f"{ep.base_url} ({ep.display_name})" for ep in detected
+            ] + [_MANUAL_ENTRY]
+            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = vol.In(endpoint_options)
+            all_models: list[str] = []
+            for ep in detected:
+                all_models.extend(ep.available_models)
+            if all_models:
+                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = vol.In(all_models)
+            else:
+                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
+        else:
+            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = str
+            schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
+
+        return self.async_show_form(
+            step_id="advanced_ai_local",
+            data_schema=vol.Schema(schema_fields),
+            errors=errors,
+            description_placeholders=description_placeholders,
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Mealie rollback  (task-1422)
+    # ──────────────────────────────────────────────────────────────────────────
 
     async def async_step_mealie_rollback(
         self, user_input: dict[str, Any] | None = None
