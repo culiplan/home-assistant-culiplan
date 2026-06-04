@@ -4,6 +4,26 @@ All notable changes to the Culiplan Home Assistant integration are documented he
 
 ## [Unreleased]
 
+### Fixed
+- **SSO panel 401 fix** — replaced the built-in iframe panel with a custom Lit
+  web component (`culiplan-panel`).  The old iframe panel navigated the top-level
+  browser context to `/api/culiplan/launch`, which never carried the HA
+  `Authorization` header; the view returned 401.  The new panel runs inside
+  HA's authenticated frontend, fetches `/api/culiplan/launch` via XHR with
+  the HA bearer token, receives `{"redirect_url": "…", "expires_in": 60}`,
+  and sets the iframe `src` to the returned URL.  The SSO code remains in the
+  URL fragment (`#`) and is never sent to any server.
+- `launch_view.py` now returns JSON instead of a 302 redirect.  Error shapes
+  are `{"error": "<short_code>", "message": "<human-readable>"}` with HTTP
+  502 (backend failure) or 503 (no config entry / token expired).
+- The panel serves its JS from `/culiplan_static/culiplan-panel.js` via
+  `hass.http.register_static_path` with `cache_headers=False` so updates
+  are picked up immediately after an integration reload.
+
+> **Beta v0.2.0 users:** after updating, open the HA sidebar and reload the
+> Culiplan panel once (browser hard-refresh or Settings → Developer Tools →
+> Clear cache).  The new Lit panel replaces the old iframe entry automatically.
+
 ## [0.2.0] - 2026-06-03
 
 ### Breaking Changes
