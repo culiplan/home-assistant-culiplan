@@ -75,7 +75,14 @@ def _is_loopback_host(endpoint: str) -> bool:
       - *.local hostnames (mDNS / Bonjour)
 
     Everything else (RFC-1918 private ranges, public IPs, hostnames) gets a
-    warning because the token might travel over an untrusted network.
+    warning because the BYOK API key will be forwarded to whatever server
+    answers the endpoint.
+
+    SSRF note: plain addr.is_loopback misses:
+      - IPv4-mapped IPv6 (::ffff:127.0.0.1) — is_loopback returns False
+      - Site-local (fec0::/10) — deprecated but present on some stacks
+      - Link-local (fe80::/10) — never routes outside the subnet
+    All three are blocked / treated as "remote" here so the warning fires.
     """
     try:
         parsed = urlparse(endpoint if "://" in endpoint else f"http://{endpoint}")
@@ -94,9 +101,19 @@ def _is_loopback_host(endpoint: str) -> bool:
     if host.endswith(".local"):
         return True
 
-    # IP address checks
+    # IP address checks — must handle IPv4-mapped IPv6 explicitly
     try:
         addr = ipaddress.ip_address(host)
+        if isinstance(addr, ipaddress.IPv6Address):
+            # IPv4-mapped IPv6 (::ffff:0:0/96): extract the embedded IPv4 address
+            # and check that — Python's is_loopback returns False for these.
+            mapped = addr.ipv4_mapped
+            if mapped is not None:
+                return mapped.is_loopback
+            # Site-local (fec0::/10) and link-local (fe80::/10): treat as remote
+            # so the user gets a warning that the endpoint is non-loopback.
+            if addr.is_site_local or addr.is_link_local:
+                return False
         return addr.is_loopback
     except ValueError:
         pass
