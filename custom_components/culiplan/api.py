@@ -35,7 +35,86 @@ class CuliplanApiClient:
         return cast(dict[str, Any], await self._get("/api/users/me"))
 
     async def async_get_meal_plans(self) -> list[dict[str, Any]]:
-        return cast(list[dict[str, Any]], await self._get("/api/meal-plans"))
+        """Fetch meal plans and normalise the response into a flat list of plan dicts.
+
+        The backend returns a grouped structure:
+            { "<YYYY-MM-DD>": { "<slot>": [ <entry>, ... ], ... }, ... }
+
+        This method converts that into the list-of-dicts shape that the
+        coordinator, calendar, and sensor code expects:
+            [
+              {
+                "id":    "<YYYY-MM-DD>",
+                "name":  "<YYYY-MM-DD>",
+                "slots": [
+                  { "id": <entry.id>, "date": "<YYYY-MM-DDT…>",
+                    "title": <recipe title or slot>, "course": <mealSlot>,
+                    "recipeId": <entry.recipeId>, "servings": null },
+                  ...
+                ],
+              },
+              ...
+            ]
+
+        A bare list-of-dicts response (legacy / test doubles) is returned as-is
+        so that unit tests that inject the old shape keep working.
+        """
+        raw = await self._get("/api/meal-plans")
+
+        # Legacy / test-double path: bare list already in the expected shape.
+        if isinstance(raw, list):
+            return cast(list[dict[str, Any]], raw)
+
+        # Grouped dict path: { date_str: { slot_name: [entry, ...] } }
+        if not isinstance(raw, dict):
+            _LOGGER.warning("async_get_meal_plans: unexpected response type %s", type(raw))
+            return []
+
+        plans: list[dict[str, Any]] = []
+        for date_str, slots_by_name in raw.items():
+            if not isinstance(slots_by_name, dict):
+                continue
+            slots: list[dict[str, Any]] = []
+            for slot_name, entries in slots_by_name.items():
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    # Normalise each entry into the slot shape expected by
+                    # calendar._build_events() and sensor.native_value.
+                    # The backend stores the date as a full ISO timestamp on
+                    # the entry; fall back to the dict-key date if absent.
+                    entry_date: str = (
+                        entry.get("date") or f"{date_str}T12:00:00Z"
+                    )
+                    # Convert datetime objects (Prisma returns them) to strings.
+                    if not isinstance(entry_date, str):
+                        entry_date = str(entry_date)
+                    recipe = entry.get("recipe") or {}
+                    title: str = (
+                        recipe.get("title")
+                        or entry.get("title")
+                        or slot_name
+                    )
+                    slots.append(
+                        {
+                            "id": entry.get("id", f"{date_str}-{slot_name}"),
+                            "date": entry_date,
+                            "title": title,
+                            "course": entry.get("mealSlot", slot_name),
+                            "recipeId": entry.get("recipeId"),
+                            "servings": entry.get("servings"),
+                        }
+                    )
+            plans.append(
+                {
+                    "id": date_str,
+                    "name": date_str,
+                    "slots": slots,
+                }
+            )
+        return plans
 
     async def async_get_shopping_lists(self) -> list[dict[str, Any]]:
         """
