@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -119,7 +119,7 @@ async def _get_active_session(
         raise HomeAssistantError(
             "No active cooking session. Call culiplan.start_cooking_mode first."
         )
-    return items[0]
+    return cast(dict[str, Any], items[0])
 
 
 async def _patch_session(
@@ -129,9 +129,9 @@ async def _patch_session(
 ) -> dict[str, Any]:
     """PATCH /api/cooking-sessions/:id and handle structured errors."""
     try:
-        result = await client._patch(  # noqa: SLF001
+        result = cast(dict[str, Any], await client._patch(  # noqa: SLF001
             f"/api/cooking-sessions/{session_id}", payload
-        )
+        ))
         return result
     except PremiumRequiredError:
         raise
@@ -225,7 +225,7 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
     def _get_client(entry_id: str | None) -> CuliplanApiClient:
         if not entry_id:
             raise HomeAssistantError("Culiplan is not configured.")
-        return hass.data[DOMAIN][entry_id]["client"]
+        return cast(CuliplanApiClient, hass.data[DOMAIN][entry_id]["client"])
 
     def _find_entry_id() -> str | None:
         return next(iter(hass.data.get(DOMAIN, {})), None)

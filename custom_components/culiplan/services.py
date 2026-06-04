@@ -25,7 +25,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -254,9 +254,9 @@ async def _call_pantry_expiring(
 ) -> dict[str, Any]:
     """Call GET /api/ha/pantry/expiring?window_hours=N."""
     try:
-        return await client._get(  # noqa: SLF001
+        return cast(dict[str, Any], await client._get(  # noqa: SLF001
             f"/api/ha/pantry/expiring?window_hours={window_hours}"
-        )
+        ))
     except Exception as exc:
         raise HomeAssistantError(f"Pantry expiring fetch failed: {exc}") from exc
 
