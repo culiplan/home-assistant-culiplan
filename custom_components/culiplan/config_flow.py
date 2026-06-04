@@ -781,10 +781,9 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID, "")
 
         try:
-            client = CuliplanApiClient(
-                self.hass,
-                self._config_entry,
-            )
+            # NOTE: CuliplanApiClient(session, access_token) — the variable was
+            # unused here; the actual DELETE is made via raw aiohttp below.
+            # Removed to avoid TypeError (B2 from E2E review).
             async with aiohttp.ClientSession() as session:
                 async with session.delete(
                     f"{BASE_URL}/api/migrate/mealie",

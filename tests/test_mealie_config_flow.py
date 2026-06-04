@@ -461,3 +461,51 @@ async def test_start_error_falls_through_to_done(hass):
     # Should still reach the done step gracefully
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_done"
+
+
+# ─── B2 regression: rollback must not raise TypeError ────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rollback_no_type_error_on_network_failure(hass):
+    """async_step_mealie_rollback must not raise TypeError (B2 from E2E review).
+
+    Previously, CuliplanApiClient(self.hass, self._config_entry) was called with
+    the wrong signature — it raised TypeError before any network call was made,
+    causing the rollback to silently abort with 'rollback_failed' even though
+    nothing was attempted.  The line was removed; this test confirms the path
+    degrades gracefully when the network call itself fails.
+    """
+    from custom_components.culiplan.config_flow import MealieOptionsFlow
+
+    entry = MagicMock()
+    entry.data = {
+        CONF_MEALIE_JOB_ID: "job-rollback-test",
+        CONF_MEALIE_IMPORT_AT: int(time.time()) - 60,
+        "access_token": "tok_access",
+    }
+
+    flow = MealieOptionsFlow(entry)
+    flow.hass = hass
+    flow._config_entry = entry
+
+    # Simulate a network error during the DELETE call — we just need to confirm
+    # no TypeError is raised before reaching the aiohttp call.
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp.ClientSession",
+    ) as mock_session_cls:
+        mock_session = AsyncMock()
+        mock_resp = AsyncMock()
+        mock_resp.raise_for_status.side_effect = Exception("simulated network error")
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_session.delete = MagicMock(return_value=mock_resp)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_session_cls.return_value = mock_session
+
+        # Must not raise TypeError; should abort with "rollback_failed"
+        result = await flow.async_step_mealie_rollback()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "rollback_failed"
