@@ -226,12 +226,12 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
     the endpoint via XHR (with the bearer token), receives a JSON redirect URL,
     and sets the iframe src itself.
 
-    Idempotent: ``register_view`` accepts re-registration; ``async_register_panel_custom``
+    Idempotent: ``register_view`` accepts re-registration; the panel registration
     raises ``ValueError`` on a duplicate path which we treat as success.
     """
     # Imported lazily to avoid pulling the frontend module on integration
     # import (it pulls heavy dependencies that are not needed until setup).
-    from homeassistant.components.frontend import async_register_panel_custom
+    from homeassistant.components.frontend import async_register_built_in_panel
 
     # 1. HTTP view that issues the one-time SSO code and returns JSON.
     #    ``register_view`` is idempotent — calling it again replaces the existing route.
@@ -248,19 +248,25 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
     )
 
     # 3. Register the custom Lit panel (web component) in the sidebar.
-    #    embed_iframe=False: we render the iframe ourselves inside the component.
-    #    trust_external=False: the panel JS is served from our static path.
+    #    HA exposes custom panels via the "custom" component_name of the
+    #    built-in panel registry. The ``_panel_custom`` config block carries
+    #    the LitElement metadata (element name, JS module URL, isolation flags).
     try:
-        async_register_panel_custom(
+        async_register_built_in_panel(
             hass,
-            webcomponent_name="culiplan-panel",
-            frontend_url_path=PANEL_URL_PATH,
-            module_url="/culiplan_static/culiplan-panel.js",
+            component_name="custom",
             sidebar_title="Culiplan",
             sidebar_icon="mdi:silverware-fork-knife",
+            frontend_url_path=PANEL_URL_PATH,
             require_admin=False,
-            embed_iframe=False,
-            trust_external=False,
+            config={
+                "_panel_custom": {
+                    "name": "culiplan-panel",
+                    "module_url": "/culiplan_static/culiplan-panel.js",
+                    "embed_iframe": False,
+                    "trust_external": False,
+                },
+            },
         )
     except ValueError:
         # Panel already registered (HA reload / second config entry) — fine.
