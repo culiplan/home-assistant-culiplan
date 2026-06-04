@@ -180,7 +180,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry, [Platform(p) for p in PLATFORMS]
     )
 
-    _register_intents(hass, entry)
+    await _register_intents(hass, entry)
     async_register_services(hass)
     async_register_cooking_services(hass)
     await _async_register_lovelace_resources(hass)
@@ -269,12 +269,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 # ─── Assist intent registration ──────────────────────────────────────────────
 
 
-def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Register Culiplan Assist intents for the HA language.
 
     The YAML load is offloaded to the executor thread pool so the event loop
     is never blocked by synchronous file I/O (fixes blocking-call warning on
-    HAOS 2025.11.0+).
+    HAOS 2025.11.0+).  Setup awaits this coroutine directly so intents are
+    registered before async_setup_entry returns (closes voice-command race).
     """
     lang = hass.config.language.split("-")[0].lower()
     if lang not in ("en", "nl", "de", "fr", "es"):
@@ -313,7 +314,7 @@ def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
             lang,
         )
 
-    hass.async_create_task(_do_register(intents_file))
+    await _do_register(intents_file)
 
 
 def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentHandler:
