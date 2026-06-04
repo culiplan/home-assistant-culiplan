@@ -164,6 +164,35 @@ async def _run_cloud_intent(
         raise HomeAssistantError(f"Culiplan AI request failed: {exc}") from exc
 
 
+def _build_dispatch_mode(ai_mode: str, entry_config: dict[str, Any]) -> str:
+    """Map the flat ai_mode + config entry options to the compound dispatcher key.
+
+    The dispatcher factory (dispatchers.create_dispatcher) accepts only compound
+    strings: "byok-openai", "byok-anthropic", "byok-gemini", "local-ollama",
+    "local-lmstudio".  Config entry data stores just "byok" or "local" together
+    with provider/endpoint fields.  This function resolves the compound key so
+    AIDispatchService never receives the bare flat strings.
+    """
+    if ai_mode == AI_MODE_BYOK:
+        provider = entry_config.get(CONF_BYOK_PROVIDER, "openai")
+        # BYOK_PROVIDERS uses "google" but the dispatcher key is "byok-gemini"
+        dispatcher_provider = "gemini" if provider == "google" else provider
+        return f"byok-{dispatcher_provider}"
+    if ai_mode == AI_MODE_LOCAL:
+        endpoint = entry_config.get(CONF_LOCAL_ENDPOINT, "")
+        # Derive from port: LM Studio uses 1234, Ollama uses 11434 (default).
+        try:
+            from urllib.parse import urlparse as _urlparse
+            port = _urlparse(
+                endpoint if "://" in endpoint else f"http://{endpoint}"
+            ).port
+            return "local-lmstudio" if port == 1234 else "local-ollama"
+        except Exception:  # noqa: BLE001
+            return "local-ollama"
+    # Cloud mode — not handled by this function but return as-is for safety
+    return ai_mode
+
+
 async def _run_byok_or_local_intent(
     hass: HomeAssistant,
     entry_data: dict[str, Any],
@@ -199,8 +228,12 @@ async def _run_byok_or_local_intent(
         base_url = _ensure_v1_path(endpoint) if endpoint else None
         api_key = "local"
 
+    # Build the compound mode string that the dispatcher factory expects
+    # (e.g. "byok-openai", "local-ollama") rather than the bare "byok"/"local".
+    dispatch_mode = _build_dispatch_mode(ai_mode, entry_config)
+
     service = AIDispatchService(
-        mode=ai_mode,
+        mode=dispatch_mode,
         culiplan_client=client,
         api_key=api_key,
         base_url=base_url,
