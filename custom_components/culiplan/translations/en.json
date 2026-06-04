@@ -98,11 +98,10 @@
     },
     "pantry_barcode_not_found": {
       "title": "Culiplan: Barcode not found in pantry",
-      "description": "The barcode '{barcode}' was scanned but no matching item was found in your Culiplan pantry. Open Culiplan and add an item with this barcode, then scanning it again will resolve this issue."
+      "description": "The barcode {barcode} was scanned but no matching item was found in your Culiplan pantry. Open Culiplan and add an item with this barcode, then scanning it again will resolve this issue."
     },
     "premium_required": {
-      "title": "Culiplan Premium required",
-      "description": "The Culiplan feature '{feature}' requires a Premium subscription. Upgrade your account at: {upgrade_url}"
+      "title": "Culiplan Premium required"
     }
   }
 }

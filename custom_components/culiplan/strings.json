@@ -196,7 +196,6 @@
     },
     "premium_required": {
       "title": "{title}",
-      "description": "{description}\n\n[Upgrade on Culiplan]({upgrade_url})",
       "fix_flow": {
         "step": {
           "confirm": {
