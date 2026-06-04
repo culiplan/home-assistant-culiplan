@@ -16,16 +16,11 @@ import time
 from typing import Any, cast
 from urllib.parse import urlparse
 
-# HA FlowResult is dict[str, Any] at runtime; cast is used to satisfy strict mypy
-# since the HA stubs type flow helper returns as Any.
-_FlowResult = dict[str, Any]
-
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import config_entry_oauth2_flow
 
-from .api import CuliplanApiClient
 from .const import (
     AI_MODE_BYOK,
     AI_MODE_CLOUD,
@@ -54,6 +49,10 @@ from .ai.local_ai import (
     probe_local_ai_endpoints,
 )
 from .ai.types import ProviderAuthError
+
+# HA FlowResult is dict[str, Any] at runtime; cast is used to satisfy strict mypy
+# since the HA stubs type flow helper returns as Any.
+_FlowResult = dict[str, Any]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -193,12 +192,19 @@ class OAuth2FlowHandler(
             # Cloud AI — no extra config needed
             return await self.async_step_mealie_offer()
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="ai_provider",
-            data_schema=vol.Schema(
-                {vol.Required(CONF_AI_MODE, default=AI_MODE_CLOUD): vol.In(AI_MODES)}
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="ai_provider",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_AI_MODE, default=AI_MODE_CLOUD): vol.In(
+                            AI_MODES
+                        )
+                    }
+                ),
             ),
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: ai_byok  (task-1390)
@@ -230,7 +236,8 @@ class OAuth2FlowHandler(
                 except ProviderAuthError as exc:
                     _LOGGER.warning(
                         "[culiplan][byok] Key validation failed for '%s': %s",
-                        provider, exc,
+                        provider,
+                        exc,
                     )
                     errors[CONF_BYOK_API_KEY] = "byok_key_invalid"
                     description_placeholders["error_detail"] = str(exc)
@@ -252,17 +259,20 @@ class OAuth2FlowHandler(
                     # Key NOT in entry_data — zero-custody §13.2
                     return await self.async_step_mealie_offer()
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="ai_byok",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
-                    vol.Required(CONF_BYOK_API_KEY): str,
-                }
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="ai_byok",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
+                        vol.Required(CONF_BYOK_API_KEY): str,
+                    }
+                ),
+                errors=errors,
+                description_placeholders=description_placeholders,
             ),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: ai_local  (task-1391 + task-1413)
@@ -295,7 +305,9 @@ class OAuth2FlowHandler(
                     probed = await probe_custom_endpoint(_host, _port, provider_hint)
                     if probed is None:
                         errors[CONF_LOCAL_ENDPOINT] = "local_endpoint_unreachable"
-                    elif local_model and not model_supports_function_calling(local_model):
+                    elif local_model and not model_supports_function_calling(
+                        local_model
+                    ):
                         description_placeholders["model_warning"] = (
                             f"Model '{local_model}' may not support tool calling. "
                             "Complex AI features (shopping list fill, meal suggestions "
@@ -323,8 +335,7 @@ class OAuth2FlowHandler(
         schema_fields: dict[Any, Any] = {}
         if self._detected_endpoints:
             endpoint_options = [
-                f"{ep.base_url} ({ep.display_name})"
-                for ep in self._detected_endpoints
+                f"{ep.base_url} ({ep.display_name})" for ep in self._detected_endpoints
             ] + [_MANUAL_ENTRY]
             schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = vol.In(endpoint_options)
 
@@ -342,12 +353,15 @@ class OAuth2FlowHandler(
             schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = str
             schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="ai_local",
-            data_schema=vol.Schema(schema_fields),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        ))
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="ai_local",
+                data_schema=vol.Schema(schema_fields),
+                errors=errors,
+                description_placeholders=description_placeholders,
+            ),
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: local_endpoint_remote_warning  (task-1413)
@@ -365,13 +379,16 @@ class OAuth2FlowHandler(
             return await self.async_step_mealie_offer()
 
         local_ep = self._entry_data.get(CONF_LOCAL_ENDPOINT, "")
-        return cast(_FlowResult, self.async_show_form(
-            step_id="local_endpoint_remote_warning",
-            data_schema=vol.Schema(
-                {vol.Required("confirmed", default=False): bool}
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="local_endpoint_remote_warning",
+                data_schema=vol.Schema(
+                    {vol.Required("confirmed", default=False): bool}
+                ),
+                description_placeholders={"endpoint": local_ep},
             ),
-            description_placeholders={"endpoint": local_ep},
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: mealie_offer  (task-1422)
@@ -388,14 +405,20 @@ class OAuth2FlowHandler(
             if user_input.get("migrate_mealie", False):
                 return await self.async_step_mealie_credentials()
             # User skipped Mealie — create entry now
-            return cast(_FlowResult, self.async_create_entry(title="Culiplan", data=self._entry_data))
+            return cast(
+                _FlowResult,
+                self.async_create_entry(title="Culiplan", data=self._entry_data),
+            )
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="mealie_offer",
-            data_schema=vol.Schema(
-                {vol.Required("migrate_mealie", default=False): bool}
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="mealie_offer",
+                data_schema=vol.Schema(
+                    {vol.Required("migrate_mealie", default=False): bool}
+                ),
             ),
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: mealie_credentials  (task-1422)
@@ -436,16 +459,19 @@ class OAuth2FlowHandler(
                     _LOGGER.error("[culiplan][mealie] Preview failed: %s", exc)
                     errors["base"] = "unknown"
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="mealie_credentials",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_MEALIE_URL): str,
-                    vol.Required(CONF_MEALIE_TOKEN): str,
-                }
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="mealie_credentials",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_MEALIE_URL): str,
+                        vol.Required(CONF_MEALIE_TOKEN): str,
+                    }
+                ),
+                errors=errors,
             ),
-            errors=errors,
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: mealie_preview  (task-1422)
@@ -461,21 +487,27 @@ class OAuth2FlowHandler(
             # User cancelled — skip import, create entry without Mealie data
             self._entry_data.pop(CONF_MEALIE_URL, None)
             self._entry_data.pop(CONF_MEALIE_TOKEN, None)
-            return cast(_FlowResult, self.async_create_entry(title="Culiplan", data=self._entry_data))
+            return cast(
+                _FlowResult,
+                self.async_create_entry(title="Culiplan", data=self._entry_data),
+            )
 
         p = self._mealie_preview
-        return cast(_FlowResult, self.async_show_form(
-            step_id="mealie_preview",
-            data_schema=vol.Schema(
-                {vol.Required("confirm_import", default=True): bool}
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="mealie_preview",
+                data_schema=vol.Schema(
+                    {vol.Required("confirm_import", default=True): bool}
+                ),
+                description_placeholders={
+                    "will_import": str(p.get("willImport", 0)),
+                    "will_flag": str(p.get("willFlag", 0)),
+                    "will_skip": str(p.get("willSkip", 0)),
+                    "samples": ", ".join(p.get("sampleTitles", [])[:3]),
+                },
             ),
-            description_placeholders={
-                "will_import": str(p.get("willImport", 0)),
-                "will_flag": str(p.get("willFlag", 0)),
-                "will_skip": str(p.get("willSkip", 0)),
-                "samples": ", ".join(p.get("sampleTitles", [])[:3]),
-            },
-        ))
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: mealie_progress  (task-1422)
@@ -510,7 +542,10 @@ class OAuth2FlowHandler(
             # Strip token and create entry anyway — user can retry via options flow
             self._entry_data.pop(CONF_MEALIE_TOKEN, None)
             self._entry_data.pop(CONF_MEALIE_URL, None)
-            return cast(_FlowResult, self.async_create_entry(title="Culiplan", data=self._entry_data))
+            return cast(
+                _FlowResult,
+                self.async_create_entry(title="Culiplan", data=self._entry_data),
+            )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: mealie_done  (task-1422)
@@ -532,16 +567,22 @@ class OAuth2FlowHandler(
             self._entry_data.pop(CONF_MEALIE_TOKEN, None)
             self._entry_data.pop(CONF_MEALIE_URL, None)
 
-            return cast(_FlowResult, self.async_create_entry(title="Culiplan", data=self._entry_data))
+            return cast(
+                _FlowResult,
+                self.async_create_entry(title="Culiplan", data=self._entry_data),
+            )
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="mealie_done",
-            data_schema=vol.Schema({}),
-            description_placeholders={
-                "job_id": job_id,
-                "errors": str(errors_count),
-            },
-        ))
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="mealie_done",
+                data_schema=vol.Schema({}),
+                description_placeholders={
+                    "job_id": job_id,
+                    "errors": str(errors_count),
+                },
+            ),
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Re-authentication
@@ -589,9 +630,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID)
         import_at = self._config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
         elapsed = int(time.time()) - import_at
-        rollback_available = bool(
-            job_id and elapsed < MEALIE_ROLLBACK_WINDOW_SECONDS
-        )
+        rollback_available = bool(job_id and elapsed < MEALIE_ROLLBACK_WINDOW_SECONDS)
 
         if user_input is not None:
             if user_input.get("rollback") and rollback_available:
@@ -609,17 +648,20 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         if rollback_available:
             schema[vol.Optional("rollback", default=False)] = bool
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(schema),
-            description_placeholders={
-                "rollback_available": str(rollback_available).lower(),
-                "job_id": job_id or "",
-                "current_ai_mode": self._config_entry.data.get(
-                    CONF_AI_MODE, AI_MODE_CLOUD
-                ),
-            },
-        ))
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema(schema),
+                description_placeholders={
+                    "rollback_available": str(rollback_available).lower(),
+                    "job_id": job_id or "",
+                    "current_ai_mode": self._config_entry.data.get(
+                        CONF_AI_MODE, AI_MODE_CLOUD
+                    ),
+                },
+            ),
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Advanced AI settings sub-flow (task-1626)
@@ -641,20 +683,24 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             if ai_mode == AI_MODE_LOCAL:
                 return await self.async_step_advanced_ai_local()
             # Cloud AI — commit immediately
-            return cast(_FlowResult, self.async_create_entry(
-                title="",
-                data={CONF_AI_MODE: AI_MODE_CLOUD},
-            ))
+            return cast(
+                _FlowResult,
+                self.async_create_entry(
+                    title="",
+                    data={CONF_AI_MODE: AI_MODE_CLOUD},
+                ),
+            )
 
         current_mode = self._config_entry.data.get(CONF_AI_MODE, AI_MODE_CLOUD)
-        return cast(_FlowResult, self.async_show_form(
-            step_id="advanced_ai",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_AI_MODE, default=current_mode): vol.In(AI_MODES)
-                }
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="advanced_ai",
+                data_schema=vol.Schema(
+                    {vol.Required(CONF_AI_MODE, default=current_mode): vol.In(AI_MODES)}
+                ),
             ),
-        ))
+        )
 
     async def async_step_advanced_ai_byok(
         self, user_input: dict[str, Any] | None = None
@@ -677,7 +723,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 except ProviderAuthError as exc:
                     _LOGGER.warning(
                         "[culiplan][options][byok] Key validation failed for '%s': %s",
-                        provider, exc,
+                        provider,
+                        exc,
                     )
                     errors[CONF_BYOK_API_KEY] = "byok_key_invalid"
                     description_placeholders["error_detail"] = str(exc)
@@ -696,26 +743,32 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                         "[culiplan][options][byok] Stored validated key for '%s'",
                         provider,
                     )
-                    return cast(_FlowResult, self.async_create_entry(
-                        title="",
-                        data={
-                            CONF_AI_MODE: AI_MODE_BYOK,
-                            CONF_BYOK_PROVIDER: provider,
-                            # Key NOT in options data — zero-custody §13.2
-                        },
-                    ))
+                    return cast(
+                        _FlowResult,
+                        self.async_create_entry(
+                            title="",
+                            data={
+                                CONF_AI_MODE: AI_MODE_BYOK,
+                                CONF_BYOK_PROVIDER: provider,
+                                # Key NOT in options data — zero-custody §13.2
+                            },
+                        ),
+                    )
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="advanced_ai_byok",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
-                    vol.Required(CONF_BYOK_API_KEY): str,
-                }
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="advanced_ai_byok",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
+                        vol.Required(CONF_BYOK_API_KEY): str,
+                    }
+                ),
+                errors=errors,
+                description_placeholders=description_placeholders,
             ),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        ))
+        )
 
     async def async_step_advanced_ai_local(
         self, user_input: dict[str, Any] | None = None
@@ -749,18 +802,21 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 self._advanced_ai_data[CONF_LOCAL_MODEL] = local_model
 
             if not errors:
-                return cast(_FlowResult, self.async_create_entry(
-                    title="",
-                    data={
-                        CONF_AI_MODE: AI_MODE_LOCAL,
-                        CONF_LOCAL_ENDPOINT: self._advanced_ai_data.get(
-                            CONF_LOCAL_ENDPOINT, ""
-                        ),
-                        CONF_LOCAL_MODEL: self._advanced_ai_data.get(
-                            CONF_LOCAL_MODEL, ""
-                        ),
-                    },
-                ))
+                return cast(
+                    _FlowResult,
+                    self.async_create_entry(
+                        title="",
+                        data={
+                            CONF_AI_MODE: AI_MODE_LOCAL,
+                            CONF_LOCAL_ENDPOINT: self._advanced_ai_data.get(
+                                CONF_LOCAL_ENDPOINT, ""
+                            ),
+                            CONF_LOCAL_MODEL: self._advanced_ai_data.get(
+                                CONF_LOCAL_MODEL, ""
+                            ),
+                        },
+                    ),
+                )
 
         detected: list[LocalAIEndpoint] = getattr(self, "_detected_endpoints", [])
         schema_fields: dict[Any, Any] = {}
@@ -780,12 +836,15 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = str
             schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
 
-        return cast(_FlowResult, self.async_show_form(
-            step_id="advanced_ai_local",
-            data_schema=vol.Schema(schema_fields),
-            errors=errors,
-            description_placeholders=description_placeholders,
-        ))
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="advanced_ai_local",
+                data_schema=vol.Schema(schema_fields),
+                errors=errors,
+                description_placeholders=description_placeholders,
+            ),
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Mealie rollback  (task-1422)

@@ -12,6 +12,16 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow, intent
 
+from .api import CuliplanApiClient
+from .const import DOMAIN, PLATFORMS
+from .coordinator import CuliplanCoordinator
+from .cooking_services import (
+    async_register_cooking_services,
+    async_unregister_cooking_services,
+)
+from .launch_view import CuliplanLaunchView
+from .services import async_register_services, async_unregister_services
+
 # ─── Lovelace resource auto-registration (task-1408) ─────────────────────────
 #
 # HACS installs the integration at <config>/custom_components/culiplan/.
@@ -37,16 +47,6 @@ _LOVELACE_RESOURCES: tuple[dict[str, str], ...] = (
         "res_type": "module",
     },
 )
-
-from .api import CuliplanApiClient
-from .const import DOMAIN, PLATFORMS
-from .coordinator import CuliplanCoordinator
-from .cooking_services import (
-    async_register_cooking_services,
-    async_unregister_cooking_services,
-)
-from .launch_view import CuliplanLaunchView
-from .services import async_register_services, async_unregister_services
 
 # Sidebar panel identifiers — kept module-level so register/unregister
 # refer to the same names.
@@ -129,7 +129,9 @@ async def _async_register_lovelace_resources(hass: HomeAssistant) -> None:
         for resource in _LOVELACE_RESOURCES:
             url = resource["url"]
             if url in existing_urls:
-                _LOGGER.debug("[culiplan] Lovelace resource already registered: %s", url)
+                _LOGGER.debug(
+                    "[culiplan] Lovelace resource already registered: %s", url
+                )
                 continue
             try:
                 await resource_collection.async_create_item(
@@ -229,9 +231,12 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = cast(bool, await hass.config_entries.async_unload_platforms(
-        entry, [Platform(p) for p in PLATFORMS]
-    ))
+    unload_ok = cast(
+        bool,
+        await hass.config_entries.async_unload_platforms(
+            entry, [Platform(p) for p in PLATFORMS]
+        ),
+    )
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
         async_unregister_services(hass)
@@ -241,6 +246,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.config_entries.async_entries(DOMAIN):
             try:
                 from homeassistant.components.frontend import async_remove_panel
+
                 async_remove_panel(hass, PANEL_URL_PATH)
             except (KeyError, ValueError, ImportError):
                 pass
@@ -365,7 +371,9 @@ def _make_cooking_intent_handler(
                     label = service_data.get("label", "")
                     text = f"Starting the {label} timer."
                 elif service_name == "cancel_recipe_timer":
-                    label = service_data.get("label_or_id", service_data.get("label", ""))
+                    label = service_data.get(
+                        "label_or_id", service_data.get("label", "")
+                    )
                     text = f"Cancelled the {label} timer."
                 else:
                     text = "Done."
@@ -376,7 +384,7 @@ def _make_cooking_intent_handler(
                     service_name,
                     err,
                 )
-                text = f"Sorry, Culiplan couldn't complete that cooking action."
+                text = "Sorry, Culiplan couldn't complete that cooking action."
             return _speech(intent_obj, text)
 
     return _CookingHandler()
