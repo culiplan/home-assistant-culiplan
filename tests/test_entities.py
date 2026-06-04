@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.culiplan.const import DOMAIN
-from custom_components.culiplan.coordinator import FlavorplanCoordinator
+from custom_components.culiplan.coordinator import CuliplanCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 
 
@@ -18,7 +18,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 
 @pytest.fixture
 def full_coordinator(hass, mock_api_client, mock_config_entry):
-    coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+    coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
     coord.data = {
         "meal_plans": [
             {
@@ -195,7 +195,7 @@ class TestSensorTrio:
     def coordinator_with_pantry(self, hass, mock_api_client, mock_config_entry):
         import datetime as dt
 
-        coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+        coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         today = dt.date.today()
         monday = today - dt.timedelta(days=today.weekday())
         slot_date = (

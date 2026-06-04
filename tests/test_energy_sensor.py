@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.culiplan.const import DOMAIN
-from custom_components.culiplan.coordinator import FlavorplanCoordinator
+from custom_components.culiplan.coordinator import CuliplanCoordinator
 from homeassistant.helpers.device_registry import DeviceInfo
 
 
@@ -18,8 +18,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 def device() -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, "test_entry_id")},
-        name="Flavorplan",
-        manufacturer="Flavorplan",
+        name="Culiplan",
+        manufacturer="Culiplan",
         model="Meal Planner",
         entry_type="service",
     )
@@ -28,7 +28,7 @@ def device() -> DeviceInfo:
 @pytest.fixture
 def coordinator_with_energy(hass, mock_api_client, mock_config_entry):
     """Coordinator pre-loaded with energy_today data."""
-    coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+    coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
     coord.data = {
         "meal_plans": [],
         "shopping_lists": [],
@@ -59,7 +59,7 @@ def coordinator_with_energy(hass, mock_api_client, mock_config_entry):
 @pytest.fixture
 def coordinator_no_energy(hass, mock_api_client, mock_config_entry):
     """Coordinator with no energy_today data (first load / missing key)."""
-    coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+    coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
     coord.data = {
         "meal_plans": [],
         "shopping_lists": [],
@@ -71,7 +71,7 @@ def coordinator_no_energy(hass, mock_api_client, mock_config_entry):
 @pytest.fixture
 def coordinator_zero_kwh(hass, mock_api_client, mock_config_entry):
     """Coordinator with energy_today returning 0 kWh (no-cook day)."""
-    coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+    coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
     coord.data = {
         "meal_plans": [],
         "shopping_lists": [],
@@ -127,7 +127,7 @@ class TestPlannedKwhTodaySensor:
         """sensor.native_value returns 0.0 when coordinator.data is None."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+        coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         coord.data = None
         sensor = PlannedKwhTodaySensor(coord, device)
         assert sensor.native_value == 0.0
@@ -223,7 +223,7 @@ class TestPlannedKwhTodaySensor:
         """Slots with no linked recipe (recipeId=None) are excluded from recipe_ids."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+        coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         coord.data = {
             "energy_today": {
                 "date": "2026-04-25",
@@ -273,7 +273,7 @@ class TestCoordinatorEnergyRefresh:
     @pytest.mark.asyncio
     async def test_refresh_energy_updates_data(self, hass, mock_api_client, mock_config_entry):
         """_refresh_energy fetches energy_today and merges it into coordinator.data."""
-        from custom_components.culiplan.coordinator import FlavorplanCoordinator
+        from custom_components.culiplan.coordinator import CuliplanCoordinator
 
         mock_api_client.async_get_energy_today.return_value = {
             "date": "2026-04-25",
@@ -282,7 +282,7 @@ class TestCoordinatorEnergyRefresh:
             "slots": [],
         }
 
-        coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+        coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         coord.data = {"meal_plans": [], "shopping_lists": [], "pantry_items": []}
 
         await coord._refresh_energy()
@@ -297,11 +297,11 @@ class TestCoordinatorEnergyRefresh:
         self, hass, mock_api_client, mock_config_entry
     ):
         """_refresh_energy logs error but does not raise when API call fails."""
-        from custom_components.culiplan.coordinator import FlavorplanCoordinator
+        from custom_components.culiplan.coordinator import CuliplanCoordinator
 
         mock_api_client.async_get_energy_today.side_effect = Exception("API timeout")
 
-        coord = FlavorplanCoordinator(hass, mock_api_client, mock_config_entry)
+        coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         coord.data = {"meal_plans": [], "shopping_lists": [], "pantry_items": []}
 
         # Must not raise

@@ -1,4 +1,4 @@
-"""Tests for FlavorplanCoordinator — happy path, reconnect, stale token."""
+"""Tests for CuliplanCoordinator (previously FlavorplanCoordinator) — happy path, reconnect, stale token."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.culiplan.coordinator import (
-    FlavorplanCoordinator,
+    CuliplanCoordinator,
     HA_EVENT,
     HA_NAMESPACE,
     _MAX_HEARTBEAT_MISSES,
@@ -37,7 +37,7 @@ def mock_entry():
 
 @pytest.fixture
 def coordinator(hass, mock_client, mock_entry):
-    return FlavorplanCoordinator(hass, mock_client, mock_entry)
+    return CuliplanCoordinator(hass, mock_client, mock_entry)
 
 
 # ─── Happy path ────────────────────────────────────────────────────────────

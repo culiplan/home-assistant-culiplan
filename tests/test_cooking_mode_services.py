@@ -1,5 +1,5 @@
 """
-Tests for Flavorplan cooking-mode HA services (task-1397).
+Tests for Culiplan cooking-mode HA services (task-1397).
 
 AC coverage:
   AC#1 — Seven services registered with proper schemas
@@ -556,12 +556,12 @@ class TestCookingIntentDispatch:
         # Patch __init__ import name
         with patch(
             "custom_components.culiplan.__init__._COOKING_INTENT_TO_SERVICE",
-            {"FlavorplanNextCookingStep": "advance_cooking_step"},
+            {"CuliplanNextCookingStep": "advance_cooking_step"},
         ):
             from custom_components.culiplan.__init__ import _make_cooking_intent_handler as mkh  # noqa: PLC0415
             entry = MagicMock()
             entry.entry_id = "test_entry_id"
-            handler = mkh("FlavorplanNextCookingStep", entry)
+            handler = mkh("CuliplanNextCookingStep", entry)
 
         intent_obj = MagicMock()
         intent_obj.slots = {}
