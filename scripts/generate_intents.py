@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate HA Assist intent YAML files from the Flavorplan voice registry.
+"""Generate HA Assist intent YAML files from the Culiplan voice registry.
 
 Source: GET https://api.culiplan.com/api/voice/tools?tag=ha-assist:eligible
 
@@ -38,7 +38,7 @@ INTENTS_DIR = Path(__file__).parent.parent / "custom_components" / "culiplan" / 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 # Prefix all intent names to avoid collisions in the global HA intent namespace.
-INTENT_PREFIX = "Flavorplan"
+INTENT_PREFIX = "Culiplan"
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ def main() -> int:
     parser.add_argument(
         "--api-base",
         default="https://api.culiplan.com",
-        help="Flavorplan API base URL (default: https://api.culiplan.com)",
+        help="Culiplan API base URL (default: https://api.culiplan.com)",
     )
     parser.add_argument(
         "--from-fixture",

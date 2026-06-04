@@ -107,7 +107,7 @@ function timerProgress(timer: CookingTimer): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-class FlavorplanCookingMode extends LitElement {
+class CuliplanCookingMode extends LitElement {
   private _config: CardConfig = {};
   private _hass: any = null;
 
@@ -970,5 +970,5 @@ class FlavorplanCookingMode extends LitElement {
 // ── Registration ──────────────────────────────────────────────────────────────
 
 if (!customElements.get("culiplan-cooking-mode")) {
-  customElements.define("culiplan-cooking-mode", FlavorplanCookingMode);
+  customElements.define("culiplan-cooking-mode", CuliplanCookingMode);
 }

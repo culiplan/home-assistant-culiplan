@@ -51,7 +51,7 @@ action:
   - service: notify.persistent_notification
     data:
       title: "Today's Meals"
-      message: "Check Flavorplan for today's meal plan."
+      message: "Check Culiplan for today's meal plan."
 
 mode: single
 """.strip()

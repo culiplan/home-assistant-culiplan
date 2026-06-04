@@ -94,7 +94,7 @@ function isLowStock(item: PantryItem): boolean {
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-class FlavorplanPantryTracker extends LitElement {
+class CuliplanPantryTracker extends LitElement {
   private _config: CardConfig = {};
   private _hass: any = null;
   private _activeFilter: FilterMode = "all";
@@ -338,7 +338,7 @@ class FlavorplanPantryTracker extends LitElement {
         </p>
         <p class="empty-subtitle">
           ${this._activeFilter === "all"
-            ? "Add items in the Flavorplan app to track your pantry here."
+            ? "Add items in the Culiplan app to track your pantry here."
             : "Try switching to a different filter."}
         </p>
       </div>
@@ -829,7 +829,7 @@ class FlavorplanPantryTracker extends LitElement {
   }
 }
 
-customElements.define("culiplan-pantry-tracker", FlavorplanPantryTracker);
+customElements.define("culiplan-pantry-tracker", CuliplanPantryTracker);
 
 (window as any).customCards = (window as any).customCards ?? [];
 (window as any).customCards.push({

@@ -31,14 +31,14 @@ blueprint:
       name: Notification message
       description: >
         Message body. You may use `{{ trigger.event.data.id }}` to include the
-        item ID (detail available via the Flavorplan app).
+        item ID (detail available via the Culiplan app).
       default: "A pantry item is running low. Check your Culiplan app."
       selector:
         text: {}
 
 trigger:
   - platform: event
-    event_type: culiplan_pantry_depleted  # fired by Flavorplan backend via HA event bus
+    event_type: culiplan_pantry_depleted  # fired by Culiplan backend via HA event bus
 
 condition: []
 

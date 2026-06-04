@@ -72,7 +72,7 @@ const ICON_CHECK = html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 
 
 type CardState = "idle" | "loading" | "result" | "error";
 
-class FlavorplanBlueprintGeneratorCard extends LitElement {
+class CuliplanBlueprintGeneratorCard extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
 
   @state() private _config: CardConfig = {};
@@ -532,11 +532,11 @@ class FlavorplanBlueprintGeneratorCard extends LitElement {
 
 customElements.define(
   "culiplan-blueprint-generator",
-  FlavorplanBlueprintGeneratorCard,
+  CuliplanBlueprintGeneratorCard,
 );
 
 declare global {
   interface HTMLElementTagNameMap {
-    "culiplan-blueprint-generator": FlavorplanBlueprintGeneratorCard;
+    "culiplan-blueprint-generator": CuliplanBlueprintGeneratorCard;
   }
 }

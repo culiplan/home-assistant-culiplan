@@ -44,7 +44,7 @@ from custom_components.culiplan.ai.service import AIDispatchService
 def make_envelope(intent: str = "suggest_meal", model: str = "test-model") -> PromptEnvelope:
     return PromptEnvelope(
         messages=[
-            Message(role="system", content="You are the Flavorplan AI assistant."),
+            Message(role="system", content="You are the Culiplan AI assistant."),
             Message(role="user", content=f"Execute intent: {intent}"),
         ],
         tools=[
@@ -414,7 +414,7 @@ class TestAnthropicDispatcher:
 
         call_kwargs = mock_anthropic_client.messages.create.call_args.kwargs
         assert "system" in call_kwargs
-        assert call_kwargs["system"] == "You are the Flavorplan AI assistant."
+        assert call_kwargs["system"] == "You are the Culiplan AI assistant."
         # System message should not appear in messages list
         messages = call_kwargs["messages"]
         for msg in messages:
@@ -632,7 +632,7 @@ class TestAIDispatchServiceMultiTurn:
 
         assert result.text == "Based on your pantry, I suggest omelette."
         assert mock_dispatcher.dispatch.call_count == 2
-        # Tool was executed via Flavorplan REST API
+        # Tool was executed via Culiplan REST API
         mock_client.async_call_voice_tool.assert_called_once_with("get_pantry", {})
 
     @pytest.mark.asyncio

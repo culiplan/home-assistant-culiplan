@@ -1,4 +1,4 @@
-"""Tests for CuliplanCoordinator (previously FlavorplanCoordinator) — happy path, reconnect, stale token."""
+"""Tests for CuliplanCoordinator — happy path, reconnect, stale token."""
 
 from __future__ import annotations
 
