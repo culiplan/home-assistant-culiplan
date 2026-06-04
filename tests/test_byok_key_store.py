@@ -9,7 +9,7 @@ AC#5 — Audit log entry records {user_id, mode='byok-<provider>', validated=Tru
         with no key fingerprint (see test_ha_ai_envelope.routes.test.ts in monorepo
         for AC#5 — backend side; this test covers the HA side)
 
-Key architectural guarantee: API key NEVER appears in FlavorplanApiClient
+Key architectural guarantee: API key NEVER appears in CuliplanApiClient
 calls or config entry data after validation.
 """
 

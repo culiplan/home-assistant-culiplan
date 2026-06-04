@@ -1,5 +1,5 @@
 """
-Tests for the Flavorplan HA Repairs UI — premium upsell deep-link (task-1395).
+Tests for the Culiplan HA Repairs UI — premium upsell deep-link (task-1395).
 
 AC coverage:
   AC#1 — Repairs flow registered: parses {feature, upgradeUrl} from 403 body.

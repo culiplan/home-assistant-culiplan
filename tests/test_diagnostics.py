@@ -1,4 +1,4 @@
-"""Tests for the Flavorplan diagnostics module (task-1501)."""
+"""Tests for the Culiplan diagnostics module (task-1501)."""
 
 from __future__ import annotations
 

@@ -1,1 +1,1 @@
-"""Tests for the Flavorplan integration — expanded in task-1370."""
+"""Tests for the Culiplan integration — expanded in task-1370."""

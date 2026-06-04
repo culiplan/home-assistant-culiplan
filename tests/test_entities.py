@@ -54,12 +54,12 @@ def full_coordinator(hass, mock_api_client, mock_config_entry):
 # ─── Calendar entity ─────────────────────────────────────────────────────────
 
 
-class TestFlavorplanCalendar:
+class TestCuliplanCalendar:
 
     def test_events_built_from_slot(self, full_coordinator, mock_config_entry):
-        from custom_components.culiplan.calendar import FlavorplanCalendar
+        from custom_components.culiplan.calendar import CuliplanCalendar
 
-        cal = FlavorplanCalendar(
+        cal = CuliplanCalendar(
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         events = cal._build_events()
@@ -76,10 +76,10 @@ class TestFlavorplanCalendar:
     def test_extra_state_attributes_exposes_next_event_meta(
         self, full_coordinator, mock_config_entry
     ):
-        from custom_components.culiplan.calendar import FlavorplanCalendar
+        from custom_components.culiplan.calendar import CuliplanCalendar
 
         # Patch event to return upcoming event
-        cal = FlavorplanCalendar(
+        cal = CuliplanCalendar(
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         # Force 'now' to before the event by using an old slot date
@@ -90,10 +90,10 @@ class TestFlavorplanCalendar:
         assert "recipe_id" in attrs
 
     def test_no_extra_state_attrs_when_no_event(self, full_coordinator, mock_config_entry):
-        from custom_components.culiplan.calendar import FlavorplanCalendar
+        from custom_components.culiplan.calendar import CuliplanCalendar
 
         full_coordinator.data["meal_plans"][0]["slots"] = []
-        cal = FlavorplanCalendar(
+        cal = CuliplanCalendar(
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         assert cal.event is None
@@ -103,9 +103,9 @@ class TestFlavorplanCalendar:
     async def test_get_events_filters_by_date_range(
         self, full_coordinator, mock_config_entry, hass
     ):
-        from custom_components.culiplan.calendar import FlavorplanCalendar
+        from custom_components.culiplan.calendar import CuliplanCalendar
 
-        cal = FlavorplanCalendar(
+        cal = CuliplanCalendar(
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         start = datetime(2026, 4, 27, 0, 0, tzinfo=timezone.utc)
@@ -121,9 +121,9 @@ class TestFlavorplanCalendar:
         ) == 0
 
     def test_device_info_present(self, full_coordinator, mock_config_entry):
-        from custom_components.culiplan.calendar import FlavorplanCalendar
+        from custom_components.culiplan.calendar import CuliplanCalendar
 
-        cal = FlavorplanCalendar(
+        cal = CuliplanCalendar(
             full_coordinator, full_coordinator.data["meal_plans"][0], mock_config_entry
         )
         assert cal._attr_device_info is not None
@@ -137,13 +137,13 @@ class TestFlavorplanCalendar:
 # ─── Todo entity ─────────────────────────────────────────────────────────────
 
 
-class TestFlavorplanShoppingList:
+class TestCuliplanShoppingList:
 
     def test_todo_items_mapped_correctly(self, full_coordinator, mock_config_entry):
-        from custom_components.culiplan.todo import FlavorplanShoppingList
+        from custom_components.culiplan.todo import CuliplanShoppingList
         from homeassistant.components.todo import TodoItemStatus
 
-        entity = FlavorplanShoppingList(
+        entity = CuliplanShoppingList(
             full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
         )
         items = entity.todo_items
@@ -157,10 +157,10 @@ class TestFlavorplanShoppingList:
     async def test_create_item_calls_api_and_refreshes(
         self, full_coordinator, mock_config_entry, mock_api_client
     ):
-        from custom_components.culiplan.todo import FlavorplanShoppingList
+        from custom_components.culiplan.todo import CuliplanShoppingList
         from homeassistant.components.todo import TodoItem, TodoItemStatus
 
-        entity = FlavorplanShoppingList(
+        entity = CuliplanShoppingList(
             full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
         )
         new_item = TodoItem(summary="Bread", status=TodoItemStatus.NEEDS_ACTION)
@@ -174,9 +174,9 @@ class TestFlavorplanShoppingList:
         )
 
     def test_device_info_present(self, full_coordinator, mock_config_entry):
-        from custom_components.culiplan.todo import FlavorplanShoppingList
+        from custom_components.culiplan.todo import CuliplanShoppingList
 
-        entity = FlavorplanShoppingList(
+        entity = CuliplanShoppingList(
             full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
         )
         info = entity._attr_device_info

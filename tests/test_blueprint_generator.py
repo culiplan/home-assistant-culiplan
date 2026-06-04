@@ -2,7 +2,7 @@
 Tests for blueprint_generator.py (task-1400).
 
 Covers:
-  AC#1 — Service call triggers correct Flavorplan API endpoint
+  AC#1 — Service call triggers correct Culiplan API endpoint
   AC#2 — Cloud AI mode: 403 raises PremiumRequiredError + Repairs issue created
   AC#3 — BYOK mode: key never leaves HA; backend returns envelope; local dispatcher used
   AC#4 — Successful generation fires culiplan_blueprint_generated event

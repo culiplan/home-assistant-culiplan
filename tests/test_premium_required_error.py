@@ -46,7 +46,7 @@ async def test_post_raises_premium_required_error_on_premium_403():
     api.py._post must raise PremiumRequiredError (not a generic Exception) when
     the server returns 403 with {error: premium_required, feature, upgradeUrl}.
     """
-    from custom_components.culiplan.api import FlavorplanApiClient
+    from custom_components.culiplan.api import CuliplanApiClient
     from custom_components.culiplan.ai.types import PremiumRequiredError
 
     premium_body = {
@@ -65,7 +65,7 @@ async def test_post_raises_premium_required_error_on_premium_403():
     mock_session = MagicMock()
     mock_session.post.return_value = mock_resp
 
-    client = FlavorplanApiClient(session=mock_session, access_token="tok")
+    client = CuliplanApiClient(session=mock_session, access_token="tok")
 
     with pytest.raises(PremiumRequiredError) as exc_info:
         await client._post("/api/voice/ha-assist", {"tool": "suggest_meal", "params": {}})
@@ -84,7 +84,7 @@ async def test_post_raises_ha_error_on_non_premium_403():
     the server returns 403 with a body that does NOT have error==premium_required
     (e.g. forbidden scope).
     """
-    from custom_components.culiplan.api import FlavorplanApiClient
+    from custom_components.culiplan.api import CuliplanApiClient
     from custom_components.culiplan.ai.types import PremiumRequiredError
     from homeassistant.exceptions import HomeAssistantError
 
@@ -100,7 +100,7 @@ async def test_post_raises_ha_error_on_non_premium_403():
     mock_session = MagicMock()
     mock_session.post.return_value = mock_resp
 
-    client = FlavorplanApiClient(session=mock_session, access_token="tok")
+    client = CuliplanApiClient(session=mock_session, access_token="tok")
 
     with pytest.raises(HomeAssistantError) as exc_info:
         await client._post("/api/some/endpoint", {})

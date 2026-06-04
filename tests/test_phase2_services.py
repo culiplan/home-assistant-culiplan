@@ -1,5 +1,5 @@
 """
-Unit tests for Phase 2 Flavorplan HA services (tasks 1376, 1378, 1379).
+Unit tests for Phase 2 Culiplan HA services (tasks 1376, 1378, 1379).
 
 Tests use mocked API clients; no real HTTP calls are made.
 Syntax-verified + mocked unit tests (Python 3.9 compatible).
