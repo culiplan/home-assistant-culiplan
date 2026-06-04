@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .ai.types import PremiumRequiredError
 from .api import CuliplanApiClient
 from .const import BASE_URL, DOMAIN
 
@@ -75,16 +76,35 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ─── DataUpdateCoordinator protocol ─────────────────────────────────────
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch full state from REST; called on start and after reconnect."""
+        """Fetch full state from REST; called on start and after reconnect.
+
+        Core endpoints (meal plans, shopping list) failing aborts setup so HA
+        retries. Premium-gated endpoints (pantry, energy) returning 403 just
+        omit their slice — sensors fall back to ``unavailable``.
+        """
         try:
             meal_plans = await self.client.async_get_meal_plans()
             shopping_lists = await self.client.async_get_shopping_lists()
-            pantry_items = await self.client.async_get_pantry_items()
-            energy_today = await self.client.async_get_energy_today()
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
             raise UpdateFailed(f"Culiplan REST fetch failed: {err}") from err
+
+        pantry_items: list[dict[str, Any]] = []
+        try:
+            pantry_items = await self.client.async_get_pantry_items()
+        except PremiumRequiredError:
+            _LOGGER.debug("Pantry not available on current plan; skipping")
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Pantry fetch failed (continuing): %s", err)
+
+        energy_today: dict[str, Any] | None = None
+        try:
+            energy_today = await self.client.async_get_energy_today()
+        except PremiumRequiredError:
+            _LOGGER.debug("Energy data not available on current plan; skipping")
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Energy fetch failed (continuing): %s", err)
 
         return {
             "meal_plans": meal_plans,
