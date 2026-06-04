@@ -1,7 +1,7 @@
 {
   "domain": "culiplan",
   "name": "Culiplan",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "documentation": "https://github.com/culiplan/home-assistant-culiplan",
   "issue_tracker": "https://github.com/culiplan/home-assistant-culiplan/issues",
   "requirements": [
@@ -14,5 +14,7 @@
   "codeowners": ["@culiplan"],
   "iot_class": "cloud_push",
   "config_flow": true,
-  "quality_scale": "gold"
+  "quality_scale": "gold",
+  "integration_type": "service",
+  "loggers": ["custom_components.culiplan"]
 }
