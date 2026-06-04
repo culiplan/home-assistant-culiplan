@@ -52,8 +52,8 @@ views:
                 show_state: true
                 columns: 3
                 entities:
-                  - entity: sensor.culiplan_meals_today
-                    name: "Meals today"
+                  - entity: sensor.culiplan_meals_planned_this_week
+                    name: "Meals this week"
                     icon: mdi:food-variant
                   - entity: sensor.culiplan_shopping_items
                     name: "Shopping items"
@@ -75,8 +75,10 @@ views:
               # Cooking Mode card — Phase 3 (task-1383 + task-1396)
               # Shows active cooking session: step list, timers, voice shortcut.
               # Gracefully shows "Start cooking from a recipe" when idle.
+              # TODO: sensor.culiplan_active_cooking_session does not exist yet —
+              # coordinator stores active_cooking_session in data but no sensor
+              # entity is exposed.  Card still renders (falls back to idle state).
               - type: custom:culiplan-cooking-mode
-                entity: sensor.culiplan_active_cooking_session
                 title: "Cooking"
                 show_step_numbers: true
                 max_timers: 3

@@ -15,7 +15,7 @@
 #   - Pantry expiry warnings without needing to tap
 #
 # Voice commands that work with this layout:
-#   "What's for dinner tonight?"          → sensor.culiplan_meals_today
+#   "What's for dinner tonight?"          → sensor.culiplan_meals_planned_this_week
 #   "Add milk to the shopping list"       → todo.culiplan_shopping_list
 #   "What's expiring in the pantry?"      → sensor.culiplan_expiring_pantry
 #   "Next step"                           → advances cooking session step
@@ -77,8 +77,8 @@ views:
                 show_state: true
                 columns: 3
                 entities:
-                  - entity: sensor.culiplan_meals_today
-                    name: "Meals today"
+                  - entity: sensor.culiplan_meals_planned_this_week
+                    name: "Meals this week"
                     icon: mdi:food-variant
                   - entity: sensor.culiplan_shopping_items
                     name: "Shopping items"
@@ -102,8 +102,8 @@ views:
               # Cooking Mode card — Phase 3 (task-1383 + task-1396)
               # Voice PE companion: timers + steps always visible while cooking.
               # Falls back gracefully to "Start cooking from a recipe" CTA.
+              # TODO: sensor.culiplan_active_cooking_session does not exist yet.
               - type: custom:culiplan-cooking-mode
-                entity: sensor.culiplan_active_cooking_session
                 title: "Cooking"
                 show_step_numbers: true
                 max_timers: 3

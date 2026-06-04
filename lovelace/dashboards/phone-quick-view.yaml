@@ -40,8 +40,8 @@ views:
         show_state: true
         columns: 3
         entities:
-          - entity: sensor.culiplan_meals_today
-            name: "Meals"
+          - entity: sensor.culiplan_meals_planned_this_week
+            name: "Meals this week"
             icon: mdi:food-variant
           - entity: sensor.culiplan_shopping_items
             name: "Shopping"
@@ -52,8 +52,8 @@ views:
 
       # Cooking Mode — Phase 3 (task-1383)
       # Shows step list + timers when cooking. Falls back to "Start cooking" CTA.
+      # TODO: sensor.culiplan_active_cooking_session does not exist yet.
       - type: custom:culiplan-cooking-mode
-        entity: sensor.culiplan_active_cooking_session
         title: "Cooking"
         show_step_numbers: true
         max_timers: 2
