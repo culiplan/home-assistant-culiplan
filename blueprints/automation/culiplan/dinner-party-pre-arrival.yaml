@@ -17,7 +17,7 @@ blueprint:
     2. Lights dim to the configured brightness level.
     3. Your chosen media player starts the specified playlist.
   domain: automation
-  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/dinner-party-pre-arrival.yaml
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/dinner-party-pre-arrival.yaml
   input:
     light_target:
       name: Lights to dim

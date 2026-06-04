@@ -12,7 +12,7 @@ blueprint:
     blueprint. Example: use a template sensor that counts how many `person.*`
     entities are `home`.
   domain: automation
-  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/presence-scale-servings.yaml
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/presence-scale-servings.yaml
   input:
     presence_sensor:
       name: Household presence count sensor

@@ -11,7 +11,7 @@ blueprint:
     **Prerequisites**: Culiplan integration installed and connected.
     **Free tier**: Yes — no Culiplan Premium required.
   domain: automation
-  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-expiry-notify.yaml
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-expiry-notify.yaml
   input:
     reminder_time:
       name: Daily reminder time

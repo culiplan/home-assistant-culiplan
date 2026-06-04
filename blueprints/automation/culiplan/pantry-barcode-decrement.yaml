@@ -10,7 +10,7 @@ blueprint:
     **Prerequisites**: Culiplan integration installed and connected.
     **Free tier**: Yes — no Culiplan Premium required.
   domain: automation
-  source_url: https://github.com/Vincent91s/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-barcode-decrement.yaml
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/pantry-barcode-decrement.yaml
   input:
     barcode_event:
       name: Barcode scan event
