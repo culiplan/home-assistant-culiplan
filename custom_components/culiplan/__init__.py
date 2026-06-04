@@ -7,13 +7,18 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from homeassistant.components.application_credentials import (
+    ClientCredential,
+    async_import_client_credential,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow, intent
+from homeassistant.helpers.typing import ConfigType
 
 from .api import CuliplanApiClient
-from .const import DOMAIN, PLATFORMS
+from .const import DOMAIN, OAUTH_CLIENT_ID, PLATFORMS
 from .coordinator import CuliplanCoordinator
 from .cooking_services import (
     async_register_cooking_services,
@@ -149,6 +154,27 @@ async def _async_register_lovelace_resources(hass: HomeAssistant) -> None:
             "Use the manual steps in lovelace/README.md instead.",
             err,
         )
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Culiplan integration.
+
+    Auto-imports the public OAuth client credentials so users skip the
+    "Add application credentials" dialog and go straight to consent.
+    The Culiplan backend's ``ha-core`` is a public PKCE-only client per
+    OAuth 2.1 §2.3 — the client_secret field is required by HA's
+    application_credentials framework but ignored by the backend.
+    """
+    await async_import_client_credential(
+        hass,
+        DOMAIN,
+        ClientCredential(
+            client_id=OAUTH_CLIENT_ID,
+            client_secret="",
+        ),
+        "Culiplan",
+    )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
