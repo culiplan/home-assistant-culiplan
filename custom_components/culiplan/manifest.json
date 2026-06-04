@@ -1,20 +1,20 @@
 {
   "domain": "culiplan",
   "name": "Culiplan",
-  "version": "0.2.0",
+  "codeowners": ["@culiplan"],
+  "config_flow": true,
+  "dependencies": ["application_credentials", "conversation", "frontend", "http"],
   "documentation": "https://github.com/culiplan/home-assistant-culiplan",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/culiplan/home-assistant-culiplan/issues",
+  "loggers": ["custom_components.culiplan"],
+  "quality_scale": "gold",
   "requirements": [
     "openai==1.77.0",
     "anthropic==0.49.0",
     "google-genai==1.12.0",
     "python-socketio==5.12.0"
   ],
-  "dependencies": ["application_credentials", "conversation", "frontend", "http"],
-  "codeowners": ["@culiplan"],
-  "iot_class": "cloud_push",
-  "config_flow": true,
-  "quality_scale": "gold",
-  "integration_type": "service",
-  "loggers": ["custom_components.culiplan"]
+  "version": "0.2.0"
 }

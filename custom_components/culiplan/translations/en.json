@@ -101,7 +101,15 @@
       "description": "The barcode {barcode} was scanned but no matching item was found in your Culiplan pantry. Open Culiplan and add an item with this barcode, then scanning it again will resolve this issue."
     },
     "premium_required": {
-      "title": "Culiplan Premium required"
+      "title": "Culiplan Premium required",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Upgrade Culiplan",
+            "description": "To use {feature}, you need a Culiplan Premium subscription.\n\n[Open upgrade page]({upgrade_url})"
+          }
+        }
+      }
     }
   }
 }
