@@ -39,7 +39,6 @@ from .const import (
     CONF_AI_MODE,
     CONF_BYOK_PROVIDER,
     CONF_LOCAL_ENDPOINT,
-    CONF_LOCAL_MODEL,
     DOMAIN,
 )
 from .ai.debug_logger import setup_debug_log_purge
@@ -63,47 +62,60 @@ SERVICE_SCALE_TONIGHT_SERVINGS = "scale_tonight_servings"
 # Blueprint generation service (task-1400)
 SERVICE_GENERATE_BLUEPRINT = "generate_blueprint"
 
-SUGGEST_MEAL_SCHEMA = vol.Schema({
-    vol.Optional("constraints"): str,
-    vol.Optional("meal_slot"): vol.In(["breakfast", "lunch", "dinner", "snack"]),
-    vol.Optional("max_time_minutes"): vol.Coerce(int),
-})
+SUGGEST_MEAL_SCHEMA = vol.Schema(
+    {
+        vol.Optional("constraints"): str,
+        vol.Optional("meal_slot"): vol.In(["breakfast", "lunch", "dinner", "snack"]),
+        vol.Optional("max_time_minutes"): vol.Coerce(int),
+    }
+)
 
-FILL_SHOPPING_LIST_SCHEMA = vol.Schema({
-    vol.Optional("week_offset"): vol.Coerce(int),
-})
+FILL_SHOPPING_LIST_SCHEMA = vol.Schema(
+    {
+        vol.Optional("week_offset"): vol.Coerce(int),
+    }
+)
 
-PANTRY_DECREMENT_SCHEMA = vol.Schema({
-    vol.Required("barcode"): str,
-    vol.Optional("qty", default=1): vol.All(vol.Coerce(float), vol.Range(min=0.01)),
-})
+PANTRY_DECREMENT_SCHEMA = vol.Schema(
+    {
+        vol.Required("barcode"): str,
+        vol.Optional("qty", default=1): vol.All(vol.Coerce(float), vol.Range(min=0.01)),
+    }
+)
 
-PANTRY_EXPIRING_SCHEMA = vol.Schema({
-    vol.Optional("window_hours", default=48): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=720)
-    ),
-})
+PANTRY_EXPIRING_SCHEMA = vol.Schema(
+    {
+        vol.Optional("window_hours", default=48): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=720)
+        ),
+    }
+)
 
-SCALE_TONIGHT_SERVINGS_SCHEMA = vol.Schema({
-    vol.Required("present_count"): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=100)
-    ),
-    vol.Optional("plan_date"): str,
-})
+SCALE_TONIGHT_SERVINGS_SCHEMA = vol.Schema(
+    {
+        vol.Required("present_count"): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=100)
+        ),
+        vol.Optional("plan_date"): str,
+    }
+)
 
-GENERATE_BLUEPRINT_SCHEMA = vol.Schema({
-    vol.Required("prompt"): vol.All(str, vol.Length(min=5, max=2000)),
-    vol.Optional("available_entities"): vol.All(
-        list,
-        vol.Length(max=100),
-        [str],
-    ),
-    vol.Optional("install", default=False): bool,
-})
+GENERATE_BLUEPRINT_SCHEMA = vol.Schema(
+    {
+        vol.Required("prompt"): vol.All(str, vol.Length(min=5, max=2000)),
+        vol.Optional("available_entities"): vol.All(
+            list,
+            vol.Length(max=100),
+            [str],
+        ),
+        vol.Optional("install", default=False): bool,
+    }
+)
 
 
 # PremiumRequiredError is imported from .ai.types (task-1416: moved to shared
 # module so both api.py and services.py can use it without circular imports).
+
 
 class PantryItemNotFoundError(HomeAssistantError):
     """Raised when a barcode is not found in the user's pantry."""
@@ -183,6 +195,7 @@ def _build_dispatch_mode(ai_mode: str, entry_config: dict[str, Any]) -> str:
         # Derive from port: LM Studio uses 1234, Ollama uses 11434 (default).
         try:
             from urllib.parse import urlparse as _urlparse
+
             port = _urlparse(
                 endpoint if "://" in endpoint else f"http://{endpoint}"
             ).port
@@ -272,8 +285,9 @@ async def _call_pantry_decrement(
             available = 0.0
             try:
                 import json
+
                 if "{" in exc_str:
-                    body = json.loads(exc_str[exc_str.index("{"):])
+                    body = json.loads(exc_str[exc_str.index("{") :])
                     available = float(body.get("available", 0))
             except (ValueError, KeyError):
                 pass
@@ -287,9 +301,12 @@ async def _call_pantry_expiring(
 ) -> dict[str, Any]:
     """Call GET /api/ha/pantry/expiring?window_hours=N."""
     try:
-        return cast(dict[str, Any], await client._get(  # noqa: SLF001
-            f"/api/ha/pantry/expiring?window_hours={window_hours}"
-        ))
+        return cast(
+            dict[str, Any],
+            await client._get(  # noqa: SLF001
+                f"/api/ha/pantry/expiring?window_hours={window_hours}"
+            ),
+        )
     except Exception as exc:
         raise HomeAssistantError(f"Pantry expiring fetch failed: {exc}") from exc
 
@@ -329,11 +346,13 @@ def async_register_services(hass: HomeAssistant) -> None:
         entry_config = entry.data if entry else {}
         ai_mode = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
         params = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "constraints": call.data.get("constraints"),
                 "mealSlot": call.data.get("meal_slot"),
                 "maxTimeMinutes": call.data.get("max_time_minutes"),
-            }.items() if v is not None
+            }.items()
+            if v is not None
         }
         try:
             if ai_mode == AI_MODE_CLOUD:
@@ -351,7 +370,8 @@ def async_register_services(hass: HomeAssistant) -> None:
             {"result": text, "mode": ai_mode},
         )
         await hass.services.async_call(
-            "persistent_notification", "create",
+            "persistent_notification",
+            "create",
             {
                 "title": "Culiplan Meal Suggestion",
                 "message": text,
@@ -377,8 +397,12 @@ def async_register_services(hass: HomeAssistant) -> None:
                 text = await _run_cloud_intent(client, "fill_shopping_list", params)
             else:
                 text = await _run_byok_or_local_intent(
-                    hass, entry_data, entry_config, client,
-                    "fill_shopping_list", params,
+                    hass,
+                    entry_data,
+                    entry_config,
+                    client,
+                    "fill_shopping_list",
+                    params,
                 )
         except PremiumRequiredError as exc:
             async_create_premium_repair(hass, exc.feature, exc.upgrade_url)
@@ -390,7 +414,8 @@ def async_register_services(hass: HomeAssistant) -> None:
             {"result": text, "mode": ai_mode},
         )
         await hass.services.async_call(
-            "persistent_notification", "create",
+            "persistent_notification",
+            "create",
             {
                 "title": "Culiplan Shopping List",
                 "message": text,
@@ -410,7 +435,9 @@ def async_register_services(hass: HomeAssistant) -> None:
             _resolve_barcode_repair(hass, barcode)
             _LOGGER.info(
                 "[culiplan] Pantry decremented: barcode=%s qty=%s item=%s",
-                barcode, qty, result.get("pantryItemId"),
+                barcode,
+                qty,
+                result.get("pantryItemId"),
             )
         except PantryItemNotFoundError as exc:
             _create_barcode_not_found_repair(hass, exc.barcode)
@@ -428,10 +455,7 @@ def async_register_services(hass: HomeAssistant) -> None:
             {
                 "window_hours": window_hours,
                 "count": result.get("count", 0),
-                "item_ids": [
-                    item["pantryItemId"]
-                    for item in result.get("items", [])
-                ],
+                "item_ids": [item["pantryItemId"] for item in result.get("items", [])],
             },
         )
 
@@ -466,11 +490,23 @@ def async_register_services(hass: HomeAssistant) -> None:
 
     registrations = [
         (SERVICE_SUGGEST_MEAL, handle_suggest_meal, SUGGEST_MEAL_SCHEMA),
-        (SERVICE_FILL_SHOPPING_LIST, handle_fill_shopping_list, FILL_SHOPPING_LIST_SCHEMA),
+        (
+            SERVICE_FILL_SHOPPING_LIST,
+            handle_fill_shopping_list,
+            FILL_SHOPPING_LIST_SCHEMA,
+        ),
         (SERVICE_PANTRY_DECREMENT, handle_pantry_decrement, PANTRY_DECREMENT_SCHEMA),
         (SERVICE_PANTRY_EXPIRING, handle_pantry_expiring, PANTRY_EXPIRING_SCHEMA),
-        (SERVICE_SCALE_TONIGHT_SERVINGS, handle_scale_tonight_servings, SCALE_TONIGHT_SERVINGS_SCHEMA),
-        (SERVICE_GENERATE_BLUEPRINT, handle_generate_blueprint, GENERATE_BLUEPRINT_SCHEMA),
+        (
+            SERVICE_SCALE_TONIGHT_SERVINGS,
+            handle_scale_tonight_servings,
+            SCALE_TONIGHT_SERVINGS_SCHEMA,
+        ),
+        (
+            SERVICE_GENERATE_BLUEPRINT,
+            handle_generate_blueprint,
+            GENERATE_BLUEPRINT_SCHEMA,
+        ),
     ]
     for name, handler, schema in registrations:
         if not hass.services.has_service(DOMAIN, name):

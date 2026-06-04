@@ -126,12 +126,15 @@ async def _cloud_generate_blueprint(
             upgrade_url = "https://culiplan.com/premium?source=ha_blueprint"
             try:
                 import json
+
                 if "{" in exc_str:
-                    body = json.loads(exc_str[exc_str.index("{"):])
+                    body = json.loads(exc_str[exc_str.index("{") :])
                     upgrade_url = body.get("upgradeUrl", upgrade_url)
             except (ValueError, KeyError):
                 pass
-            raise PremiumRequiredError(feature="ai.blueprint", upgrade_url=upgrade_url) from exc
+            raise PremiumRequiredError(
+                feature="ai.blueprint", upgrade_url=upgrade_url
+            ) from exc
         raise HomeAssistantError(f"Blueprint generation failed: {exc_str}") from exc
 
 
@@ -185,7 +188,11 @@ async def _byok_local_generate_blueprint(
         backend_mode = f"byok-{byok_provider}"
     elif ai_mode == AI_MODE_LOCAL:
         model_name = entry_config.get(CONF_LOCAL_MODEL, "")
-        backend_mode = "local-lmstudio" if "lmstudio" in (model_name or "").lower() else "local-ollama"
+        backend_mode = (
+            "local-lmstudio"
+            if "lmstudio" in (model_name or "").lower()
+            else "local-ollama"
+        )
     else:
         backend_mode = "culiplan-cloud"
 
@@ -198,13 +205,17 @@ async def _byok_local_generate_blueprint(
         envelope_payload["context"] = {"available_entities": available_entities[:100]}
 
     try:
-        envelope_resp = await client.async_post("/api/blueprints/generate", envelope_payload)
+        envelope_resp = await client.async_post(
+            "/api/blueprints/generate", envelope_payload
+        )
     except Exception as exc:
         raise HomeAssistantError(f"Failed to fetch blueprint envelope: {exc}") from exc
 
     envelope = envelope_resp.get("envelope")
     if not envelope:
-        raise HomeAssistantError("Backend returned no prompt envelope for blueprint generation.")
+        raise HomeAssistantError(
+            "Backend returned no prompt envelope for blueprint generation."
+        )
 
     # Execute AI call locally via dispatcher (no tool-call loop needed — YAML response)
     from .ai.types import PromptEnvelope
@@ -214,7 +225,9 @@ async def _byok_local_generate_blueprint(
         dispatch_result = await dispatcher.dispatch(prompt_envelope, tool_results=None)
         raw_yaml = dispatch_result.text or ""
     except Exception as exc:
-        raise HomeAssistantError(f"Local AI blueprint generation failed: {exc}") from exc
+        raise HomeAssistantError(
+            f"Local AI blueprint generation failed: {exc}"
+        ) from exc
 
     # The raw YAML from local AI is unvalidated — return it in the standard shape.
     # Validation happens on a best-effort basis in the service handler.
@@ -234,7 +247,9 @@ def _extract_name_from_yaml(yaml_text: str) -> str:
 
 def _extract_description_from_yaml(yaml_text: str) -> str:
     """Extract blueprint description from YAML text (simple regex)."""
-    match = re.search(r"^\s+description:\s*[\"']?(.+?)[\"']?\s*$", yaml_text, re.MULTILINE)
+    match = re.search(
+        r"^\s+description:\s*[\"']?(.+?)[\"']?\s*$", yaml_text, re.MULTILINE
+    )
     return match.group(1).strip() if match else ""
 
 
@@ -279,7 +294,9 @@ async def handle_generate_blueprint(
     yaml_content: str = result.get("yaml", "")
     name: str = result.get("name", "blueprint")
     description: str = result.get("description", "")
-    validation: dict[str, Any] = result.get("validation", {"valid": True, "warnings": []})
+    validation: dict[str, Any] = result.get(
+        "validation", {"valid": True, "warnings": []}
+    )
     is_valid: bool = validation.get("valid", True)
     warnings: list[str] = validation.get("warnings", [])
 

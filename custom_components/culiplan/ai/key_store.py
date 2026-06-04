@@ -23,7 +23,6 @@ Validation contract (§13.6):
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -83,6 +82,7 @@ class BYOKKeyStore:
 
 # ─── Validation calls ──────────────────────────────────────────────────────────
 
+
 async def validate_openai_key(api_key: str) -> bool:
     """
     Validate an OpenAI API key with a minimal models.list call.
@@ -91,7 +91,7 @@ async def validate_openai_key(api_key: str) -> bool:
     Raises ProviderAuthError if the key is invalid.
     """
     try:
-        from openai import AsyncOpenAI, AuthenticationError
+        from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=api_key)
         # models.list is a free endpoint — no tokens consumed
@@ -99,8 +99,14 @@ async def validate_openai_key(api_key: str) -> bool:
         return True
     except Exception as exc:  # noqa: BLE001
         exc_str = str(exc)
-        _LOGGER.debug("[culiplan][byok-validation] OpenAI validation failed: %s", exc_str)
-        if "401" in exc_str or "auth" in exc_str.lower() or "invalid" in exc_str.lower():
+        _LOGGER.debug(
+            "[culiplan][byok-validation] OpenAI validation failed: %s", exc_str
+        )
+        if (
+            "401" in exc_str
+            or "auth" in exc_str.lower()
+            or "invalid" in exc_str.lower()
+        ):
             raise ProviderAuthError(
                 "OpenAI API key is invalid or does not have model access. "
                 "Please check your key at https://platform.openai.com/api-keys"
@@ -119,7 +125,7 @@ async def validate_anthropic_key(api_key: str) -> bool:
     Raises ProviderAuthError if the key is invalid.
     """
     try:
-        from anthropic import AsyncAnthropic, AuthenticationError
+        from anthropic import AsyncAnthropic
 
         client = AsyncAnthropic(api_key=api_key)
         # Cheapest possible call: 1-token prompt, max 1 output token
@@ -131,8 +137,14 @@ async def validate_anthropic_key(api_key: str) -> bool:
         return True
     except Exception as exc:  # noqa: BLE001
         exc_str = str(exc)
-        _LOGGER.debug("[culiplan][byok-validation] Anthropic validation failed: %s", exc_str)
-        if "401" in exc_str or "auth" in exc_str.lower() or "invalid_api_key" in exc_str.lower():
+        _LOGGER.debug(
+            "[culiplan][byok-validation] Anthropic validation failed: %s", exc_str
+        )
+        if (
+            "401" in exc_str
+            or "auth" in exc_str.lower()
+            or "invalid_api_key" in exc_str.lower()
+        ):
             raise ProviderAuthError(
                 "Anthropic API key is invalid. "
                 "Please check your key at https://console.anthropic.com/"
@@ -160,7 +172,9 @@ async def validate_google_key(api_key: str) -> bool:
         return True
     except Exception as exc:  # noqa: BLE001
         exc_str = str(exc)
-        _LOGGER.debug("[culiplan][byok-validation] Google validation failed: %s", exc_str)
+        _LOGGER.debug(
+            "[culiplan][byok-validation] Google validation failed: %s", exc_str
+        )
         if (
             "API_KEY_INVALID" in exc_str
             or "401" in exc_str
@@ -179,9 +193,9 @@ async def validate_google_key(api_key: str) -> bool:
 # ─── Provider dispatch ────────────────────────────────────────────────────────
 
 _VALIDATORS = {
-    "openai":    validate_openai_key,
+    "openai": validate_openai_key,
     "anthropic": validate_anthropic_key,
-    "google":    validate_google_key,
+    "google": validate_google_key,
 }
 
 
@@ -195,8 +209,7 @@ async def validate_byok_key(provider: str, api_key: str) -> bool:
     """
     if provider not in _VALIDATORS:
         raise ValueError(
-            f"Unknown BYOK provider '{provider}'. "
-            f"Supported: {list(_VALIDATORS.keys())}"
+            f"Unknown BYOK provider '{provider}'. Supported: {list(_VALIDATORS.keys())}"
         )
     validator = _VALIDATORS[provider]
     return await validator(api_key)

@@ -73,7 +73,9 @@ ADVANCE_COOKING_STEP_SCHEMA = vol.Schema({})
 SET_RECIPE_TIMER_SCHEMA = vol.Schema(
     {
         vol.Required("label"): str,
-        vol.Required("duration_sec"): vol.All(vol.Coerce(int), vol.Range(min=1, max=86400)),
+        vol.Required("duration_sec"): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=86400)
+        ),
         vol.Optional("step_index"): vol.All(vol.Coerce(int), vol.Range(min=0)),
     }
 )
@@ -129,9 +131,12 @@ async def _patch_session(
 ) -> dict[str, Any]:
     """PATCH /api/cooking-sessions/:id and handle structured errors."""
     try:
-        result = cast(dict[str, Any], await client._patch(  # noqa: SLF001
-            f"/api/cooking-sessions/{session_id}", payload
-        ))
+        result = cast(
+            dict[str, Any],
+            await client._patch(  # noqa: SLF001
+                f"/api/cooking-sessions/{session_id}", payload
+            ),
+        )
         return result
     except PremiumRequiredError:
         raise
@@ -311,6 +316,7 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
         step_index: int | None = call.data.get("step_index")
 
         import datetime
+
         new_timer: dict[str, Any] = {
             "label": label,
             "durationSec": duration_sec,
@@ -359,7 +365,8 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
         existing_timers: list[dict[str, Any]] = list(session.get("timers", []))
         # Match by id or label
         to_cancel = [
-            t for t in existing_timers
+            t
+            for t in existing_timers
             if t.get("id") == label_or_id or t.get("label") == label_or_id
         ]
         if not to_cancel:
@@ -368,7 +375,8 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
             )
 
         remaining_timers = [
-            t for t in existing_timers
+            t
+            for t in existing_timers
             if t.get("id") != label_or_id and t.get("label") != label_or_id
         ]
         await _patch_session(client, session["id"], {"timers": remaining_timers})
@@ -453,13 +461,37 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
     # ─── Register all seven ───────────────────────────────────────────────────
 
     registrations = [
-        (SERVICE_START_COOKING_MODE, handle_start_cooking_mode, START_COOKING_MODE_SCHEMA),
-        (SERVICE_ADVANCE_COOKING_STEP, handle_advance_cooking_step, ADVANCE_COOKING_STEP_SCHEMA),
+        (
+            SERVICE_START_COOKING_MODE,
+            handle_start_cooking_mode,
+            START_COOKING_MODE_SCHEMA,
+        ),
+        (
+            SERVICE_ADVANCE_COOKING_STEP,
+            handle_advance_cooking_step,
+            ADVANCE_COOKING_STEP_SCHEMA,
+        ),
         (SERVICE_SET_RECIPE_TIMER, handle_set_recipe_timer, SET_RECIPE_TIMER_SCHEMA),
-        (SERVICE_CANCEL_RECIPE_TIMER, handle_cancel_recipe_timer, CANCEL_RECIPE_TIMER_SCHEMA),
-        (SERVICE_PAUSE_COOKING_MODE, handle_pause_cooking_mode, PAUSE_COOKING_MODE_SCHEMA),
-        (SERVICE_RESUME_COOKING_MODE, handle_resume_cooking_mode, RESUME_COOKING_MODE_SCHEMA),
-        (SERVICE_COMPLETE_COOKING_MODE, handle_complete_cooking_mode, COMPLETE_COOKING_MODE_SCHEMA),
+        (
+            SERVICE_CANCEL_RECIPE_TIMER,
+            handle_cancel_recipe_timer,
+            CANCEL_RECIPE_TIMER_SCHEMA,
+        ),
+        (
+            SERVICE_PAUSE_COOKING_MODE,
+            handle_pause_cooking_mode,
+            PAUSE_COOKING_MODE_SCHEMA,
+        ),
+        (
+            SERVICE_RESUME_COOKING_MODE,
+            handle_resume_cooking_mode,
+            RESUME_COOKING_MODE_SCHEMA,
+        ),
+        (
+            SERVICE_COMPLETE_COOKING_MODE,
+            handle_complete_cooking_mode,
+            COMPLETE_COOKING_MODE_SCHEMA,
+        ),
     ]
     for name, handler, schema in registrations:
         if not hass.services.has_service(DOMAIN, name):

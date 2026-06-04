@@ -15,16 +15,19 @@ except ImportError:  # pragma: no cover
 
 # ─── Prompt envelope ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class Message:
     """A single chat message in the prompt envelope."""
-    role: str        # "system" | "user" | "assistant"
+
+    role: str  # "system" | "user" | "assistant"
     content: str
 
 
 @dataclass
 class ToolSpec:
     """OpenAPI-style tool specification."""
+
     name: str
     description: str
     parameters: dict[str, Any]
@@ -38,6 +41,7 @@ class PromptEnvelope:
     The backend builds this; the dispatcher executes it locally against
     the AI provider.  API keys never transit Culiplan infrastructure.
     """
+
     messages: list[Message]
     tools: list[ToolSpec]
     model: str
@@ -57,12 +61,14 @@ class PromptEnvelope:
 
 # ─── Dispatcher result ────────────────────────────────────────────────────────
 
+
 @dataclass
 class ToolCall:
     """A single tool call emitted by the model."""
+
     name: str
     params: dict[str, Any]
-    call_id: str = ""   # provider-specific call identifier for multi-turn loop
+    call_id: str = ""  # provider-specific call identifier for multi-turn loop
 
 
 @dataclass
@@ -73,6 +79,7 @@ class DispatchResult:
     If tool_calls is non-empty, the caller should execute the tools via the
     Culiplan API and loop back to the dispatcher with the results appended.
     """
+
     text: str | None
     tool_calls: list[ToolCall] = field(default_factory=list)
 
@@ -84,15 +91,18 @@ class DispatchResult:
 
 # ─── Tool result (for multi-turn loops) ──────────────────────────────────────
 
+
 @dataclass
 class ToolResult:
     """Result of a Culiplan tool call, forwarded back to the model."""
+
     call_id: str
     tool_name: str
-    content: Any   # JSON-serialisable
+    content: Any  # JSON-serialisable
 
 
 # ─── Dispatcher errors ────────────────────────────────────────────────────────
+
 
 class DispatcherError(Exception):
     """Base class for dispatcher-level errors."""
@@ -111,6 +121,7 @@ class ProviderUnavailableError(DispatcherError):
 
 
 # ─── API / premium errors (shared between api.py and services.py) ─────────────
+
 
 class PremiumRequiredError(_HomeAssistantError):
     """

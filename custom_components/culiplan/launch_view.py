@@ -74,10 +74,14 @@ class CuliplanLaunchView(HomeAssistantView):
             )
 
         try:
-            implementation = await config_entry_oauth2_flow.async_get_config_entry_implementation(
-                self._hass, entry
+            implementation = (
+                await config_entry_oauth2_flow.async_get_config_entry_implementation(
+                    self._hass, entry
+                )
             )
-            session = config_entry_oauth2_flow.OAuth2Session(self._hass, entry, implementation)
+            session = config_entry_oauth2_flow.OAuth2Session(
+                self._hass, entry, implementation
+            )
             await session.async_ensure_token_valid()
             access_token: str = session.token["access_token"]
         except Exception as err:  # noqa: BLE001 — token problems must not surface raw stack

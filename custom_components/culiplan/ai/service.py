@@ -25,18 +25,11 @@ import logging
 from typing import Any
 
 from .dispatchers import (
-    AnthropicDispatcher,
-    GoogleDispatcher,
-    OpenAICompatibleDispatcher,
     create_dispatcher,
 )
 from .types import (
     DispatchResult,
-    DispatcherError,
     PromptEnvelope,
-    ProviderAuthError,
-    ProviderRateLimitError,
-    ProviderUnavailableError,
     ToolCall,
     ToolResult,
 )
@@ -64,6 +57,7 @@ def _is_non_retryable(exc: Exception) -> bool:
         if str(code) in exc_str:
             return True
     return False
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -168,7 +162,9 @@ class AIDispatchService:
                 _LOGGER.debug(
                     "[culiplan][ai-service] Intent '%s' completed in %d turn(s). "
                     "Mode: %s",
-                    intent, turn + 1, self._mode,
+                    intent,
+                    turn + 1,
+                    self._mode,
                 )
                 return current_result
 
@@ -181,7 +177,8 @@ class AIDispatchService:
             for tc in current_result.tool_calls:
                 _LOGGER.debug(
                     "[culiplan][ai-service] Executing tool '%s' (call_id=%s)",
-                    tc.name, tc.call_id,
+                    tc.name,
+                    tc.call_id,
                 )
                 try:
                     result_data = await self.execute_tool_call(tc)
@@ -192,7 +189,9 @@ class AIDispatchService:
                     # task-1414).
                     _LOGGER.warning(
                         "[culiplan][ai-service] Tool '%s' (call_id=%s) failed: %s",
-                        tc.name, tc.call_id, exc,
+                        tc.name,
+                        tc.call_id,
+                        exc,
                         exc_info=True,
                     )
                     retryable = not _is_non_retryable(exc)
@@ -214,6 +213,7 @@ class AIDispatchService:
         _LOGGER.warning(
             "[culiplan][ai-service] Intent '%s' did not resolve after %d turns. "
             "Returning last result.",
-            intent, _MAX_TOOL_TURNS,
+            intent,
+            _MAX_TOOL_TURNS,
         )
         return current_result or DispatchResult(text=None)

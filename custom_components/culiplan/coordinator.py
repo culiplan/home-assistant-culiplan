@@ -44,7 +44,9 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._reconnect_task: asyncio.Task | None = None
         self._connected = False
         self._miss_count = 0
-        self._stopped = False  # set by async_stop(); guards against post-unload reconnects
+        self._stopped = (
+            False  # set by async_stop(); guards against post-unload reconnects
+        )
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -161,8 +163,11 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # task-1380 AC#3 — live update; trigger coordinator listeners so
             # DinnerPartyActiveBinarySensor.async_update() is scheduled.
             self.async_set_updated_data(self.data or {})
-        elif event_type in ("cooking.session.updated", "cooking.session.started",
-                            "cooking.session.completed"):
+        elif event_type in (
+            "cooking.session.updated",
+            "cooking.session.started",
+            "cooking.session.completed",
+        ):
             # task-1397 — re-fetch active session and sync HA timer entities.
             # ID-only payload (§14.3); the full session is re-fetched here.
             await self._refresh_cooking_session()
@@ -177,14 +182,18 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _refresh_shopping_lists(self) -> None:
         try:
             shopping_lists = await self.client.async_get_shopping_lists()
-            self.async_set_updated_data({**(self.data or {}), "shopping_lists": shopping_lists})
+            self.async_set_updated_data(
+                {**(self.data or {}), "shopping_lists": shopping_lists}
+            )
         except Exception as err:
             _LOGGER.error("Failed to refresh shopping lists: %s", err)
 
     async def _refresh_pantry(self) -> None:
         try:
             pantry_items = await self.client.async_get_pantry_items()
-            self.async_set_updated_data({**(self.data or {}), "pantry_items": pantry_items})
+            self.async_set_updated_data(
+                {**(self.data or {}), "pantry_items": pantry_items}
+            )
         except Exception as err:
             _LOGGER.error("Failed to refresh pantry items: %s", err)
 
@@ -228,7 +237,9 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Re-fetch today's kWh estimate (task-1399). Called after meal_plan.updated."""
         try:
             energy_today = await self.client.async_get_energy_today()
-            self.async_set_updated_data({**(self.data or {}), "energy_today": energy_today})
+            self.async_set_updated_data(
+                {**(self.data or {}), "energy_today": energy_today}
+            )
         except Exception as err:
             _LOGGER.error("Failed to refresh energy today: %s", err)
 

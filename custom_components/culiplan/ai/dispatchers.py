@@ -90,7 +90,9 @@ async def _retry_once_on_5xx(
         _LOGGER.warning(
             "[culiplan][%s] Provider returned 5xx — retrying once after %.1fs. "
             "Error: %s",
-            provider, _RETRY_BACKOFF_SECONDS, exc,
+            provider,
+            _RETRY_BACKOFF_SECONDS,
+            exc,
         )
         await asyncio.sleep(_RETRY_BACKOFF_SECONDS)
         # Raises ProviderUnavailableError (or any other exception) on the second
@@ -156,6 +158,7 @@ def _messages_to_openai(messages: list[Message]) -> list[dict[str, str]]:
 
 # ─── OpenAI-compatible dispatcher ─────────────────────────────────────────────
 
+
 class OpenAICompatibleDispatcher:
     """
     Dispatcher for OpenAI-compatible endpoints.
@@ -212,11 +215,13 @@ class OpenAICompatibleDispatcher:
         # Append tool results as tool messages if we're continuing a loop
         if tool_results:
             for result in tool_results:
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": result.call_id,
-                    "content": json.dumps(result.content),
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": result.call_id,
+                        "content": json.dumps(result.content),
+                    }
+                )
 
         tools = _tool_specs_to_openai(envelope.tools)
 
@@ -243,7 +248,8 @@ class OpenAICompatibleDispatcher:
             except APIStatusError as exc:
                 _LOGGER.error(
                     "[culiplan][openai-compat] Provider error: %s %s",
-                    exc.status_code, exc.message,
+                    exc.status_code,
+                    exc.message,
                 )
                 if exc.status_code == 401:
                     raise ProviderAuthError(
@@ -316,6 +322,7 @@ class OpenAICompatibleDispatcher:
 
 # ─── Anthropic dispatcher ─────────────────────────────────────────────────────
 
+
 class AnthropicDispatcher:
     """
     Dispatcher for Anthropic Claude models.
@@ -359,16 +366,18 @@ class AnthropicDispatcher:
         # Append tool results for multi-turn
         if tool_results:
             for result in tool_results:
-                conversation.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": result.call_id,
-                            "content": json.dumps(result.content),
-                        }
-                    ],
-                })
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": result.call_id,
+                                "content": json.dumps(result.content),
+                            }
+                        ],
+                    }
+                )
 
         tools = _tool_specs_to_anthropic(envelope.tools)
 
@@ -397,7 +406,8 @@ class AnthropicDispatcher:
             except APIStatusError as exc:
                 _LOGGER.error(
                     "[culiplan][anthropic] Provider error: %s %s",
-                    exc.status_code, exc.message,
+                    exc.status_code,
+                    exc.message,
                 )
                 if exc.status_code == 401:
                     raise ProviderAuthError(
@@ -439,6 +449,7 @@ class AnthropicDispatcher:
 
 
 # ─── Google Gemini dispatcher ─────────────────────────────────────────────────
+
 
 class GoogleDispatcher:
     """
@@ -492,17 +503,19 @@ class GoogleDispatcher:
         # Append tool results for multi-turn
         if tool_results:
             for result in tool_results:
-                contents.append({
-                    "role": "user",
-                    "parts": [
-                        {
-                            "function_response": {
-                                "name": result.tool_name,
-                                "response": {"result": result.content},
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "function_response": {
+                                    "name": result.tool_name,
+                                    "response": {"result": result.content},
+                                }
                             }
-                        }
-                    ],
-                })
+                        ],
+                    }
+                )
 
         # Build function declarations
         function_declarations = _tool_specs_to_google(envelope.tools)
@@ -517,7 +530,9 @@ class GoogleDispatcher:
                 json.dumps(contents),
             )
 
-        async def _call() -> Any:  # return type is Any: google-genai SDK ships no py.typed
+        async def _call() -> (
+            Any
+        ):  # return type is Any: google-genai SDK ships no py.typed
             try:
                 config_kwargs: dict[str, Any] = {}
                 if system_instruction:
@@ -536,7 +551,9 @@ class GoogleDispatcher:
                     if config_kwargs
                     else None,
                 )
-            except Exception as exc:  # google-genai uses generic exceptions  # noqa: BLE001
+            except (
+                Exception
+            ) as exc:  # google-genai uses generic exceptions  # noqa: BLE001
                 msg = str(exc)
                 _LOGGER.error("[culiplan][google] Provider error: %s", msg)
                 if "401" in msg or "API_KEY_INVALID" in msg:
@@ -585,6 +602,7 @@ class GoogleDispatcher:
 
 
 # ─── Factory ──────────────────────────────────────────────────────────────────
+
 
 def create_dispatcher(
     mode: str,

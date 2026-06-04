@@ -25,7 +25,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any
 
 import aiohttp
 
@@ -42,46 +41,49 @@ _PROBE_TIMEOUT_SEC = 2.0
 
 # Models known to support function/tool calling.
 # When the user picks a model NOT in this list, we warn about constrained-intent fallback.
-_FUNCTION_CALLING_MODELS: frozenset[str] = frozenset({
-    # Ollama / llama.cpp compatible
-    "llama3.2",
-    "llama3.1",
-    "llama3.1:8b",
-    "llama3.1:70b",
-    "llama3",
-    "llama3:8b",
-    "llama3:70b",
-    "qwen2.5",
-    "qwen2.5:7b",
-    "qwen2.5:14b",
-    "qwen2.5:32b",
-    "qwen2.5:72b",
-    "gemma3",
-    "gemma3:4b",
-    "gemma3:12b",
-    "gemma3:27b",
-    "mistral-nemo",
-    "mistral",
-    "mistral:7b",
-    "mixtral",
-    "mixtral:8x7b",
-    "hermes3",
-    "hermes3:8b",
-    "functionary",
-    "functionary-small",
-    "functionary-medium",
-    "deepseek-r1",
-    # LM Studio bundled models typically follow llama/mistral family
-    "local-model",  # placeholder shown to users for manual LM Studio
-})
+_FUNCTION_CALLING_MODELS: frozenset[str] = frozenset(
+    {
+        # Ollama / llama.cpp compatible
+        "llama3.2",
+        "llama3.1",
+        "llama3.1:8b",
+        "llama3.1:70b",
+        "llama3",
+        "llama3:8b",
+        "llama3:70b",
+        "qwen2.5",
+        "qwen2.5:7b",
+        "qwen2.5:14b",
+        "qwen2.5:32b",
+        "qwen2.5:72b",
+        "gemma3",
+        "gemma3:4b",
+        "gemma3:12b",
+        "gemma3:27b",
+        "mistral-nemo",
+        "mistral",
+        "mistral:7b",
+        "mixtral",
+        "mixtral:8x7b",
+        "hermes3",
+        "hermes3:8b",
+        "functionary",
+        "functionary-small",
+        "functionary-medium",
+        "deepseek-r1",
+        # LM Studio bundled models typically follow llama/mistral family
+        "local-model",  # placeholder shown to users for manual LM Studio
+    }
+)
 
 
 @dataclass
 class LocalAIEndpoint:
     """A detected local AI endpoint."""
+
     host: str
     port: int
-    provider: str              # "ollama" or "lmstudio"
+    provider: str  # "ollama" or "lmstudio"
     available_models: list[str] = field(default_factory=list)
     openai_compatible: bool = True
 
@@ -130,9 +132,7 @@ async def _probe_ollama(
                 return None
             data = await resp.json()
             models = [
-                m.get("name", "")
-                for m in data.get("models", [])
-                if m.get("name")
+                m.get("name", "") for m in data.get("models", []) if m.get("name")
             ]
             return LocalAIEndpoint(
                 host=host,
@@ -164,11 +164,7 @@ async def _probe_lmstudio(
             if resp.status != 200:
                 return None
             data = await resp.json()
-            models = [
-                m.get("id", "")
-                for m in data.get("data", [])
-                if m.get("id")
-            ]
+            models = [m.get("id", "") for m in data.get("data", []) if m.get("id")]
             return LocalAIEndpoint(
                 host=host,
                 port=port,

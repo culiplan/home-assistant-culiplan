@@ -44,9 +44,7 @@ def _count_errors_last_24h(entry_id: str) -> int:
     """Return the number of errors recorded in the last 24 h for *entry_id*."""
     now = time.monotonic()
     cutoff = now - _24H_SECONDS
-    return sum(
-        1 for ts, eid in _ERROR_BUFFER if eid == entry_id and ts >= cutoff
-    )
+    return sum(1 for ts, eid in _ERROR_BUFFER if eid == entry_id and ts >= cutoff)
 
 
 async def async_get_config_entry_diagnostics(

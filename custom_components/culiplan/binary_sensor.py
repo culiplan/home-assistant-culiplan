@@ -58,13 +58,16 @@ async def async_setup_entry(
 
     device = _build_device_info(entry)
 
-    async_add_entities([
-        PantryHasExpiringBinarySensor(coordinator, device, expiry_hours),
-        DinnerPartyActiveBinarySensor(coordinator, client, device),
-    ])
+    async_add_entities(
+        [
+            PantryHasExpiringBinarySensor(coordinator, device, expiry_hours),
+            DinnerPartyActiveBinarySensor(coordinator, client, device),
+        ]
+    )
 
 
 # ─── Pantry expiry binary sensor ─────────────────────────────────────────────
+
 
 class PantryHasExpiringBinarySensor(
     CoordinatorEntity[CuliplanCoordinator], BinarySensorEntity
@@ -128,6 +131,7 @@ class PantryHasExpiringBinarySensor(
 
 
 # ─── Dinner party active binary sensor ──────────────────────────────────────
+
 
 class DinnerPartyActiveBinarySensor(
     CoordinatorEntity[CuliplanCoordinator], BinarySensorEntity
@@ -220,7 +224,9 @@ class DinnerPartyActiveBinarySensor(
         task-1380 AC#3 — live update on dinner_party.updated events.
         """
         try:
-            self._active_party = await self._client.async_get("/api/ha/dinner-party/active")
+            self._active_party = await self._client.async_get(
+                "/api/ha/dinner-party/active"
+            )
         except Exception as err:
             _LOGGER.warning("[culiplan] Could not fetch active dinner party: %s", err)
             # Keep the last known state on transient failures

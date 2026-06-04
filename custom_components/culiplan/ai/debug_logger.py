@@ -25,9 +25,8 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
-import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -157,8 +156,7 @@ def setup_debug_log_purge(hass: "HomeAssistant") -> None:
         deleted = purge_old_debug_logs(config_dir)
         if deleted:
             _LOGGER.info(
-                "[culiplan][debug-logger] Purged %d stale debug log file(s) "
-                "(TTL=24h)",
+                "[culiplan][debug-logger] Purged %d stale debug log file(s) (TTL=24h)",
                 deleted,
             )
 

@@ -27,7 +27,7 @@ AC#5 — Tested by stubbing 403 from backend.
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -39,13 +39,13 @@ _LOGGER = logging.getLogger(__name__)
 # ─── Feature-to-human-readable copy ───────────────────────────────────────────
 
 _FEATURE_TITLES: dict[str, str] = {
-    "ai.suggestion":      "AI meal suggestions need Culiplan Premium",
-    "ai.shopping_fill":   "AI shopping list fill needs Culiplan Premium",
-    "ai.blueprint":       "AI automation blueprints need Culiplan Premium",
-    "cooking_mode":       "Guided cooking mode needs Culiplan Premium",
-    "smart_appliance":    "Smart appliance integration needs Culiplan Premium",
-    "recipe_image_gen":   "Recipe image generation needs Culiplan Premium",
-    "smart_pantry":       "Smart pantry recommendations need Culiplan Premium",
+    "ai.suggestion": "AI meal suggestions need Culiplan Premium",
+    "ai.shopping_fill": "AI shopping list fill needs Culiplan Premium",
+    "ai.blueprint": "AI automation blueprints need Culiplan Premium",
+    "cooking_mode": "Guided cooking mode needs Culiplan Premium",
+    "smart_appliance": "Smart appliance integration needs Culiplan Premium",
+    "recipe_image_gen": "Recipe image generation needs Culiplan Premium",
+    "smart_pantry": "Smart pantry recommendations need Culiplan Premium",
 }
 
 _FEATURE_DESCRIPTIONS: dict[str, str] = {
@@ -93,6 +93,7 @@ def _default_description(feature: str) -> str:
 
 # ─── Issue ID helpers ──────────────────────────────────────────────────────────
 
+
 def _repair_issue_id(feature: str) -> str:
     """Unique repair issue ID per feature (stable across HA restarts)."""
     # Replace dots/slashes with underscores to satisfy HA issue-id conventions
@@ -101,6 +102,7 @@ def _repair_issue_id(feature: str) -> str:
 
 
 # ─── URL helper ───────────────────────────────────────────────────────────────
+
 
 def _append_ha_install_id(upgrade_url: str, hass: HomeAssistant) -> str:
     """
@@ -130,6 +132,7 @@ def _append_ha_install_id(upgrade_url: str, hass: HomeAssistant) -> str:
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
+
 
 def async_create_premium_repair(
     hass: HomeAssistant,
@@ -167,7 +170,7 @@ def async_create_premium_repair(
         domain=DOMAIN,
         issue_id=issue_id,
         is_fixable=True,
-        is_persistent=False,   # Resolves when user upgrades (not on HA restart)
+        is_persistent=False,  # Resolves when user upgrades (not on HA restart)
         severity=ir.IssueSeverity.WARNING,
         translation_key="premium_required",
         translation_placeholders={

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
-from aiohttp import ClientResponseError, ClientSession
+from aiohttp import ClientSession
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
@@ -63,7 +63,9 @@ class CuliplanApiClient:
         response = await self._get("/api/pantry/stock?limit=100")
         if isinstance(response, dict) and isinstance(response.get("data"), list):
             return cast(list[dict[str, Any]], response["data"])
-        return cast(list[dict[str, Any]], response) if isinstance(response, list) else []
+        return (
+            cast(list[dict[str, Any]], response) if isinstance(response, list) else []
+        )
 
     async def async_get_energy_today(self) -> dict[str, Any]:
         """Fetch today's estimated kWh for planned recipes (task-1399)."""
@@ -89,10 +91,13 @@ class CuliplanApiClient:
     async def async_update_shopping_item(
         self, list_id: str, item_id: str, completed: bool
     ) -> dict[str, Any]:
-        return cast(dict[str, Any], await self._patch(
-            f"/api/shopping-list/{item_id}",
-            {"checked": completed},
-        ))
+        return cast(
+            dict[str, Any],
+            await self._patch(
+                f"/api/shopping-list/{item_id}",
+                {"checked": completed},
+            ),
+        )
 
     async def async_remove_shopping_item(self, list_id: str, item_id: str) -> None:
         await self._delete(f"/api/shopping-list/{item_id}")
@@ -100,9 +105,12 @@ class CuliplanApiClient:
     async def async_call_voice_tool(
         self, tool_name: str, params: dict[str, Any]
     ) -> dict[str, Any]:
-        return cast(dict[str, Any], await self._post(
-            "/api/voice/ha-assist", {"tool": tool_name, "params": params}
-        ))
+        return cast(
+            dict[str, Any],
+            await self._post(
+                "/api/voice/ha-assist", {"tool": tool_name, "params": params}
+            ),
+        )
 
     # ─── Generic helpers (used by AI dispatcher service + Phase 2 services) ──
 
@@ -146,9 +154,7 @@ class CuliplanApiClient:
                         ),
                     )
                 # Non-premium 403 (e.g. forbidden scope) — raise as generic HA error
-                raise HomeAssistantError(
-                    f"Culiplan API returned 403 on {path}: {body}"
-                )
+                raise HomeAssistantError(f"Culiplan API returned 403 on {path}: {body}")
             resp.raise_for_status()
             return await resp.json()
 
@@ -159,6 +165,7 @@ class CuliplanApiClient:
         404 PANTRY_ITEM_NOT_FOUND) can be parsed by the service layer.
         """
         import json as _json
+
         async with self._session.post(
             f"{BASE_URL}{path}", headers=self._headers(), json=payload
         ) as resp:

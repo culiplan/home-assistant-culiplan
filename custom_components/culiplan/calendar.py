@@ -28,7 +28,9 @@ async def async_setup_entry(
     """Set up Culiplan calendar entities."""
     coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     meal_plans = (coordinator.data or {}).get("meal_plans", [])
-    async_add_entities(CuliplanCalendar(coordinator, plan, entry) for plan in meal_plans)
+    async_add_entities(
+        CuliplanCalendar(coordinator, plan, entry) for plan in meal_plans
+    )
 
 
 class CuliplanCalendar(CoordinatorEntity[CuliplanCoordinator], CalendarEntity):
@@ -75,9 +77,7 @@ class CuliplanCalendar(CoordinatorEntity[CuliplanCoordinator], CalendarEntity):
     ) -> list[CalendarEvent]:
         """Return events within the requested window."""
         return [
-            e
-            for e in self._build_events()
-            if e.start < end_date and e.end > start_date
+            e for e in self._build_events() if e.start < end_date and e.end > start_date
         ]
 
     def _build_events(self) -> list[CalendarEvent]:
@@ -91,11 +91,13 @@ class CuliplanCalendar(CoordinatorEntity[CuliplanCoordinator], CalendarEntity):
                     start = parse_dt(slot["date"])
                     end = start + timedelta(hours=1)
                     # Recipe metadata goes into description as JSON (IDs only per §14.3).
-                    description = json.dumps({
-                        "recipe_id": slot.get("recipeId"),
-                        "servings": slot.get("servings"),
-                        "course": slot.get("course"),
-                    })
+                    description = json.dumps(
+                        {
+                            "recipe_id": slot.get("recipeId"),
+                            "servings": slot.get("servings"),
+                            "course": slot.get("course"),
+                        }
+                    )
                     events.append(
                         CalendarEvent(
                             start=start,

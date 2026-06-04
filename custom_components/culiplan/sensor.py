@@ -6,7 +6,11 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -31,12 +35,14 @@ async def async_setup_entry(
     coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     expiry_days: int = entry.options.get("expiry_days", DEFAULT_EXPIRY_DAYS)
     device = _build_device_info(entry)
-    async_add_entities([
-        MealsPlanedThisWeekSensor(coordinator, device),
-        ShoppingItemsCountSensor(coordinator, device),
-        ExpiringPantrySensor(coordinator, device, expiry_days),
-        PlannedKwhTodaySensor(coordinator, device),
-    ])
+    async_add_entities(
+        [
+            MealsPlanedThisWeekSensor(coordinator, device),
+            ShoppingItemsCountSensor(coordinator, device),
+            ExpiringPantrySensor(coordinator, device, expiry_days),
+            PlannedKwhTodaySensor(coordinator, device),
+        ]
+    )
 
 
 class _CuliplanSensor(CoordinatorEntity[CuliplanCoordinator], SensorEntity):
@@ -44,9 +50,7 @@ class _CuliplanSensor(CoordinatorEntity[CuliplanCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(
-        self, coordinator: CuliplanCoordinator, device: DeviceInfo
-    ) -> None:
+    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
         super().__init__(coordinator)
         self._attr_device_info = device
 

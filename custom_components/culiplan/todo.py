@@ -102,6 +102,8 @@ def _to_todo_item(item: dict[str, Any]) -> TodoItem:
         uid=item.get("id", ""),
         summary=item.get("name", ""),
         status=(
-            TodoItemStatus.COMPLETED if item.get("completed") else TodoItemStatus.NEEDS_ACTION
+            TodoItemStatus.COMPLETED
+            if item.get("completed")
+            else TodoItemStatus.NEEDS_ACTION
         ),
     )
