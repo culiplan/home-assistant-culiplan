@@ -614,7 +614,7 @@ function fmtCountdown(secs) {
   const s5 = secs % 60;
   return `${m2}:${s5.toString().padStart(2, "0")}`;
 }
-var FlavorplanCookingMode = class extends s4 {
+var CuliplanCookingMode = class extends s4 {
   constructor() {
     super(...arguments);
     __publicField(this, "_config", {});
@@ -1425,5 +1425,5 @@ var FlavorplanCookingMode = class extends s4 {
   }
 };
 if (!customElements.get("culiplan-cooking-mode")) {
-  customElements.define("culiplan-cooking-mode", FlavorplanCookingMode);
+  customElements.define("culiplan-cooking-mode", CuliplanCookingMode);
 }

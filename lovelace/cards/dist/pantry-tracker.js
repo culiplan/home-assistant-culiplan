@@ -637,7 +637,7 @@ function isLowStock(item) {
   if (item.lowStockThreshold !== void 0 && item.quantity <= item.lowStockThreshold) return true;
   return false;
 }
-var FlavorplanPantryTracker = class extends s4 {
+var CuliplanPantryTracker = class extends s4 {
   constructor() {
     super(...arguments);
     __publicField(this, "_config", {});
@@ -847,7 +847,7 @@ var FlavorplanPantryTracker = class extends s4 {
           ${this._activeFilter === "all" ? "Pantry is empty" : `No items matching "${filterLabel}"`}
         </p>
         <p class="empty-subtitle">
-          ${this._activeFilter === "all" ? "Add items in the Flavorplan app to track your pantry here." : "Try switching to a different filter."}
+          ${this._activeFilter === "all" ? "Add items in the Culiplan app to track your pantry here." : "Try switching to a different filter."}
         </p>
       </div>
     `;
@@ -1324,7 +1324,7 @@ var FlavorplanPantryTracker = class extends s4 {
     `;
   }
 };
-customElements.define("culiplan-pantry-tracker", FlavorplanPantryTracker);
+customElements.define("culiplan-pantry-tracker", CuliplanPantryTracker);
 window.customCards = window.customCards ?? [];
 window.customCards.push({
   type: "culiplan-pantry-tracker",

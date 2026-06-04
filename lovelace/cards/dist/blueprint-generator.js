@@ -741,7 +741,7 @@ var ICON_SPINNER = x`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 var ICON_ALERT = x`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
 var ICON_CHECK = x`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 var __installed_dec, __copied_dec, __errorMessage_dec, __result_dec, __cardState_dec, __prompt_dec, __config_dec, _hass_dec, _a, _init;
-var FlavorplanBlueprintGeneratorCard = class extends (_a = s4, _hass_dec = [n5({ attribute: false })], __config_dec = [t3()], __prompt_dec = [t3()], __cardState_dec = [t3()], __result_dec = [t3()], __errorMessage_dec = [t3()], __copied_dec = [t3()], __installed_dec = [t3()], _a) {
+var CuliplanBlueprintGeneratorCard = class extends (_a = s4, _hass_dec = [n5({ attribute: false })], __config_dec = [t3()], __prompt_dec = [t3()], __cardState_dec = [t3()], __result_dec = [t3()], __errorMessage_dec = [t3()], __copied_dec = [t3()], __installed_dec = [t3()], _a) {
   constructor() {
     super(...arguments);
     __publicField(this, "hass", __runInitializers(_init, 8, this)), __runInitializers(_init, 11, this);
@@ -1184,16 +1184,16 @@ var FlavorplanBlueprintGeneratorCard = class extends (_a = s4, _hass_dec = [n5({
   }
 };
 _init = __decoratorStart(_a);
-__decorateElement(_init, 5, "hass", _hass_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_config", __config_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_prompt", __prompt_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_cardState", __cardState_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_result", __result_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_errorMessage", __errorMessage_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_copied", __copied_dec, FlavorplanBlueprintGeneratorCard);
-__decorateElement(_init, 5, "_installed", __installed_dec, FlavorplanBlueprintGeneratorCard);
-__decoratorMetadata(_init, FlavorplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "hass", _hass_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_config", __config_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_prompt", __prompt_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_cardState", __cardState_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_result", __result_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_errorMessage", __errorMessage_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_copied", __copied_dec, CuliplanBlueprintGeneratorCard);
+__decorateElement(_init, 5, "_installed", __installed_dec, CuliplanBlueprintGeneratorCard);
+__decoratorMetadata(_init, CuliplanBlueprintGeneratorCard);
 customElements.define(
   "culiplan-blueprint-generator",
-  FlavorplanBlueprintGeneratorCard
+  CuliplanBlueprintGeneratorCard
 );
