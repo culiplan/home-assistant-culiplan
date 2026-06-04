@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.application_credentials import (
     AuthImplementation,
@@ -51,10 +51,10 @@ class CuliplanOAuth2Implementation(AuthImplementation):
             "code_challenge_method": "S256",
         }
 
-    async def _token_request(self, data: dict) -> dict:
+    async def _token_request(self, data: dict[str, Any]) -> dict[Any, Any]:
         if data.get("grant_type") == "authorization_code":
             data["code_verifier"] = self._code_verifier
-        return await super()._token_request(data)
+        return cast(dict[Any, Any], await super()._token_request(data))
 
 
 async def async_get_auth_implementation(

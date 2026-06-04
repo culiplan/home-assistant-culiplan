@@ -174,7 +174,7 @@ class DinnerPartyActiveBinarySensor(
     def is_on(self) -> bool:
         """Return True if a dinner party is active today."""
         if self._active_party is not None:
-            return self._active_party.get("is_active", False)
+            return bool(self._active_party.get("is_active", False))
         # Fall back to coordinator data: check dinner_parties list
         return self._has_active_party_from_coordinator()
 

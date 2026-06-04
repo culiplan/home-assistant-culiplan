@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from aiohttp import ClientResponseError, ClientSession
 
@@ -32,10 +32,10 @@ class CuliplanApiClient:
     # ─── Read ────────────────────────────────────────────────────────────────
 
     async def async_get_user(self) -> dict[str, Any]:
-        return await self._get("/api/users/me")
+        return cast(dict[str, Any], await self._get("/api/users/me"))
 
     async def async_get_meal_plans(self) -> list[dict[str, Any]]:
-        return await self._get("/api/meal-plans")
+        return cast(list[dict[str, Any]], await self._get("/api/meal-plans"))
 
     async def async_get_shopping_lists(self) -> list[dict[str, Any]]:
         """
@@ -62,12 +62,12 @@ class CuliplanApiClient:
         """
         response = await self._get("/api/pantry/stock?limit=100")
         if isinstance(response, dict) and isinstance(response.get("data"), list):
-            return response["data"]
-        return response if isinstance(response, list) else []
+            return cast(list[dict[str, Any]], response["data"])
+        return cast(list[dict[str, Any]], response) if isinstance(response, list) else []
 
     async def async_get_energy_today(self) -> dict[str, Any]:
         """Fetch today's estimated kWh for planned recipes (task-1399)."""
-        return await self._get("/api/ha/energy/today")
+        return cast(dict[str, Any], await self._get("/api/ha/energy/today"))
 
     # ─── Shopping list mutations ─────────────────────────────────────────────
     # The backend exposes a flat, single-list API (POST /api/shopping-list
@@ -82,15 +82,17 @@ class CuliplanApiClient:
         if quantity:
             item["quantity"] = quantity
         created = await self._post("/api/shopping-list", {"items": [item]})
-        return created[0] if isinstance(created, list) and created else created
+        if isinstance(created, list) and created:
+            return cast(dict[str, Any], created[0])
+        return cast(dict[str, Any], created)
 
     async def async_update_shopping_item(
         self, list_id: str, item_id: str, completed: bool
     ) -> dict[str, Any]:
-        return await self._patch(
+        return cast(dict[str, Any], await self._patch(
             f"/api/shopping-list/{item_id}",
             {"checked": completed},
-        )
+        ))
 
     async def async_remove_shopping_item(self, list_id: str, item_id: str) -> None:
         await self._delete(f"/api/shopping-list/{item_id}")
@@ -98,9 +100,9 @@ class CuliplanApiClient:
     async def async_call_voice_tool(
         self, tool_name: str, params: dict[str, Any]
     ) -> dict[str, Any]:
-        return await self._post(
+        return cast(dict[str, Any], await self._post(
             "/api/voice/ha-assist", {"tool": tool_name, "params": params}
-        )
+        ))
 
     # ─── Generic helpers (used by AI dispatcher service + Phase 2 services) ──
 
@@ -110,7 +112,7 @@ class CuliplanApiClient:
 
     async def async_post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Generic POST — used by AI dispatcher (1387) and Phase 2 services (1376, 1379)."""
-        return await self._post(path, payload)
+        return cast(dict[str, Any], await self._post(path, payload))
 
     # ─── HTTP helpers ────────────────────────────────────────────────────────
 

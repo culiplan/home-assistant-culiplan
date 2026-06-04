@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 import socketio
 
@@ -278,6 +278,6 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass, self.entry, implementation
         )
         await session.async_ensure_token_valid()
-        token = session.token.get("access_token", "")
+        token = cast(str, session.token.get("access_token", ""))
         self.client._access_token = token  # noqa: SLF001
         return token

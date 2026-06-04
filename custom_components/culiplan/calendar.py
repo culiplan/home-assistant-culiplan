@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.config_entries import ConfigEntry
@@ -63,7 +63,7 @@ class CuliplanCalendar(CoordinatorEntity[CuliplanCoordinator], CalendarEntity):
         if ev is None or ev.description is None:
             return {}
         try:
-            return json.loads(ev.description)
+            return cast(dict[str, Any], json.loads(ev.description))
         except (ValueError, TypeError):
             return {}
 
