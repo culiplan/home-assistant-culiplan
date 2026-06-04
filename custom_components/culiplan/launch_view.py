@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from aiohttp import web
+from aiohttp import ClientTimeout, web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -102,7 +102,7 @@ class CuliplanLaunchView(HomeAssistantView):
             async with client.post(
                 f"{BASE_URL}/api/oauth/sso/exchange",
                 headers={"Authorization": f"Bearer {access_token}"},
-                timeout=10,
+                timeout=ClientTimeout(total=10),
             ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
