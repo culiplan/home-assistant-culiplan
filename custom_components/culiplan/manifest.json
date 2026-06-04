@@ -10,7 +10,7 @@
     "google-genai==1.12.0",
     "python-socketio==5.12.0"
   ],
-  "dependencies": ["application_credentials", "conversation"],
+  "dependencies": ["application_credentials", "conversation", "frontend", "http"],
   "codeowners": ["@culiplan"],
   "iot_class": "cloud_push",
   "config_flow": true,
