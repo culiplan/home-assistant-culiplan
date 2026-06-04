@@ -1,9 +1,9 @@
 """
 Launch endpoint that bridges the Home Assistant user into the Culiplan web
-app inside an iframe panel.
+app inside the custom Lit panel.
 
-When the user clicks the "Culiplan" entry in the HA sidebar, HA navigates the
-iframe to ``/api/culiplan/launch`` (this view). The view:
+When the custom panel's JS fetches ``/api/culiplan/launch`` (this view) it
+sends the HA bearer token in the ``Authorization`` header.  The view:
 
   1. Verifies the request comes from an authenticated HA user (HA's standard
      view auth — same mechanism the rest of HA's REST API uses).
@@ -12,17 +12,21 @@ iframe to ``/api/culiplan/launch`` (this view). The view:
      refreshes the token if it expired.
   3. POSTs that bearer token to ``/api/oauth/sso/exchange`` on the Culiplan
      backend, which returns a one-time, IP-bound, 60-second bridge code.
-  4. 302-redirects the browser to ``https://culiplan.com/ha-bridge#<code>``.
-     The hash fragment is never sent to a server, never logged in our access
-     logs, and is scrubbed client-side by the bridge page before any
-     analytics flush.
+  4. Returns JSON: ``{"redirect_url": "https://culiplan.com/ha-bridge#<code>",
+     "expires_in": 60}``
 
-Failure modes:
-- No config entry / no token       → 503 with explanatory message.
-- Backend rejects exchange         → 502 (bad gateway).
-- Network error talking to backend → 502.
+     The code is embedded in the fragment (``#``), so it is never sent to a
+     server, never appears in HA access logs, and is scrubbed client-side by
+     the bridge page before any analytics flush.
 
-We never log the code, the access token, or anything derived from them.
+Failure modes are returned as JSON with a short ``error`` code and a
+``message`` suitable for display in the panel error card:
+
+- 503 — no config entry / no token.
+- 502 — backend exchange failed or network error.
+
+We NEVER log the SSO code, the bearer token, or the resolved redirect_url —
+all three carry the secret code.
 """
 
 from __future__ import annotations
@@ -40,9 +44,11 @@ from .const import BASE_URL, DOMAIN, WEB_URL
 
 _LOGGER = logging.getLogger(__name__)
 
+_SSO_CODE_EXPIRES_IN = 60  # seconds — must match backend value
+
 
 class CuliplanLaunchView(HomeAssistantView):
-    """HA HTTP view that issues a one-time SSO code and redirects."""
+    """HA HTTP view that issues a one-time SSO code and returns the redirect URL as JSON."""
 
     url = "/api/culiplan/launch"
     name = "api:culiplan:launch"
@@ -53,8 +59,8 @@ class CuliplanLaunchView(HomeAssistantView):
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass
 
-    async def get(self, request: web.Request) -> web.StreamResponse:
-        # `request['hass_user']` is populated by HA's auth middleware when
+    async def get(self, request: web.Request) -> web.Response:
+        # ``request['hass_user']`` is populated by HA's auth middleware when
         # ``requires_auth = True``. We use it to pick the right config entry
         # on multi-user HA installs.
         ha_user = request.get("hass_user")
@@ -67,10 +73,9 @@ class CuliplanLaunchView(HomeAssistantView):
                 ha_user_id,
             )
             return web.Response(
-                status=403,
-                text="Your Home Assistant user has not linked a Culiplan account. "
-                "Add the Culiplan integration in Settings → Devices & Services.",
-                content_type="text/plain",
+                status=503,
+                content_type="application/json",
+                text='{"error": "no_entry", "message": "Your Home Assistant user has not linked a Culiplan account. Add the Culiplan integration in Settings → Devices & Services."}',
             )
 
         try:
@@ -88,9 +93,8 @@ class CuliplanLaunchView(HomeAssistantView):
             _LOGGER.warning("[culiplan][launch] Could not obtain access token: %s", err)
             return web.Response(
                 status=503,
-                text="Culiplan session has expired. Re-link the integration in "
-                "Settings → Devices & Services.",
-                content_type="text/plain",
+                content_type="application/json",
+                text='{"error": "token_expired", "message": "Culiplan session has expired. Re-link the integration in Settings → Devices & Services."}',
             )
 
         try:
@@ -103,23 +107,22 @@ class CuliplanLaunchView(HomeAssistantView):
                 if resp.status != 200:
                     body = await resp.text()
                     _LOGGER.warning(
-                        "[culiplan][launch] Exchange failed: status=%s body=%s",
+                        "[culiplan][launch] Exchange failed: status=%s body=<redacted len=%d>",
                         resp.status,
-                        body[:200],
+                        len(body),
                     )
                     return web.Response(
                         status=502,
-                        text="Culiplan SSO bridge is unavailable. Please try again "
-                        "in a moment.",
-                        content_type="text/plain",
+                        content_type="application/json",
+                        text='{"error": "exchange_failed", "message": "Culiplan SSO bridge is unavailable. Please try again in a moment."}',
                     )
                 payload: dict[str, Any] = await resp.json()
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("[culiplan][launch] Network error during exchange: %s", err)
             return web.Response(
                 status=502,
-                text="Could not reach Culiplan. Check your internet connection.",
-                content_type="text/plain",
+                content_type="application/json",
+                text='{"error": "network_error", "message": "Could not reach Culiplan. Check your internet connection."}',
             )
 
         code = payload.get("code")
@@ -127,15 +130,24 @@ class CuliplanLaunchView(HomeAssistantView):
             _LOGGER.warning("[culiplan][launch] Exchange response missing code.")
             return web.Response(
                 status=502,
-                text="Culiplan SSO bridge returned an invalid response.",
-                content_type="text/plain",
+                content_type="application/json",
+                text='{"error": "invalid_response", "message": "Culiplan SSO bridge returned an invalid response."}',
             )
 
-        # Hash fragment is client-only. We deliberately do NOT pass the code
-        # via query string or response body to keep it out of HA access logs.
+        # The code is placed in the fragment (#) so it is never sent to a
+        # server and never appears in access logs.  We do NOT log redirect_url
+        # because the fragment contains the secret code.
+        import json
+
         return web.Response(
-            status=302,
-            headers={"Location": f"{WEB_URL}/ha-bridge#{code}"},
+            status=200,
+            content_type="application/json",
+            text=json.dumps(
+                {
+                    "redirect_url": f"{WEB_URL}/ha-bridge#{code}",
+                    "expires_in": _SSO_CODE_EXPIRES_IN,
+                }
+            ),
         )
 
     def _entry_for_user(self, ha_user_id: str | None) -> ConfigEntry | None:
@@ -160,7 +172,7 @@ class CuliplanLaunchView(HomeAssistantView):
                 if e.data.get("ha_user_id") == ha_user_id:
                     return e
             # User-bound match failed. If any entry HAS a ha_user_id tag,
-            # treat this as a "wrong user" 403 — never silently bridge.
+            # treat this as a "wrong user" 503 — never silently bridge.
             if any(e.data.get("ha_user_id") for e in loaded):
                 return None
 
