@@ -48,10 +48,8 @@ _LOVELACE_RESOURCES: tuple[dict[str, str], ...] = (
     },
 )
 
-# Sidebar panel identifiers — kept module-level so register/unregister
-# refer to the same names.
+# Sidebar panel path — kept module-level so register/unregister refer to the same name.
 PANEL_URL_PATH = "culiplan"
-LAUNCH_VIEW_URL = "/api/culiplan/launch"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -194,35 +192,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
-    """Register the launch view + iframe sidebar entry.
+    """Register the launch view + custom Lit panel.
 
-    Idempotent: HA's ``register_view`` accepts re-registration; the panel
-    registration raises ``ValueError`` on a duplicate path which we treat as
-    success.
+    Replaces the old built-in iframe panel: the iframe panel navigated the
+    top-level browser context to ``/api/culiplan/launch``, which never carried
+    the HA ``Authorization`` header, causing a 401.  The custom panel fetches
+    the endpoint via XHR (with the bearer token), receives a JSON redirect URL,
+    and sets the iframe src itself.
+
+    Idempotent: ``register_view`` accepts re-registration; ``async_register_panel_custom``
+    raises ``ValueError`` on a duplicate path which we treat as success.
     """
     # Imported lazily to avoid pulling the frontend module on integration
     # import (it pulls heavy dependencies that are not needed until setup).
-    from homeassistant.components.frontend import (
-        async_register_built_in_panel,
-    )
+    from homeassistant.components.frontend import async_register_panel_custom
 
-    # 1. HTTP view that issues the one-time SSO code and redirects to
-    #    culiplan.com/ha-bridge. ``register_view`` is idempotent — calling it
-    #    again replaces the existing route.
+    # 1. HTTP view that issues the one-time SSO code and returns JSON.
+    #    ``register_view`` is idempotent — calling it again replaces the existing route.
     hass.http.register_view(CuliplanLaunchView(hass))
 
-    # 2. iframe panel in the sidebar pointing at that view. HA's iframe panel
-    #    serves the URL inside an <iframe>; our launch view 302-redirects to
-    #    culiplan.com/ha-bridge so the iframe's final src is the web app.
+    # 2. Serve the panel JS from a dedicated static path so the file is
+    #    reachable at /culiplan_static/culiplan-panel.js.
+    #    cache_headers=False ensures the browser always gets the latest version
+    #    after an integration update without requiring a hard-refresh.
+    hass.http.register_static_path(
+        "/culiplan_static",
+        hass.config.path("custom_components/culiplan/frontend"),
+        cache_headers=False,
+    )
+
+    # 3. Register the custom Lit panel (web component) in the sidebar.
+    #    embed_iframe=False: we render the iframe ourselves inside the component.
+    #    trust_external=False: the panel JS is served from our static path.
     try:
-        async_register_built_in_panel(
+        async_register_panel_custom(
             hass,
-            component_name="iframe",
+            webcomponent_name="culiplan-panel",
+            frontend_url_path=PANEL_URL_PATH,
+            module_url="/culiplan_static/culiplan-panel.js",
             sidebar_title="Culiplan",
             sidebar_icon="mdi:silverware-fork-knife",
-            frontend_url_path=PANEL_URL_PATH,
-            config={"url": LAUNCH_VIEW_URL},
             require_admin=False,
+            embed_iframe=False,
+            trust_external=False,
         )
     except ValueError:
         # Panel already registered (HA reload / second config entry) — fine.
@@ -258,7 +270,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Register Culiplan Assist intents for the HA language."""
+    """Register Culiplan Assist intents for the HA language.
+
+    The YAML load is offloaded to the executor thread pool so the event loop
+    is never blocked by synchronous file I/O (fixes blocking-call warning on
+    HAOS 2025.11.0+).
+    """
     lang = hass.config.language.split("-")[0].lower()
     if lang not in ("en", "nl", "de", "fr", "es"):
         lang = "en"
@@ -267,27 +284,36 @@ def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if not intents_file.exists():
         intents_file = _INTENTS_DIR / "en.yaml"
 
-    try:
-        data = yaml.safe_load(intents_file.read_text(encoding="utf-8"))
-    except Exception as err:
-        _LOGGER.error("Failed to load Culiplan intents YAML: %s", err)
-        return
+    def _load_yaml_sync(path: Path) -> dict[str, Any]:
+        """Blocking helper — runs in the executor thread pool."""
+        return cast(
+            dict[str, Any], yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        )
 
-    intents_data = data.get("intents", {})
-    for intent_name in intents_data:
-        # Cooking-mode intents are handled by local HA service calls.
-        if intent_name in _COOKING_INTENT_TO_SERVICE:
-            handler = _make_cooking_intent_handler(intent_name, entry)
-        else:
-            handler = _make_intent_handler(intent_name, entry)
-        # async_register is idempotent (overwrites on reload).
-        intent.async_register(hass, handler)
+    async def _do_register(file_path: Path) -> None:
+        try:
+            data = await hass.async_add_executor_job(_load_yaml_sync, file_path)
+        except Exception as err:
+            _LOGGER.error("Failed to load Culiplan intents YAML: %s", err)
+            return
 
-    _LOGGER.debug(
-        "Registered %d Culiplan Assist intents (lang=%s)",
-        len(intents_data),
-        lang,
-    )
+        intents_data = data.get("intents", {})
+        for intent_name in intents_data:
+            # Cooking-mode intents are handled by local HA service calls.
+            if intent_name in _COOKING_INTENT_TO_SERVICE:
+                handler = _make_cooking_intent_handler(intent_name, entry)
+            else:
+                handler = _make_intent_handler(intent_name, entry)
+            # async_register is idempotent (overwrites on reload).
+            intent.async_register(hass, handler)
+
+        _LOGGER.debug(
+            "Registered %d Culiplan Assist intents (lang=%s)",
+            len(intents_data),
+            lang,
+        )
+
+    hass.async_create_task(_do_register(intents_file))
 
 
 def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentHandler:
