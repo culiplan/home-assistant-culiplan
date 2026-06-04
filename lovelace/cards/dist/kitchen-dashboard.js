@@ -1150,11 +1150,11 @@ var FlavorplanKitchenDashboard = class extends s4 {
     `;
   }
 };
-customElements.define("flavorplan-kitchen-dashboard", FlavorplanKitchenDashboard);
+customElements.define("culiplan-kitchen-dashboard", FlavorplanKitchenDashboard);
 window.customCards = window.customCards ?? [];
 window.customCards.push({
-  type: "flavorplan-kitchen-dashboard",
-  name: "Flavorplan Kitchen Dashboard",
+  type: "culiplan-kitchen-dashboard",
+  name: "Culiplan Kitchen Dashboard",
   description: "Today's meal plan with shopping list shortcut. Part of the Culiplan integration card pack.",
   preview: true,
   documentationURL: "https://github.com/culiplan/home-assistant-culiplan/tree/main/lovelace"

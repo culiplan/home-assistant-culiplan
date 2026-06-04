@@ -1424,6 +1424,6 @@ var FlavorplanCookingMode = class extends s4 {
     `;
   }
 };
-if (!customElements.get("flavorplan-cooking-mode")) {
-  customElements.define("flavorplan-cooking-mode", FlavorplanCookingMode);
+if (!customElements.get("culiplan-cooking-mode")) {
+  customElements.define("culiplan-cooking-mode", FlavorplanCookingMode);
 }

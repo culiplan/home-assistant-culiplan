@@ -1324,11 +1324,11 @@ var FlavorplanPantryTracker = class extends s4 {
     `;
   }
 };
-customElements.define("flavorplan-pantry-tracker", FlavorplanPantryTracker);
+customElements.define("culiplan-pantry-tracker", FlavorplanPantryTracker);
 window.customCards = window.customCards ?? [];
 window.customCards.push({
-  type: "flavorplan-pantry-tracker",
-  name: "Flavorplan Pantry Tracker",
+  type: "culiplan-pantry-tracker",
+  name: "Culiplan Pantry Tracker",
   description: "Track pantry stock levels with expiry warnings and low-stock indicators. Part of the Culiplan integration card pack.",
   preview: true,
   documentationURL: "https://github.com/culiplan/home-assistant-culiplan/tree/main/lovelace"

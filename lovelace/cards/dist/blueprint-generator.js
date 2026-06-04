@@ -1194,6 +1194,6 @@ __decorateElement(_init, 5, "_copied", __copied_dec, FlavorplanBlueprintGenerato
 __decorateElement(_init, 5, "_installed", __installed_dec, FlavorplanBlueprintGeneratorCard);
 __decoratorMetadata(_init, FlavorplanBlueprintGeneratorCard);
 customElements.define(
-  "flavorplan-blueprint-generator",
+  "culiplan-blueprint-generator",
   FlavorplanBlueprintGeneratorCard
 );
