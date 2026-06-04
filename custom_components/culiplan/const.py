@@ -25,6 +25,7 @@ OAUTH2_SCOPES: tuple[str, ...] = (
     "profile:read",
     "household:read",
     "subscription:read",
+    "energy:read",
     "ai:suggestions",
     "blueprints:generate",
     "openid",
