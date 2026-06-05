@@ -94,7 +94,9 @@
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_account%]",
       "oauth_error": "OAuth error: {error}",
-      "missing_configuration": "Integration not configured. Please configure it in the UI."
+      "missing_configuration": "Integration not configured. Please configure it in the UI.",
+      "wrong_account": "The Culiplan account you authenticated with does not match the account that needed re-configuration. Re-run the action from the same account, or remove the entry and add the new account fresh.",
+      "reconfigure_successful": "The Culiplan integration has been re-configured. Existing entities are preserved."
     }
   },
   "options": {

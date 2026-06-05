@@ -161,26 +161,137 @@ class OAuth2FlowHandler(
         return MealieOptionsFlow(config_entry)
 
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Handle successful OAuth completion; default to Cloud AI and proceed.
+        """Handle successful OAuth completion.
 
-        task-1626: The AI mode step is skipped on first run. Cloud AI is the
-        implicit default and is stored in entry.data. BYOK / Local AI are
-        available via OptionsFlow → Advanced AI settings.
+        Two paths:
+
+        - **New entry** (default): default AI mode to Cloud, set a stable
+          unique_id from the Culiplan account, then continue to the Mealie
+          import offer. task-1626: BYOK / Local AI are configured later via
+          OptionsFlow → Advanced AI settings.
+        - **Reconfigure** (Gold rule `reconfiguration-flow`): verify the
+          OAuth completed against the *same* Culiplan account as the entry
+          being reconfigured; if not, abort with `wrong_account`. On match,
+          update the existing entry's token + identity and reload.
 
         Captures the HA user id of whoever drove the OAuth flow into
         ``data["ha_user_id"]`` so the launch view can later distinguish
-        per-user Culiplan accounts on multi-user HA installs. The id comes
-        from HA's auth context; for flows started by a non-user (yaml
-        import, service call) it is left unset.
+        per-user Culiplan accounts on multi-user HA installs.
         """
         self._oauth_data = data
         ha_user_id = self.context.get("user_id")
         if ha_user_id:
             self._oauth_data["ha_user_id"] = ha_user_id
+
+        # Resolve a stable per-account identifier from the Culiplan API so
+        # both the new-entry and reconfigure paths can enforce account
+        # identity. Failure here is non-fatal for legacy entries — we fall
+        # back to letting HA assign a synthetic unique_id, matching the
+        # pre-Gold behaviour rather than locking the user out.
+        culiplan_account_id = await self._fetch_culiplan_account_id(data)
+
+        if self.source == config_entries.SOURCE_RECONFIGURE:
+            return await self._async_finish_reconfigure(data, culiplan_account_id)
+
+        if culiplan_account_id:
+            await self.async_set_unique_id(culiplan_account_id)
+            self._abort_if_unique_id_configured()
+
         # task-1626: Default to Cloud AI — skip the ai_provider step entirely.
         # Users who want BYOK / Local AI can reconfigure via OptionsFlow.
         self._entry_data = {**self._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
         return await self.async_step_mealie_offer()
+
+    async def _fetch_culiplan_account_id(
+        self, oauth_data: dict[str, Any]
+    ) -> str | None:
+        """Fetch the Culiplan account id via /api/users/me.
+
+        Returns ``None`` on any failure so that an OAuth-but-API-down case
+        doesn't break setup. The account id is used as ``ConfigEntry.unique_id``
+        to drive the Gold-tier `wrong_account` check on reconfigure.
+        """
+        try:
+            token = oauth_data.get("token", {})
+            access_token = token.get("access_token") if isinstance(token, dict) else None
+            if not access_token:
+                return None
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{BASE_URL}/api/users/me",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        return None
+                    me = await resp.json()
+                    user_id = me.get("id") if isinstance(me, dict) else None
+                    return str(user_id) if user_id else None
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning(
+                "[culiplan][oauth] Could not fetch Culiplan account id "
+                "for unique_id (continuing without): %s",
+                exc,
+            )
+            return None
+
+    async def _async_finish_reconfigure(
+        self,
+        data: dict[str, Any],
+        culiplan_account_id: str | None,
+    ) -> dict[str, Any]:
+        """Apply a reconfigure result to the existing entry.
+
+        Implements the Gold rule `reconfiguration-flow`. Compares the freshly
+        OAuth'd Culiplan account to the existing entry's unique_id; mismatch
+        aborts with `wrong_account` (HA 2024.10 lacks
+        `_abort_if_unique_id_mismatch`, so this is the manual equivalent).
+
+        On match, replaces the OAuth tokens on the entry, preserves the
+        previously-chosen AI mode / Mealie state, and triggers a reload.
+        """
+        entry_id = self.context.get("entry_id")
+        existing = (
+            self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
+        )
+
+        if existing and culiplan_account_id and existing.unique_id:
+            if existing.unique_id != culiplan_account_id:
+                return cast(_FlowResult, self.async_abort(reason="wrong_account"))
+
+        # Adopt the new unique_id on entries that pre-date this check.
+        if culiplan_account_id:
+            await self.async_set_unique_id(culiplan_account_id)
+
+        # Preserve everything the user already configured (AI mode, BYOK
+        # provider, Mealie job id, etc); replace just the OAuth identity.
+        merged_data = {**(existing.data if existing else {}), **data}
+        ha_user_id = self.context.get("user_id")
+        if ha_user_id:
+            merged_data["ha_user_id"] = ha_user_id
+
+        if existing is None:
+            # Defensive: reconfigure with no target entry should never happen
+            # in practice, but fall back to creating a new entry rather than
+            # silently dropping the OAuth result.
+            self._entry_data = {**data, CONF_AI_MODE: AI_MODE_CLOUD}
+            return await self.async_step_mealie_offer()
+
+        return cast(
+            _FlowResult,
+            self.async_update_reload_and_abort(existing, data=merged_data),
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Entry point for the Settings → ⋮ → Reconfigure action.
+
+        Re-runs OAuth with the same scopes; on completion,
+        ``_async_finish_reconfigure`` enforces same-account identity and
+        replaces the entry's tokens.
+        """
+        return cast(_FlowResult, await self.async_step_user())
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: ai_provider
