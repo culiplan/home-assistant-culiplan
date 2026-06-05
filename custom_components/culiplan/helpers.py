@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import DOMAIN
 
@@ -33,7 +33,7 @@ def _build_device_info(entry: ConfigEntry) -> DeviceInfo:
         model="Meal Planner",
         sw_version=sw_version,
         configuration_url="https://culiplan.com",
-        entry_type="service",
+        entry_type=DeviceEntryType.SERVICE,
     )
 
 

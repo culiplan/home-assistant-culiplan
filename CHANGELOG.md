@@ -2,6 +2,24 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-06-05
+
+Phase B of the Gold → Platinum (Diamant) roadmap. All four Platinum-tier
+HA quality-scale rules now claimable. Compliance-only refactor — no
+behaviour change. `manifest.json` `quality_scale` advanced from `gold`
+to `platinum`.
+
+### Changed
+
+- **`inject-websession` (Platinum).** Every remaining `aiohttp.ClientSession()` constructor across the integration removed; all HTTP calls now route through `homeassistant.helpers.aiohttp_client.async_get_clientsession(hass)` so HA owns the connection pool and DNS resolution centrally. Migrated call sites: `config_flow._fetch_culiplan_account_id`, `config_flow._call_migrate_preview`, `config_flow._call_migrate_start`, `MealieOptionsFlow.async_step_mealie_rollback`, and the LAN-probe helpers `ai.local_ai.probe_local_ai_endpoints` + `probe_custom_endpoint` (which now take `hass` as their first argument). `grep -rn 'aiohttp\.ClientSession()' custom_components/culiplan/` returns zero matches.
+- **`strict-typing` (Platinum).** `mypy --strict` now passes against the integration's own code with **zero entries in `pyproject.toml [tool.mypy] disable_error_code`** — reduced from 8 globally-suppressed error codes in v0.3.0 (`misc`, `type-arg`, `untyped-decorator`, `assignment`, `call-arg`, `import-untyped`, `unused-ignore`, `no-untyped-def`) to none. Remaining stub-gap silences are localized per-line with explanatory comments (4× `untyped-decorator` on python-socketio handlers, 3× `attr-defined` on lagging HA component re-exports, 2× `override` on `dict[str, Any]` config-flow returns kept for HA 2024.10 floor, 1× `call-arg` on `DataUpdateCoordinator config_entry` for the same reason, 1× `misc,assignment` on the `_HomeAssistantError` ImportError fallback). Pre-existing errors at `launch_view.py:38` (HomeAssistantView re-export) and `__init__.py:339` (redundant cast) resolved; ~8 unused `# type: ignore[arg-type]` / `[import]` comments in `ai/dispatchers.py` + `ai/key_store.py` deleted.
+- **`async-dependency` (Platinum).** Audited all four PyPI-pinned runtime deps. The integration uses the async client variants throughout — `AsyncOpenAI`, `AsyncAnthropic`, `genai.Client.aio.*`, and `socketio.AsyncClient`. No sync `OpenAI()` / `Anthropic()` / `socketio.Client()` constructor exists in the codebase. Status flipped from `todo` to `done` in `quality_scale.yaml` with the per-dep mapping documented.
+- **`entity-event-setup` (Platinum).** Re-verified for v0.3.1: all entity classes (sensor, binary_sensor, calendar, todo) inherit `CoordinatorEntity`, which handles the coordinator subscription lifecycle automatically. No entity subscribes to extra HA bus events, Socket.IO events, or any other external signal source, so no manual `async_on_remove` wiring is required. `quality_scale.yaml` comment expanded to record the verification.
+
+### Documentation
+
+- Roadmap: `backlog/docs/ha-integration-gold-platinum-roadmap-2026-06-05.md` (Phase B, B1–B5).
+
 ## [0.3.0] — 2026-06-05
 
 ### Added

@@ -35,7 +35,7 @@ import logging
 from typing import Any
 
 from aiohttp import ClientTimeout, web
-from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http import HomeAssistantView  # type: ignore[attr-defined]
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow

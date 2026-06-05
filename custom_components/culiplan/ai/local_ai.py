@@ -25,8 +25,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import aiohttp
+from homeassistant.helpers import aiohttp_client
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -177,6 +182,7 @@ async def _probe_lmstudio(
 
 
 async def probe_local_ai_endpoints(
+    hass: HomeAssistant,
     extra_hosts: list[tuple[str, int, str]] | None = None,
 ) -> list[LocalAIEndpoint]:
     """
@@ -204,15 +210,17 @@ async def probe_local_ai_endpoints(
 
     detected: list[LocalAIEndpoint] = []
 
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for host, port, provider in probe_targets:
-            if provider == "ollama":
-                tasks.append(_probe_ollama(host, port, session))
-            else:
-                tasks.append(_probe_lmstudio(host, port, session))
+    # Platinum rule `inject-websession`: route through HA's shared aiohttp
+    # session even for localhost probes so HA can manage the connection pool.
+    session = aiohttp_client.async_get_clientsession(hass)
+    tasks = []
+    for host, port, provider in probe_targets:
+        if provider == "ollama":
+            tasks.append(_probe_ollama(host, port, session))
+        else:
+            tasks.append(_probe_lmstudio(host, port, session))
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
     for result in results:
         if isinstance(result, LocalAIEndpoint):
@@ -227,6 +235,7 @@ async def probe_local_ai_endpoints(
 
 
 async def probe_custom_endpoint(
+    hass: HomeAssistant,
     host: str,
     port: int,
     provider: str,
@@ -235,6 +244,7 @@ async def probe_custom_endpoint(
     Probe a user-specified custom endpoint (AC#4: manual entry path).
 
     Args:
+        hass:     Home Assistant instance (for the shared aiohttp session).
         host:     Hostname or IP (e.g. "192.168.1.50").
         port:     Port number.
         provider: "ollama" or "lmstudio".
@@ -242,7 +252,9 @@ async def probe_custom_endpoint(
     Returns:
         LocalAIEndpoint if reachable, None otherwise.
     """
-    async with aiohttp.ClientSession() as session:
-        if provider == "ollama":
-            return await _probe_ollama(host, port, session)
-        return await _probe_lmstudio(host, port, session)
+    # Platinum rule `inject-websession`: route through HA's shared aiohttp
+    # session even for LAN probes so HA can manage the connection pool.
+    session = aiohttp_client.async_get_clientsession(hass)
+    if provider == "ollama":
+        return await _probe_ollama(host, port, session)
+    return await _probe_lmstudio(host, port, session)

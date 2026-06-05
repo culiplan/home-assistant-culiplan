@@ -1,7 +1,8 @@
 # pyproject.toml — Python tooling configuration for home-assistant-culiplan
 #
 # Coverage: task-1502 (Silver/Gold) — enforces ≥95% coverage gate.
-# Mypy:     task-1503 (Gold)        — strict static typing with py.typed marker.
+# Mypy:     task-1503 (Gold) + Platinum `strict-typing` (v0.3.1) — strict
+#           static typing with py.typed marker and zero blanket suppressions.
 
 [tool.coverage.run]
 source = ["custom_components/culiplan"]
@@ -29,34 +30,33 @@ exclude_lines = [
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
-# HA type stubs are incomplete in many places — suppress the most common
-# patterns rather than sprinkling ignores throughout the code.
-# See task-1503 for rationale.
+# Platinum rule `strict-typing` (v0.3.1):
+#
+# The global `disable_error_code` list is empty — `mypy --strict` passes
+# against the integration's own code with no blanket suppressions.
+# Reduced from 8 globally-disabled error codes in v0.3.0 to 0.
+#
+# Localized stub gaps are silenced per-line with explanatory comments:
+#   - `# type: ignore[untyped-decorator]` on the four python-socketio
+#     @sio.event / @sio.on handlers in coordinator.py.
+#   - `# type: ignore[attr-defined]` on three HA stub re-exports
+#     (HomeAssistantView from .components.http, TodoItemStatus /
+#     TodoListEntityFeature from .components.todo, EntityCategory from
+#     .helpers.entity) — runtime exports are correct, the stubs lag.
+#   - `# type: ignore[override]` on two ConfigFlowResult vs dict[str, Any]
+#     return-type drifts on config_flow.async_step_user / async_oauth_create_entry;
+#     kept loose for HA 2024.10 floor compatibility.
+#   - `# type: ignore[call-arg]` on the DataUpdateCoordinator `config_entry`
+#     kwarg in coordinator.py (added in HA 2025.5, gracefully degraded for
+#     2024.10 via TypeError fallback).
+#   - `# type: ignore[misc,assignment]` on the ImportError fallback in
+#     ai/types.py that re-binds `_HomeAssistantError` to Exception.
+#
+# `warn_return_any` stays disabled because HA's coordinator/entity helpers
+# return Any in many places and tightening would force every accessor
+# through cast() with no payoff.
 warn_return_any = false
-# All HA base classes (CoordinatorEntity, CalendarEntity, TodoListEntity,
-# SensorEntity, BinarySensorEntity, IntentHandler, etc.) are typed "Any"
-# in the installed stubs without py.typed, producing spurious errors on
-# every subclass definition.  All 40 residual errors at task-1503 ship time
-# trace back to HA stub incompleteness, not to our own code.
-# Suppress globally rather than sprinkling # type: ignore[misc] on every line.
-# [misc] = subclassing untyped HA base classes
-# [type-arg] = asyncio.Task missing params (HA coordinator pattern)
-# [untyped-decorator] = socketio @sio.event decorator has no stubs
-# [assignment] = HA response types return Any (narrow cast not worth it)
-# [call-arg] = HA AbstractOAuth2FlowHandler metaclass kwargs
-# [import-untyped] = yaml (types-PyYAML not in CI; add when pinning stubs)
-# [unused-ignore] = mypy version skew between dev and CI
-# [no-untyped-def] = HA dynamic callback signatures (socketio event handlers)
-disable_error_code = [
-    "misc",
-    "type-arg",
-    "untyped-decorator",
-    "assignment",
-    "call-arg",
-    "import-untyped",
-    "unused-ignore",
-    "no-untyped-def",
-]
+disable_error_code = []
 
 [[tool.mypy.overrides]]
 # socket.io and its engine.io dependency ship no py.typed or stubs.

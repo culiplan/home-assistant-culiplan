@@ -336,11 +336,8 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = cast(
-        bool,
-        await hass.config_entries.async_unload_platforms(
-            entry, [Platform(p) for p in PLATFORMS]
-        ),
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry, [Platform(p) for p in PLATFORMS]
     )
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)

@@ -151,7 +151,7 @@ def setup_debug_log_purge(hass: "HomeAssistant") -> None:
 
     config_dir = hass.config.config_dir
 
-    def _purge_callback(now: datetime) -> None:  # type: ignore[type-arg]
+    def _purge_callback(now: datetime) -> None:
         """Periodic callback to purge old debug logs."""
         deleted = purge_old_debug_logs(config_dir)
         if deleted:

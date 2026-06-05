@@ -241,8 +241,8 @@ class OpenAICompatibleDispatcher:
 
                 return await self._client.chat.completions.create(
                     model=envelope.model,
-                    messages=messages,  # type: ignore[arg-type]
-                    tools=tools if tools else None,  # type: ignore[arg-type]
+                    messages=messages,
+                    tools=tools if tools else None,
                     tool_choice="auto" if tools else None,
                 )
             except APIStatusError as exc:
@@ -400,8 +400,8 @@ class AnthropicDispatcher:
                     model=envelope.model,
                     max_tokens=2048,
                     system=system_content or "",
-                    messages=conversation,  # type: ignore[arg-type]
-                    tools=tools if tools else [],  # type: ignore[arg-type]
+                    messages=conversation,
+                    tools=tools if tools else [],
                 )
             except APIStatusError as exc:
                 _LOGGER.error(
@@ -470,7 +470,7 @@ class GoogleDispatcher:
             debug:      If True, log prompt content (client-side only, 24h TTL).
             config_dir: HA config directory for debug log files (task-1410).
         """
-        from google import genai  # type: ignore[import]
+        from google import genai
 
         self._client = genai.Client(api_key=api_key)
         self._debug = debug
@@ -484,7 +484,7 @@ class GoogleDispatcher:
         tool_results: list[ToolResult] | None = None,
     ) -> DispatchResult:
         """Execute a single Google Gemini provider turn."""
-        from google.genai import types as genai_types  # type: ignore[import]
+        from google.genai import types as genai_types
 
         # Build system instruction from system messages
         system_parts: list[str] = [
@@ -539,14 +539,12 @@ class GoogleDispatcher:
                     config_kwargs["system_instruction"] = system_instruction
                 if function_declarations:
                     config_kwargs["tools"] = [
-                        genai_types.Tool(
-                            function_declarations=function_declarations  # type: ignore[arg-type]
-                        )
+                        genai_types.Tool(function_declarations=function_declarations)
                     ]
 
                 return await self._client.aio.models.generate_content(
                     model=envelope.model,
-                    contents=contents,  # type: ignore[arg-type]
+                    contents=contents,
                     config=genai_types.GenerateContentConfig(**config_kwargs)
                     if config_kwargs
                     else None,

@@ -114,10 +114,11 @@ async def _get_active_session(
         ) from exc
 
     # The backend returns either a list or {sessions: [...]}
+    items: list[Any]
     if isinstance(sessions, list):
         items = sessions
     elif isinstance(sessions, dict):
-        items = sessions.get("sessions", sessions.get("data", []))
+        items = sessions.get("sessions", sessions.get("data", [])) or []
     else:
         items = []
 
@@ -443,10 +444,11 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
                 translation_placeholders={"error": str(exc)},
             ) from exc
 
+        items: list[Any]
         if isinstance(sessions, list):
             items = sessions
         elif isinstance(sessions, dict):
-            items = sessions.get("sessions", sessions.get("data", []))
+            items = sessions.get("sessions", sessions.get("data", [])) or []
         else:
             items = []
 

@@ -107,7 +107,7 @@ class TestProbeLocalAIEndpoints:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            detected = await probe_local_ai_endpoints()
+            detected = await probe_local_ai_endpoints(MagicMock())
 
         assert len(detected) == 1
         ep = detected[0]
@@ -141,7 +141,7 @@ class TestProbeLocalAIEndpoints:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            detected = await probe_local_ai_endpoints()
+            detected = await probe_local_ai_endpoints(MagicMock())
 
         assert len(detected) == 1
         ep = detected[0]
@@ -165,7 +165,7 @@ class TestProbeLocalAIEndpoints:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            detected = await probe_local_ai_endpoints()
+            detected = await probe_local_ai_endpoints(MagicMock())
 
         assert detected == []
 
@@ -185,7 +185,7 @@ class TestProbeLocalAIEndpoints:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            detected = await probe_local_ai_endpoints()
+            detected = await probe_local_ai_endpoints(MagicMock())
 
         # Should not raise, just return empty
         assert detected == []
@@ -214,7 +214,7 @@ class TestProbeLocalAIEndpoints:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            detected = await probe_local_ai_endpoints()
+            detected = await probe_local_ai_endpoints(MagicMock())
 
         assert len(detected) == 2
         providers = {ep.provider for ep in detected}
@@ -245,7 +245,7 @@ class TestProbeCustomEndpoint:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            ep = await probe_custom_endpoint("192.168.1.50", 11434, "ollama")
+            ep = await probe_custom_endpoint(MagicMock(), "192.168.1.50", 11434, "ollama")
 
         assert ep is not None
         assert ep.host == "192.168.1.50"
@@ -264,7 +264,7 @@ class TestProbeCustomEndpoint:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            ep = await probe_custom_endpoint("192.168.99.99", 11434, "ollama")
+            ep = await probe_custom_endpoint(MagicMock(), "192.168.99.99", 11434, "ollama")
 
         assert ep is None
 
@@ -311,7 +311,7 @@ async def test_probe_makes_no_external_calls():
             async def __aexit__(self, *a: Any) -> None: pass
 
         with patch("custom_components.culiplan.ai.local_ai.aiohttp.ClientSession", _Session):
-            return await probe_local_ai_endpoints()
+            return await probe_local_ai_endpoints(MagicMock())
 
     await capturing_probe()
 

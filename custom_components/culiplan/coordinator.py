@@ -48,14 +48,14 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER,
                 name=DOMAIN,
                 update_interval=None,
-                config_entry=entry,
+                config_entry=entry,  # type: ignore[call-arg]
             )
         except TypeError:
             super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
         self.client = client
         self.entry = entry
         self._sio: socketio.AsyncClient | None = None
-        self._reconnect_task: asyncio.Task | None = None
+        self._reconnect_task: asyncio.Task[None] | None = None
         self._connected = False
         self._miss_count = 0
         self._stopped = (
@@ -142,14 +142,18 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._sio = sio
 
-        @sio.event(namespace=HA_NAMESPACE)
+        # python-socketio's @AsyncClient.event / .on decorators are untyped in
+        # the installed stubs (the library ships no py.typed). Per-line ignore
+        # keeps the strict-mode check on for the rest of this module while
+        # acknowledging the upstream gap explicitly.
+        @sio.event(namespace=HA_NAMESPACE)  # type: ignore[untyped-decorator]
         async def connect() -> None:
             _LOGGER.info("Connected to Culiplan /ha-events")
             self._connected = True
             self._miss_count = 0
             await self.async_refresh()
 
-        @sio.event(namespace=HA_NAMESPACE)
+        @sio.event(namespace=HA_NAMESPACE)  # type: ignore[untyped-decorator]
         async def disconnect(reason: str | None = None) -> None:
             _LOGGER.warning("Disconnected from Culiplan /ha-events: %s", reason)
             self._connected = False
@@ -159,11 +163,11 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.async_update_listeners()
             self._schedule_reconnect()
 
-        @sio.on(HA_EVENT, namespace=HA_NAMESPACE)
+        @sio.on(HA_EVENT, namespace=HA_NAMESPACE)  # type: ignore[untyped-decorator]
         async def on_ha_event(payload: dict[str, Any]) -> None:
             await self._handle_event(payload)
 
-        @sio.on(HA_ERROR, namespace=HA_NAMESPACE)
+        @sio.on(HA_ERROR, namespace=HA_NAMESPACE)  # type: ignore[untyped-decorator]
         async def on_ha_error(payload: dict[str, Any]) -> None:
             _LOGGER.warning("HA gateway error: %s", payload.get("message"))
 
@@ -244,10 +248,11 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             sessions = await self.client.async_get(
                 "/api/cooking-sessions?status=active&limit=1"
             )
+            items: list[Any]
             if isinstance(sessions, list):
                 items = sessions
             elif isinstance(sessions, dict):
-                items = sessions.get("sessions", sessions.get("data", []))
+                items = sessions.get("sessions", sessions.get("data", [])) or []
             else:
                 items = []
 

@@ -23,6 +23,7 @@ Validation contract (§13.6):
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -47,7 +48,7 @@ class BYOKKeyStore:
     """
 
     def __init__(self, hass: HomeAssistant) -> None:
-        self._store: Store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
+        self._store: Store[dict[str, Any]] = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
         self._data: dict[str, str] = {}
 
     async def async_load(self) -> None:
@@ -163,7 +164,7 @@ async def validate_google_key(api_key: str) -> bool:
     Raises ProviderAuthError if the key is invalid.
     """
     try:
-        from google import genai  # type: ignore[import]
+        from google import genai
 
         client = genai.Client(api_key=api_key)
         # List models — free, no token consumption

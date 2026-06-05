@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow
 from homeassistant.helpers.selector import (
     BooleanSelector,
     NumberSelector,
@@ -154,10 +154,16 @@ class OAuth2FlowHandler(
     def logger(self) -> logging.Logger:
         return _LOGGER
 
-    async def async_step_user(
+    async def async_step_user(  # type: ignore[override]
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Ensure the built-in OAuth credential is registered, then start OAuth.
+
+        Note: HA's ConfigFlowResult TypedDict was introduced in 2024.x; we keep
+        the loose `dict[str, Any]` return type for HA 2024.10 compatibility per
+        the integration's supported-version range. Once the floor is raised to
+        2025.x the return type can be tightened to ConfigFlowResult and the
+        override ignore removed.
 
         HA only invokes the integration's ``async_setup`` when an entry
         already exists OR when configuration.yaml references the domain.
@@ -202,7 +208,9 @@ class OAuth2FlowHandler(
         """
         return MealieOptionsFlow()
 
-    async def async_oauth_create_entry(self, data: dict[str, Any]) -> dict[str, Any]:
+    async def async_oauth_create_entry(  # type: ignore[override]
+        self, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle successful OAuth completion.
 
         Two paths:
@@ -258,17 +266,19 @@ class OAuth2FlowHandler(
             access_token = token.get("access_token") if isinstance(token, dict) else None
             if not access_token:
                 return None
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{BASE_URL}/api/users/me",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status != 200:
-                        return None
-                    me = await resp.json()
-                    user_id = me.get("id") if isinstance(me, dict) else None
-                    return str(user_id) if user_id else None
+            # Platinum rule `inject-websession`: use HA's shared aiohttp session
+            # so HA can manage connection pooling and DNS resolution centrally.
+            session = aiohttp_client.async_get_clientsession(self.hass)
+            async with session.get(
+                f"{BASE_URL}/api/users/me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                me = await resp.json()
+                user_id = me.get("id") if isinstance(me, dict) else None
+                return str(user_id) if user_id else None
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning(
                 "[culiplan][oauth] Could not fetch Culiplan account id "
@@ -333,7 +343,7 @@ class OAuth2FlowHandler(
         ``_async_finish_reconfigure`` enforces same-account identity and
         replaces the entry's tokens.
         """
-        return cast(_FlowResult, await self.async_step_user())
+        return await self.async_step_user()
 
     # ──────────────────────────────────────────────────────────────────────────
     # Step: ai_provider
@@ -468,7 +478,9 @@ class OAuth2FlowHandler(
                     _host, _port_str = _parse_local_endpoint(local_endpoint)
                     _port = int(_port_str)
                     provider_hint = "lmstudio" if _port == 1234 else "ollama"
-                    probed = await probe_custom_endpoint(_host, _port, provider_hint)
+                    probed = await probe_custom_endpoint(
+                        self.hass, _host, _port, provider_hint
+                    )
                     if probed is None:
                         errors[CONF_LOCAL_ENDPOINT] = "local_endpoint_unreachable"
                     elif local_model and not model_supports_function_calling(
@@ -787,7 +799,7 @@ class OAuth2FlowHandler(
         """Confirm re-authentication."""
         if user_input is None:
             return cast(_FlowResult, self.async_show_form(step_id="reauth_confirm"))
-        return cast(_FlowResult, await self.async_step_user())
+        return await self.async_step_user()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -857,7 +869,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                     "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
                 }
                 # Probe local endpoints before entering Advanced AI step
-                self._detected_endpoints = await probe_local_ai_endpoints()
+                self._detected_endpoints = await probe_local_ai_endpoints(self.hass)
                 return await self.async_step_advanced_ai()
             # No Advanced AI: persist the General/Pantry/Advanced fields.
             options_data = {
@@ -1099,7 +1111,9 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                     _host, _port_str = _parse_local_endpoint(local_endpoint)
                     _port = int(_port_str)
                     provider_hint = "lmstudio" if _port == 1234 else "ollama"
-                    probed = await probe_custom_endpoint(_host, _port, provider_hint)
+                    probed = await probe_custom_endpoint(
+                        self.hass, _host, _port, provider_hint
+                    )
                     if probed is None:
                         errors[CONF_LOCAL_ENDPOINT] = "local_endpoint_unreachable"
                     else:
@@ -1230,16 +1244,18 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             # NOTE: CuliplanApiClient(session, access_token) — the variable was
             # unused here; the actual DELETE is made via raw aiohttp below.
             # Removed to avoid TypeError (B2 from E2E review).
-            async with aiohttp.ClientSession() as session:
-                async with session.delete(
-                    f"{BASE_URL}/api/migrate/mealie",
-                    headers={
-                        "Authorization": f"Bearer {self.config_entry.data.get('access_token', '')}",
-                    },
-                    json={"jobId": job_id},
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    resp.raise_for_status()
+            #
+            # Platinum rule `inject-websession`: use HA's shared aiohttp session.
+            session = aiohttp_client.async_get_clientsession(self.hass)
+            async with session.delete(
+                f"{BASE_URL}/api/migrate/mealie",
+                headers={
+                    "Authorization": f"Bearer {self.config_entry.data.get('access_token', '')}",
+                },
+                json={"jobId": job_id},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                resp.raise_for_status()
 
             _LOGGER.info("[culiplan][mealie] Rollback succeeded for jobId=%s", job_id)
             return cast(_FlowResult, self.async_abort(reason="rollback_complete"))
@@ -1289,17 +1305,20 @@ async def _call_migrate_preview(
     """Call POST /api/migrate/mealie/preview via Culiplan backend.
 
     Returns a dict with keys: willImport, willFlag, willSkip, sampleTitles.
+
+    Platinum rule `inject-websession`: routes through HA's shared aiohttp
+    session via the `hass` parameter so HA controls the connection pool.
     """
     access_token = entry_data.get("access_token", "")
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{BASE_URL}/api/migrate/mealie/preview",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
-            timeout=aiohttp.ClientTimeout(total=30),
-        ) as resp:
-            resp.raise_for_status()
-            return cast(dict[str, Any], await resp.json())
+    session = aiohttp_client.async_get_clientsession(hass)
+    async with session.post(
+        f"{BASE_URL}/api/migrate/mealie/preview",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
+        timeout=aiohttp.ClientTimeout(total=30),
+    ) as resp:
+        resp.raise_for_status()
+        return cast(dict[str, Any], await resp.json())
 
 
 async def _call_migrate_start(
@@ -1311,14 +1330,17 @@ async def _call_migrate_start(
     """Call POST /api/migrate/mealie to start the import job.
 
     Returns a dict with keys: jobId, errors.
+
+    Platinum rule `inject-websession`: routes through HA's shared aiohttp
+    session via the `hass` parameter so HA controls the connection pool.
     """
     access_token = entry_data.get("access_token", "")
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{BASE_URL}/api/migrate/mealie",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
-            timeout=aiohttp.ClientTimeout(total=120),
-        ) as resp:
-            resp.raise_for_status()
-            return cast(dict[str, Any], await resp.json())
+    session = aiohttp_client.async_get_clientsession(hass)
+    async with session.post(
+        f"{BASE_URL}/api/migrate/mealie",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"mealieUrl": mealie_url, "mealieToken": mealie_token},
+        timeout=aiohttp.ClientTimeout(total=120),
+    ) as resp:
+        resp.raise_for_status()
+        return cast(dict[str, Any], await resp.json())

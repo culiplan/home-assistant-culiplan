@@ -68,8 +68,13 @@ rules:
   entity-event-setup:
     status: done
     comment: |
-      Entities use CoordinatorEntity, which subscribes / unsubscribes via
-      async_added_to_hass / async_will_remove_from_hass automatically.
+      All entity classes (sensor, binary_sensor, calendar, todo) inherit
+      from CoordinatorEntity which handles the coordinator subscription
+      lifecycle automatically (subscribe in async_added_to_hass, unsubscribe
+      via async_on_remove during async_will_remove_from_hass).
+      Re-verified for v0.3.1: zero entities subscribe to extra HA bus events,
+      Socket.IO events, or any other external signal source, so no manual
+      async_on_remove wiring is required.
   entity-unique-id:
     status: done
     comment: |
@@ -280,20 +285,52 @@ rules:
 
   # ─── Platinum ──────────────────────────────────────────────────────────────
   async-dependency:
-    status: todo
+    status: done
     comment: |
-      openai / anthropic / google-genai expose async clients; python-socketio
-      uses asyncio. Pending audit of sync hot paths (e.g. manifest version
-      read at module load) for v0.3.0.
+      All four PyPI-pinned runtime deps are async-compatible and the
+      integration uses their Async* client variants throughout:
+        * openai>=1.77.0       → AsyncOpenAI         (ai/dispatchers.py, ai/key_store.py)
+        * anthropic>=0.49.0    → AsyncAnthropic      (ai/dispatchers.py, ai/key_store.py)
+        * google-genai>=1.12.0 → genai.Client.aio.*  (ai/dispatchers.py, ai/key_store.py)
+        * python-socketio>=5.12.0 → socketio.AsyncClient (coordinator.py)
+      No sync OpenAI() / Anthropic() / socketio.Client() constructor
+      survives anywhere in the codebase.
   inject-websession:
-    status: todo
+    status: done
     comment: |
-      coordinator.py and api.py build their own ClientSession; Mealie
-      helpers also create sessions directly. Will route through
-      homeassistant.helpers.aiohttp_client.async_get_clientsession in v0.3.0.
+      All aiohttp.ClientSession() constructions removed in v0.3.1. Every
+      HTTP call routes through aiohttp_client.async_get_clientsession(hass):
+        * api.py / coordinator.py     — main Culiplan API client (since v0.2.x)
+        * launch_view.py              — SSO exchange (since v0.2.x)
+        * config_flow.py              — _fetch_culiplan_account_id, Mealie
+                                        preview, Mealie migrate, Mealie
+                                        rollback (migrated in v0.3.1)
+        * ai/local_ai.py              — Ollama / LM Studio probes (migrated
+                                        in v0.3.1; module-level probe
+                                        helpers now take `hass`)
+      `grep -rn 'aiohttp\.ClientSession()' custom_components/culiplan/`
+      returns no matches.
   strict-typing:
-    status: todo
+    status: done
     comment: |
-      pyproject.toml runs mypy --strict but several modules carry
-      pre-existing "Redundant cast" / "Return type mismatch" drift.
-      Targeted for cleanup in v0.3.0.
+      `mypy --strict custom_components/culiplan/` passes with ZERO entries
+      in pyproject.toml `[tool.mypy] disable_error_code` (reduced from 8
+      blanket suppressions in v0.3.0 — misc, type-arg, untyped-decorator,
+      assignment, call-arg, import-untyped, unused-ignore, no-untyped-def).
+      Remaining stub-gap suppressions are LOCALIZED per-line with comments:
+        * 4× `# type: ignore[untyped-decorator]` on coordinator.py
+          @sio.event / @sio.on handlers (python-socketio ships no typed stubs).
+        * 3× `# type: ignore[attr-defined]` on HA component re-exports
+          that lag the stubs (HomeAssistantView, TodoItemStatus /
+          TodoListEntityFeature, EntityCategory).
+        * 2× `# type: ignore[override]` on config_flow.async_step_user /
+          async_oauth_create_entry — kept loose `dict[str, Any]` return
+          type for HA 2024.10 compatibility (will tighten to ConfigFlowResult
+          once that becomes the floor).
+        * 1× `# type: ignore[call-arg]` on coordinator.py DataUpdateCoordinator
+          `config_entry` kwarg (added in HA 2025.5; gracefully falls back
+          via TypeError catch for 2024.10).
+        * 1× `# type: ignore[misc,assignment]` on ai/types.py ImportError
+          fallback that rebinds `_HomeAssistantError = Exception`.
+      Pre-existing `launch_view.py:38` (HomeAssistantView re-export) and
+      `__init__.py:339` (redundant cast) errors are resolved.
