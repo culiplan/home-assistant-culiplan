@@ -137,6 +137,14 @@ class CuliplanLaunchView(HomeAssistantView):
         # The code is placed in the fragment (#) so it is never sent to a
         # server and never appears in access logs.  We do NOT log redirect_url
         # because the fragment contains the secret code.
+        #
+        # ?embed=ha is a server-readable hint to the web app that it is being
+        # rendered inside the HA iframe panel.  The front-end uses it (plus
+        # window.self !== window.top) to enable "embed mode" — hiding its own
+        # sidebar, logo, greeting, and account block to avoid duplicating
+        # chrome that HA's own UI already shows.  Not sensitive; safe in the
+        # query string.  The fragment stays the LAST component so the
+        # one-time code remains in the URL hash (never sent to a server).
         import json
 
         return web.Response(
@@ -144,7 +152,7 @@ class CuliplanLaunchView(HomeAssistantView):
             content_type="application/json",
             text=json.dumps(
                 {
-                    "redirect_url": f"{WEB_URL}/ha-bridge#{code}",
+                    "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha#{code}",
                     "expires_in": _SSO_CODE_EXPIRES_IN,
                 }
             ),
