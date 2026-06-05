@@ -19,3 +19,6 @@ htmlcov/
 node_modules/
 pnpm-debug.log
 .pnpm-store/
+
+# macOS
+.DS_Store
