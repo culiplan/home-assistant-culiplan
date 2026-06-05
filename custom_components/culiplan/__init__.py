@@ -31,6 +31,7 @@ from .cooking_services import (
     async_unregister_cooking_services,
 )
 from .launch_view import CuliplanLaunchView
+from .llm_api import async_register_llm_api, async_unregister_llm_api
 from .services import async_register_services, async_unregister_services
 
 
@@ -244,11 +245,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await _register_intents(hass, entry)
     async_register_services(hass)
     async_register_cooking_services(hass)
+    # Phase C (v0.3.0): expose Culiplan tools to any HA Conversation Agent
+    # via the official llm.async_register_api() mechanism. Non-fatal if the
+    # LLM helper is unavailable on older HA versions.
+    async_register_llm_api(hass)
     await _async_register_lovelace_resources(hass)
     await _async_register_sidebar_panel(hass)
     entry.async_on_unload(coordinator.async_stop)
     entry.async_on_unload(lambda: async_unregister_services(hass))
     entry.async_on_unload(lambda: async_unregister_cooking_services(hass))
+    entry.async_on_unload(lambda: async_unregister_llm_api(hass))
     # Reload the entry whenever OptionsFlow saves so the new ai_mode / pantry
     # windows / debug toggle take effect without requiring the user to
     # disable+enable the integration. Equivalent to OptionsFlowWithReload

@@ -2,6 +2,18 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-05
+
+### Added
+
+- **`llm.API` registration — Culiplan tools available to any HA Conversation Agent.** New module `custom_components/culiplan/llm_api.py` registers Culiplan with HA's official LLM helper (`homeassistant.helpers.llm.async_register_api`). Any user who already has an HA Conversation Agent configured (OpenAI / Anthropic / Google / Ollama / HA Voice Preview) can now select "Culiplan" under the agent's "Control Home Assistant" dropdown and the LLM gets six Culiplan tools natively — no Culiplan BYOK setup required for users who only want the LLM tools surface. Tools shipped: `get_meal_plan` (date-range optional), `suggest_meal` (routes through the existing AI dispatcher so Premium gating and BYOK key resolution are preserved), `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items` (expiring-within-days filter). All tools reuse `CuliplanApiClient` methods and the same permission/Premium-gating as the integration's services. The Conversation Agent's LLM key is used only for natural-language understanding; Culiplan's own AI runs for `suggest_meal`. Deregister on unload via direct pop from `hass.data["llm"]` (HA does not yet expose `async_unregister_api`).
+- **Standard intents — `HassListAddItem` routes into the Culiplan todo entity.** No new wiring required: the `CuliplanShoppingList` entity already subclasses `TodoListEntity` and exposes `TodoListEntityFeature.CREATE_TODO_ITEM`, which is the contract HA's built-in shopping-list intent handler dispatches against. Users who have selected `todo.culiplan_shopping_list` as their active list now get "add milk to my shopping list" working out of the box.
+
+### Documentation
+
+- Pairs with the wiki "three integration paths" page at `docs/integrations/home-assistant-paths.md`.
+- Roadmap: `backlog/docs/ha-integration-gold-platinum-roadmap-2026-06-05.md` (Phase C).
+
 ## [0.2.6] — 2026-06-05
 
 ### Added
