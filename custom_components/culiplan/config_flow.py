@@ -565,8 +565,29 @@ class OAuth2FlowHandler(
     ) -> dict[str, Any]:
         """Offer the user the option to import from Mealie.
 
-        User can skip and complete setup without importing.
+        Skips the question entirely when there's no Mealie integration
+        configured in this HA install — without Mealie running there's
+        nothing to import from, so the prompt is just friction. Users
+        who add Mealie later can trigger import via Settings → Configure.
+
+        User can also skip from the form itself and complete setup
+        without importing.
         """
+        # Check whether HA's Mealie integration has any configured entries.
+        # async_entries returns [] if Mealie isn't installed (manifest absent
+        # from custom_components/integrations) OR is installed but no entry
+        # has been set up. In both cases the import wizard has nothing to
+        # connect to that the user has already authenticated, so skip.
+        if not self.hass.config_entries.async_entries("mealie"):
+            _LOGGER.debug(
+                "[culiplan][flow] No Mealie config entries detected — "
+                "skipping mealie_offer step",
+            )
+            return cast(
+                _FlowResult,
+                self.async_create_entry(title="Culiplan", data=self._entry_data),
+            )
+
         if user_input is not None:
             if user_input.get("migrate_mealie", False):
                 return await self.async_step_mealie_credentials()
