@@ -137,25 +137,35 @@ action:
 
 ---
 
+## What works (v0.3.1)
+
+Full feature surface as of 2026-06-05:
+
+- **OAuth 2.1 PKCE account linking** — first-install dialog is skipped via auto-imported credential.
+- **Reconfigure flow** with same-account guard (wrong-account aborts cleanly).
+- **Calendar entity** — one entity (`calendar.culiplan_meal_plan`) with N meal-plan events.
+- **Shopping list todo entity** — two-way sync; `HassListAddItem` standard intent works ("add milk to my shopping list").
+- **Sensors** — meals planned this week, shopping items count, expiring pantry items, planned kWh today (premium, opt-in).
+- **Binary sensors** — pantry has expiring items, dinner party active (opt-in).
+- **Lovelace card pack** — Kitchen Dashboard, Pantry Tracker, Cooking Mode + a drop-in welcome card.
+- **Cooking Mode** — active-session reader with step list + timer mirroring; `culiplan.advance_cooking_step`, `pause_cooking_session`, `set_servings`, etc.
+- **Sidebar panel** — vanilla web component, embed-mode (hides duplicate Culiplan chrome inside the iframe), HA theme tokens bridged via postMessage (dark mode follows).
+- **AI services** — `culiplan.suggest_meal`, `culiplan.fill_shopping_list`, `culiplan.generate_blueprint` with three modes:
+  - Cloud (Culiplan Premium)
+  - BYOK (your own OpenAI / Anthropic / Google key, stored in HA only)
+  - Local (Ollama / LM Studio on your LAN)
+- **`llm.API` registration** — six Culiplan tools (`get_meal_plan`, `suggest_meal`, `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items`) are available to **any** HA-configured Conversation Agent (OpenAI / Anthropic / Google / Ollama / Voice Preview) — no BYOK needed if you already have an HA LLM agent.
+- **Mealie import wizard** — one-click migration during config flow (24-hour rollback).
+- **Smart pantry recommendations** — premium-gated, surfaced via Repairs upsell when called.
+- **Assist voice intents** — `what's for dinner tonight`, `what's in my pantry`, `add to shopping list`, cooking-mode controls (en / nl / de / fr / es).
+- **Premium gating** — gracefully surfaces Repairs upsell flows on 403; users without Premium see a clean "upgrade" link instead of a stack trace.
+- **Live push updates** via Socket.IO (no polling).
+- **MCP server** — Culiplan tools also reachable via `mcp.culiplan.com` for HA's built-in MCP client. See [docs/integrations/home-assistant-paths.md](https://github.com/culiplan/Flavorplan/blob/master/docs/integrations/home-assistant-paths.md).
+
 ## Known limitations
 
-The following features are **not yet available** and are planned for later HACS releases:
-
-- **AI shopping list fill** (voice command "fill my shopping list for the week") — Phase 3
-- **Smart pantry recommendations** — Phase 3
-- **Mealie data migration wizard** — Phase 3
-- **HA Core catalog listing** — Phase 4 (after HACS community validation)
-- **HA cooking-mode service** (culiplan.advance_cooking_step — required for Cooking Mode card step taps) — Phase 3 follow-up (task-1397)
-
-What **does** work:
-- OAuth account linking
-- Calendar entity (meal plan events, dinner parties)
-- Shopping list todo entity (two-way sync)
-- Sensors: meals this week, shopping items count, expiring pantry items
-- Assist voice commands: add to shopping list, what's for dinner, what's in pantry (en/nl/de/fr/es)
-- Lovelace card pack: Kitchen Dashboard, Pantry Tracker, Cooking Mode (Phase 3)
-- Cooking Mode card: reads active session, shows step list + timers; graceful idle fallback
-- Live push updates via WebSocket (no polling)
+- **HA Core catalog listing** — Phase 4. We're aiming for HACS first; HA Core submission depends on the upstream `pytest_homeassistant_custom_component` test-fixture fix (the only Silver rule still `todo` in `quality_scale.yaml`).
+- **Brands logo in HA integration picker** — assets are prepared; the PR to `home-assistant/brands` ships at the same time as HACS submission.
 
 ---
 
