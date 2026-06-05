@@ -4,6 +4,21 @@
 # Mypy:     task-1503 (Gold) + Platinum `strict-typing` (v0.3.1) — strict
 #           static typing with py.typed marker and zero blanket suppressions.
 
+[tool.pytest.ini_options]
+# `auto` mode makes pytest-asyncio await async fixtures transparently —
+# including the upstream `hass` fixture from pytest-homeassistant-custom-
+# component, which is an async generator. Without this, sync fixtures that
+# consume `hass` (e.g. `enable_custom_integrations`) receive an unresolved
+# async_generator object and fail with
+#   AttributeError: 'async_generator' object has no attribute 'data'
+# which is exactly how the Tests matrix broke across all 3 lanes
+# (HA 2024.10 / 2025.1 / 2026.6) on 2026-06-04. Fixed 2026-06-05.
+asyncio_mode = "auto"
+# Pin the default loop scope so we don't get the future-default deprecation
+# warning each run (pytest-asyncio ≥0.24 emits this whenever the setting is
+# unset and threatens to flip the default in a future major).
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.coverage.run]
 source = ["custom_components/culiplan"]
 omit = [
