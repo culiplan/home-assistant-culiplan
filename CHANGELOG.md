@@ -1,87 +1,87 @@
 # Changelog
 
-All notable changes to the Culiplan Home Assistant integration are documented here.
+All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-- **SSO panel 401 fix** — replaced the built-in iframe panel with a custom Lit
-  web component (`culiplan-panel`).  The old iframe panel navigated the top-level
-  browser context to `/api/culiplan/launch`, which never carried the HA
-  `Authorization` header; the view returned 401.  The new panel runs inside
-  HA's authenticated frontend, fetches `/api/culiplan/launch` via XHR with
-  the HA bearer token, receives `{"redirect_url": "…", "expires_in": 60}`,
-  and sets the iframe `src` to the returned URL.  The SSO code remains in the
-  URL fragment (`#`) and is never sent to any server.
-- `launch_view.py` now returns JSON instead of a 302 redirect.  Error shapes
-  are `{"error": "<short_code>", "message": "<human-readable>"}` with HTTP
-  502 (backend failure) or 503 (no config entry / token expired).
-- The panel serves its JS from `/culiplan_static/culiplan-panel.js` via
-  `hass.http.register_static_path` with `cache_headers=False` so updates
-  are picked up immediately after an integration reload.
-
-> **Beta v0.2.0 users:** after updating, open the HA sidebar and reload the
-> Culiplan panel once (browser hard-refresh or Settings → Developer Tools →
-> Clear cache).  The new Lit panel replaces the old iframe entry automatically.
-
-## [0.2.0] - 2026-06-03
-
-### Breaking Changes
-
-**Entity IDs, service names, and Lovelace card identifiers renamed from `flavorplan*` to `culiplan*`.**
-Beta users upgrading from v0.1.x must: remove the integration from Settings → Integrations, then
-re-add it via HACS or manually. Re-import any blueprints from `blueprints/automation/culiplan/`.
-Recreate Lovelace dashboards from the bundled YAML files in `lovelace/dashboards/` — replace all
-`custom:flavorplan-*` card types with `custom:culiplan-*` and update any entity_id references
-(e.g. `calendar.flavorplan_meal_plan` → `calendar.culiplan_meal_plan`).
-
-### Fixed
-- OAuth config flow now sends PKCE (`code_challenge` S256 + `code_verifier`) as required
-  by the Culiplan OAuth 2.1 backend for the public `ha-core` client. HA's default
-  `LocalOAuth2Implementation` omits PKCE, which caused `invalid_request:
-  code_challenge is required (PKCE S256)` on first link.
-- OAuth config flow now requests the required scopes (`calendar:read`, `todo:read/write`,
-  `pantry:*`, `meals:*`, `shopping:*`, `recipes:read`, `profile:read`, `household:read`,
-  `subscription:read`, `ai:suggestions`, `blueprints:generate`, `openid`, `offline_access`).
-  Scope list lives in `const.py:OAUTH2_SCOPES` as a single source of truth, mirroring
-  `ha-core`'s `allowedScopes` in the backend seed.
-
-### Changed
-- Brand rename across all user-facing strings: Flavorplan → Culiplan. `hacs.json` name
-  field updated to `"Culiplan"`.
-- Iframe sidebar panel added for embedded Culiplan web UI within Home Assistant.
+## [0.2.3] — 2026-06-05
 
 ### Added
-- OAuth PKCE (S256 code challenge/verifier) support for OAuth 2.1 compliance.
-- Scoped OAuth: explicit scope list in `const.py:OAUTH2_SCOPES` matching backend seed.
+
+- **HA theme tokens bridged into the embedded iframe.** The panel JS reads `getComputedStyle(document.documentElement)` for HA's 12 design tokens (`--primary-color`, `--card-background-color`, `--primary/secondary-text-color`, `--divider-color`, `--accent-color`, error/success/warning, etc.) and posts them via `postMessage` to the Culiplan web app on iframe load and on every `hass` state update. The web app applies them as CSS variable overrides on `:root` — embedded Culiplan now follows HA's dark mode / accent color instead of always rendering light. Token names whitelisted on both sides; arbitrary CSS variable injection is not possible. Pairs with the matching listener in `culiplan/Flavorplan@master`.
+
+## [0.2.2] — 2026-06-05
+
+### Added
+
+- **Embed-mode signaling.** The `redirect_url` returned by `/api/culiplan/launch` now includes `?embed=ha` before the SSO code fragment. The web app reads this on boot, persists it via `sessionStorage`, and applies a `body.embed-mode` class on every route. CSS hides the duplicate sidebar / logo / account block / greeting / notification bell when running inside the HA iframe, recovering the full content width. Outside embed mode nothing changes.
+
+## [0.2.1] — 2026-06-05
+
+### Fixed
+
+- **Panel JS cache-bust on version bump.** Read the manifest version at module load time and append it to the sidebar panel `module_url` (`/culiplan_static/culiplan-panel.js?v=0.2.1`). Browsers refetch the module on each version bump — no more hard-refresh required after an update.
+
+## [0.2.0] — 2026-06-05
+
+First production release with all P0 issues from the 2026-06-04/05 smoke-test sessions fixed. Tag `v0.2.0` was retagged ~5 times during the smoke-test session before SemVer discipline was adopted — from `v0.2.1` onward, every tag is immutable.
+
+### Fixed
+
+- **Calendar entity collapse.** Backend returns meal plans grouped by date (`{date: {slot: [entry]}}`). The previous implementation emitted one calendar entity per date — 11+ entities/week observed. The integration now flattens the response into ONE `calendar.culiplan` entity (`id="current"`) with N events across the dates, matching the user's mental model of a continuous timeline. Stable `unique_id` so the entity survives coordinator refreshes without re-registering.
+- **`entry.options` ⇄ `entry.data` mismatch.** OptionsFlow saves were silently ignored: `services.py` and `blueprint_generator.py` read AI mode / BYOK provider / local endpoint from `entry.data`, while the flow wrote them to `entry.options`. Both call sites now merge `{**entry.data, **entry.options}` so Settings changes actually take effect at runtime.
+- **`expiry_days` / `expiry_hours` dead options wired.** Both were consumed by `sensor.py` and `binary_sensor.py` but had no UI surface — defaults baked in at 3 days / 48 hours. Now exposed in the Settings dialog as `NumberSelector` slider + box, configurable 1–30 days / 1–168 hours.
+- **`debug_ai` access path corrected.** Was read via `entry_data.get("options", {}).get("debug_ai")` — `entry_data` is `hass.data[DOMAIN][entry_id]` (a runtime dict), NOT the `ConfigEntry`. Re-routed through the merged `entry_config` so the toggle actually engages.
+- **Loopback warning re-runs on reconfigure.** Task-1413's non-loopback Local AI endpoint warning fired in the initial config flow but was skipped when the user reconfigured to a remote endpoint via OptionsFlow. The same warning step now runs in both flows.
+- **Mealie offer step auto-skipped when Mealie not installed.** Checks `hass.config_entries.async_entries("mealie")` — if empty, skips directly to entry creation. Cuts friction for users without a Mealie server.
+- **OAuth credential auto-imported on first install.** The "Add application credentials" dialog appeared on every fresh install because `async_setup` never runs before the first config entry exists — HA loads the integration only after entry creation, but the dialog fires before. The fix imports the built-in `ha-core` client credential inside `async_step_user` itself, idempotent on re-call, so pick_implementation finds it on the first OAuth attempt.
+- **Sidebar panel rewritten as vanilla web components.** The previous Lit-based panel used a bare `import "lit"` specifier that browsers don't resolve, producing `Failed to resolve module specifier "lit"` and a blank panel. Rewritten as `HTMLElement` + Shadow DOM — no third-party deps, no CDN, no bundler.
+- **Panel registration: `async_register_built_in_panel` with `component_name="custom"`.** The previous `async_register_panel_custom` API was removed.
+- **OAuth credential `auth_domain` argument.** Was passing `"Culiplan"` (capital C) as the fourth positional arg, which sets `auth_domain="Culiplan"` — HA's lookup uses `auth_domain="culiplan"` (matching the domain), so the credential was stored under a key HA never looked up. Argument removed (defaults to `DOMAIN`).
+
+### HA 2024.10 – 2026.6 compatibility sweep
+
+The CI matrix tested HA 2024.10 + 2025.4 (Python 3.12); a user installed on HA 2026.6.0 / Python 3.14.2 and hit six API breakages we hadn't caught. Each is fixed and the CI matrix now also covers HA 2026.6 / Python 3.14 so this class of issue lands as a red build:
+
+- `register_static_path` (sync, blocking-IO) → `async_register_static_paths` + `StaticPathConfig` with an `ImportError` fallback for the 2024.10 lane.
+- `DataUpdateCoordinator.__init__` now requires `config_entry=` kwarg (HA 2025.10+) — passed with a `TypeError` catch for older HA.
+- `OptionsFlow.__init__(config_entry)` removed (HA 2025.12+) — switched to no-arg ctor + `self.config_entry` framework injection.
+- `async_create_issue` no longer accepts `is_persistent` (HA 2025.4+) — kwarg dropped (default was False anyway).
+- `hass.components.lovelace` proxy removed (HA 2025.8+) — switched to `hass.data.get("lovelace")`.
+- AI SDK pins relaxed (`==` → `>=`) so pip can resolve Python 3.14 wheels (the `openai==1.77.0` wheel does not exist for 3.14).
+
+### Added
+
+- **Settings dialog redesigned with HA selectors.** `NumberSelector` (slider + box), `SelectSelector` (LIST + DROPDOWN modes), `BooleanSelector`, `TextSelector(PASSWORD/URL, autocomplete=off)`. Localized strings for every step (`options.step.*` and `options.error.*` blocks added to `strings.json`). Replaces unlabeled raw schema keys (`ai_mode`, `byok_provider`, `local_endpoint`) that the old options flow rendered.
+- **`async_step_reconfigure`** (Gold-tier "reconfiguration-flow" rule). Fetches the user's Culiplan account ID from `/api/users/me` after OAuth, compares against the entry's `unique_id`, and aborts with `wrong_account` on mismatch — preventing accidental re-pointing of an entry at a different account. On match, merges the new tokens into existing entry data and triggers a reload. Same-account reconfigure preserves AI mode / BYOK / Mealie state.
+- **`OptionsFlowWithReload` equivalent.** `__init__.py` now registers an update listener so OptionsFlow saves auto-reload the entry. Works on the supported 2024.10 / 2025.4 CI matrix where `OptionsFlowWithReload` isn't yet exported.
+- **Sidebar icon `mdi:chef-hat`** (replacing `mdi:silverware-fork-knife`) for brand consistency with the integration card and brand assets.
+- **Local brand assets** (`custom_components/culiplan/brand/icon.png` + `logo.png`) for HA device-card branding. PR to `home-assistant/brands` is prepared at `/tmp/brands/add-culiplan` but not yet pushed — picker placeholder remains until that lands.
+
+### Documentation
+
+- Design doc: `backlog/docs/ha-integration-settings-redesign-2026-06-05.md` (Settings page IA + rationale).
+- Handoff doc: `backlog/docs/ha-integration-handoff-2026-06-05.md`.
+- UX roadmap: `backlog/docs/ha-integration-ux-improvements-2026-06-05.md` (P0–P5, F1–F9, pre-HACS gate list).
+
+## [0.1.1] — 2026-04-26
+
+Beta release. Initial OAuth flow, AI provider selection, scaffolded entities. **Superseded by 0.2.0** — users upgrading should reinstall via HACS.
 
 ## [0.1.0] — 2026-04-25
 
 ### Added
-- Initial scaffold: `manifest.json`, `__init__.py`, `config_flow.py`, `const.py`, `api.py`, `coordinator.py`
-- OAuth 2.0 config flow using HA's `application_credentials` + `config_entry_oauth2_flow` helpers
-  — connects to `https://api.culiplan.com/api/oauth/authorize` and `/api/oauth/token`
-- AI provider selection step: Cloud AI (default), BYOK, Local AI
-- Platform stubs: `calendar.py`, `sensor.py`, `todo.py` (entities added in tasks 1365–1368)
-- Translations: en, nl, de, fr, es
-- LICENSE (Apache 2.0)
-- CI: hassfest + HACS action on push / pull_request
-- Pre-commit: gitleaks secret scanning
 
-### Pinned AI library versions (smoke-tested 2026-04-25)
+- Initial scaffold: `manifest.json`, `__init__.py`, `config_flow.py`, `const.py`, `api.py`, `coordinator.py`.
+- OAuth 2.0 config flow using HA's `application_credentials` + `config_entry_oauth2_flow` helpers — connects to `https://api.culiplan.com/api/oauth/authorize` and `/api/oauth/token`.
+- AI provider selection step: Cloud AI (default), BYOK, Local AI.
+- Platform stubs: `calendar.py`, `sensor.py`, `todo.py`.
+- Translations: en, nl, de, fr, es.
+- LICENSE (Apache 2.0).
+- CI: hassfest + HACS action on push / pull_request.
+- Pre-commit: gitleaks secret scanning.
 
-| Library | Version | Purpose |
-|---|---|---|
-| `openai` | `1.77.0` | BYOK / Local AI via OpenAI-compatible API |
-| `anthropic` | `0.49.0` | BYOK Claude models |
-| `google-genai` | `1.12.0` | BYOK Gemini models |
-
-> **Note:** Update these pins in `manifest.json` before each HACS release.
-> Run `pip install openai anthropic google-genai` in a clean venv and capture
-> the installed versions.
-
-### Beta limits
-- Calendar, todo, and sensor entities are stubs — they load without error but
-  expose no data until tasks 1365–1368 are complete.
-- Only the HACS beta channel is supported in this release.
-- HA Core submission is deferred pending community validation.
+[0.2.3]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.3
+[0.2.2]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.2
+[0.2.1]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.1
+[0.2.0]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.0
+[0.1.1]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.1.1
+[0.1.0]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.1.0
