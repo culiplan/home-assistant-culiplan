@@ -146,7 +146,6 @@ def _create_barcode_not_found_repair(hass: HomeAssistant, barcode: str) -> None:
         domain=DOMAIN,
         issue_id=f"pantry_barcode_not_found_{barcode}",
         is_fixable=True,
-        is_persistent=False,
         severity=ir.IssueSeverity.WARNING,
         translation_key="pantry_barcode_not_found",
         translation_placeholders={"barcode": barcode},

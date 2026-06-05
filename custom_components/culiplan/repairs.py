@@ -165,12 +165,14 @@ def async_create_premium_repair(
         issue_id,
     )
 
+    # HA 2025.4+ removed the ``is_persistent`` kwarg from async_create_issue
+    # (default is False, which is what we want — issue resolves on upgrade
+    # success, not on HA restart). Drop the kwarg so HA 2026.x doesn't TypeError.
     ir.async_create_issue(
         hass,
         domain=DOMAIN,
         issue_id=issue_id,
         is_fixable=True,
-        is_persistent=False,  # Resolves when user upgrades (not on HA restart)
         severity=ir.IssueSeverity.WARNING,
         translation_key="premium_required",
         translation_placeholders={

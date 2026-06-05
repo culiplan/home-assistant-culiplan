@@ -38,7 +38,20 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         client: CuliplanApiClient,
         entry: ConfigEntry,
     ) -> None:
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
+        # HA 2025.5+ added `config_entry` as a keyword arg to
+        # DataUpdateCoordinator.__init__ and made it required in 2026.x.
+        # Older HA versions (2024.10, our CI floor) reject the kwarg with a
+        # TypeError, so fall back to the legacy signature on those.
+        try:
+            super().__init__(
+                hass,
+                _LOGGER,
+                name=DOMAIN,
+                update_interval=None,
+                config_entry=entry,
+            )
+        except TypeError:
+            super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
         self.client = client
         self.entry = entry
         self._sio: socketio.AsyncClient | None = None

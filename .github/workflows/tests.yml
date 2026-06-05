@@ -11,21 +11,28 @@ on:
 
 jobs:
   pytest:
-    name: pytest — HA ${{ matrix.ha-version }}
+    name: pytest — HA ${{ matrix.ha-version }} (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        ha-version:
-          # Current stable + previous stable (6-month window from task-1364 plan)
-          - "2025.4.0"
-          - "2024.10.0"
+        # Each entry pins the HA version and the Python version it requires.
+        # 2026.6.0 was the user-facing breakage point in 2026-06 (OptionsFlow
+        # ctor removal + openai 1.77 wheel gap); keep it in the matrix so we
+        # catch deprecations on HA latest before users hit them on HAOS.
+        include:
+          - ha-version: "2024.10.0"
+            python-version: "3.12"
+          - ha-version: "2025.4.0"
+            python-version: "3.12"
+          - ha-version: "2026.6.0"
+            python-version: "3.14"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
         run: |
@@ -36,8 +43,8 @@ jobs:
             pytest-asyncio \
             pytest-cov \
             aiohttp \
-            python-socketio==5.12.0 \
-            PyYAML==6.0.2
+            "python-socketio>=5.12.0" \
+            "PyYAML>=6.0.2"
 
       - name: Run tests with coverage
         run: |
@@ -47,7 +54,7 @@ jobs:
             --cov-fail-under=95
 
       - name: Upload coverage report
-        if: matrix.ha-version == '2025.4.0'
+        if: matrix.ha-version == '2026.6.0'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

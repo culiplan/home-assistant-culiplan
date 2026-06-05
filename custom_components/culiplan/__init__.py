@@ -94,18 +94,13 @@ async def _async_register_lovelace_resources(hass: HomeAssistant) -> None:
     integration unload/reload (see _LOVELACE_RESOURCES comment above).
     """
     try:
-        # HA exposes the Lovelace component lazily; load it to ensure the
-        # resource collection is initialised.
+        # HA exposes the Lovelace resource collection via hass.data["lovelace"].
+        # The legacy `hass.components.lovelace` proxy was removed in HA 2025.8;
+        # if hass.data hasn't been populated yet, treat it as "not available"
+        # and skip registration (the user can still install resources via the
+        # Lovelace UI per lovelace/README.md).
         lovelace = hass.data.get("lovelace")
-        if lovelace is None:
-            # Not yet initialised — try to obtain via component loader.
-            lovelace_component = hass.components.lovelace
-            # Accessing .resources may raise AttributeError on older HA versions.
-            resource_collection = getattr(
-                lovelace_component, "resources", None
-            ) or getattr(lovelace, "resources", None)
-        else:
-            resource_collection = getattr(lovelace, "resources", None)
+        resource_collection = getattr(lovelace, "resources", None) if lovelace else None
 
         if resource_collection is None:
             _LOGGER.debug(
@@ -251,11 +246,21 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
     #    reachable at /culiplan_static/culiplan-panel.js.
     #    cache_headers=False ensures the browser always gets the latest version
     #    after an integration update without requiring a hard-refresh.
-    hass.http.register_static_path(
-        "/culiplan_static",
-        hass.config.path("custom_components/culiplan/frontend"),
-        cache_headers=False,
-    )
+    #    HA 2025.9+ removed the legacy synchronous register_static_path (it did
+    #    blocking I/O in the event loop). Use async_register_static_paths with
+    #    StaticPathConfig where available; fall back for older HA.
+    static_dir = hass.config.path("custom_components/culiplan/frontend")
+    try:
+        from homeassistant.components.http import StaticPathConfig  # noqa: PLC0415
+
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig("/culiplan_static", static_dir, False)]
+        )
+    except ImportError:
+        # HA < 2024.7 — legacy synchronous helper still works.
+        hass.http.register_static_path(
+            "/culiplan_static", static_dir, cache_headers=False
+        )
 
     # 3. Register the custom Lit panel (web component) in the sidebar.
     #    HA exposes custom panels via the "custom" component_name of the
