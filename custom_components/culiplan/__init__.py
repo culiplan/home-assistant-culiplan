@@ -156,10 +156,22 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     Auto-imports the public OAuth client credentials so users skip the
     "Add application credentials" dialog and go straight to consent.
+
     The Culiplan backend's ``ha-core`` is a public PKCE-only client per
     OAuth 2.1 §2.3 — the client_secret field is required by HA's
     application_credentials framework but ignored by the backend.
+
+    Note: ``async_import_client_credential``'s fourth positional argument
+    is ``auth_domain``, NOT a display name. Earlier versions passed
+    ``"Culiplan"`` which stored the credential under a mismatched
+    auth_domain, so HA's lookup for ``culiplan`` never found it and the
+    dialog kept appearing. Pass ``None`` (the default) so auth_domain
+    falls back to DOMAIN, matching what the config flow looks up.
     """
+    _LOGGER.debug(
+        "[culiplan][setup] Importing built-in OAuth client credential for domain %s",
+        DOMAIN,
+    )
     await async_import_client_credential(
         hass,
         DOMAIN,
@@ -167,7 +179,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             client_id=OAUTH_CLIENT_ID,
             client_secret="",
         ),
-        "Culiplan",
     )
     return True
 
