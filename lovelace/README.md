@@ -6,6 +6,19 @@ the integration is installed.
 
 ---
 
+## Welcome card
+
+After installing the integration, you can add a one-tap "Open Culiplan"
+shortcut to any dashboard. Copy `cards/culiplan-welcome-card.yaml` into a
+manual Lovelace card, or import it via Dashboard → Edit → "Add card" →
+"Manual".
+
+The card uses HA's built-in `button` type — no custom JS, no extra
+resources. It shows the live "meals planned this week" count and taps
+through to the Culiplan sidebar panel.
+
+---
+
 ## Cards included
 
 | Card element | Description | Source |

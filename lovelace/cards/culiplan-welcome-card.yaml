@@ -1,0 +1,21 @@
+# Culiplan Welcome Card
+#
+# Drop this card on any Lovelace dashboard for a one-tap entry to the
+# Culiplan sidebar panel. Copy the YAML below into:
+#   Dashboard -> Edit -> "Add card" -> "Manual"
+# Or merge into your dashboard YAML if you use storage mode.
+#
+# Requires the Culiplan integration to be installed and configured.
+# After install the panel lives at /culiplan.
+
+type: button
+name: Culiplan
+icon: mdi:chef-hat
+tap_action:
+  action: navigate
+  navigation_path: /culiplan
+hold_action:
+  action: more-info
+  entity: sensor.culiplan_meals_planned_this_week
+show_state: true
+entity: sensor.culiplan_meals_planned_this_week
