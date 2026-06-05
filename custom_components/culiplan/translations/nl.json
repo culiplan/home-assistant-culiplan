@@ -36,5 +36,94 @@
       "oauth_error": "OAuth-fout: {error}",
       "missing_configuration": "Integratie niet geconfigureerd. Configureer deze via de UI."
     }
+  },
+  "entity": {
+    "sensor": {
+      "meals_planned_this_week": {
+        "name": "Maaltijden gepland deze week"
+      },
+      "shopping_items": {
+        "name": "Boodschappen"
+      },
+      "expiring_pantry_items": {
+        "name": "Bijna verlopen voorraad"
+      },
+      "planned_kwh_today": {
+        "name": "Geplande kWh vandaag"
+      }
+    },
+    "binary_sensor": {
+      "pantry_has_expiring": {
+        "name": "Voorraad heeft bijna verlopen items"
+      },
+      "dinner_party_active": {
+        "name": "Dinner party actief"
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Culiplan is niet geconfigureerd."
+    },
+    "byok_key_missing": {
+      "message": "Geen BYOK-sleutel gevonden voor aanbieder {provider}. Configureer de Culiplan-integratie opnieuw."
+    },
+    "ai_request_failed": {
+      "message": "Culiplan AI-aanvraag mislukt: {error}"
+    },
+    "pantry_decrement_failed": {
+      "message": "Voorraad verminderen mislukt: {error}"
+    },
+    "pantry_expiring_failed": {
+      "message": "Ophalen van bijna verlopen voorraad mislukt: {error}"
+    },
+    "scale_servings_failed": {
+      "message": "Porties schalen mislukt: {error}"
+    },
+    "pantry_item_not_found": {
+      "message": "Geen voorraaditem met barcode {barcode} gevonden. Voeg het item eerst toe aan je Culiplan-voorraad."
+    },
+    "insufficient_stock": {
+      "message": "Onvoldoende voorraad (item={item_id}): gevraagd {requested}, beschikbaar {available}."
+    },
+    "api_forbidden": {
+      "message": "Culiplan API gaf 403 op {path}: {body}"
+    },
+    "blueprint_write_failed": {
+      "message": "Schrijven van blueprint-bestand {path} mislukt: {error}"
+    },
+    "blueprint_generation_failed": {
+      "message": "Blueprint genereren mislukt: {error}"
+    },
+    "blueprint_envelope_failed": {
+      "message": "Ophalen van blueprint-envelop mislukt: {error}"
+    },
+    "blueprint_envelope_missing": {
+      "message": "Backend gaf geen prompt-envelop terug voor blueprint-generatie."
+    },
+    "blueprint_local_ai_failed": {
+      "message": "Lokale AI blueprint-generatie mislukt: {error}"
+    },
+    "cooking_session_fetch_failed": {
+      "message": "Ophalen van kooksessie mislukt: {error}"
+    },
+    "cooking_session_update_failed": {
+      "message": "Bijwerken van kooksessie mislukt: {error}"
+    },
+    "no_active_cooking_session": {
+      "message": "Geen actieve kooksessie. Roep eerst culiplan.start_cooking_mode aan."
+    },
+    "cooking_already_last_step": {
+      "message": "Al bij de laatste stap ({current}/{total}). Gebruik culiplan.complete_cooking_mode om af te ronden."
+    },
+    "no_paused_cooking_session": {
+      "message": "Geen gepauzeerde kooksessie gevonden. Niets om te hervatten."
+    },
+    "paused_session_fetch_failed": {
+      "message": "Ophalen van gepauzeerde sessie mislukt: {error}"
+    },
+    "timer_not_found": {
+      "message": "Geen timer met label of id {label_or_id} in de actieve sessie."
+    }
   }
 }

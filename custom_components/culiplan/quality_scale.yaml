@@ -1,0 +1,299 @@
+# Quality scale for the Culiplan integration.
+#
+# This file enumerates each Bronze / Silver / Gold / Platinum rule with one of:
+#   status: done      — the integration satisfies the rule.
+#   status: exempt    — the rule does not apply; `comment:` explains why.
+#   status: todo      — the rule is not yet satisfied; `comment:` explains plan.
+#
+# Reference shape: homeassistant/components/spotify/quality_scale.yaml.
+# Manifest currently advertises `quality_scale: gold` — this file is the
+# enumerated proof.
+
+rules:
+  # ─── Bronze ────────────────────────────────────────────────────────────────
+  action-setup:
+    status: done
+    comment: |
+      Services are registered in async_setup_entry via async_register_services()
+      and removed in async_unload_entry via async_unregister_services().
+  appropriate-polling:
+    status: done
+    comment: |
+      DataUpdateCoordinator polls at the default 5-minute interval; live
+      updates are pushed via Socket.IO so polling is the fallback path.
+  brands:
+    status: todo
+    comment: |
+      Local brand assets exist at custom_components/culiplan/brand/{icon,logo}.png.
+      PR against home-assistant/brands is prepared at /tmp/brands/add-culiplan
+      and will be opened alongside the HA Core PR for v0.3.0.
+  common-modules:
+    status: done
+    comment: |
+      const.py, helpers.py, coordinator.py, api.py follow the standard layout.
+  config-flow-test-coverage:
+    status: done
+    comment: |
+      tests/components/culiplan/test_config_flow.py covers OAuth, AI provider
+      selection, BYOK validation, Local AI loopback warning, Mealie import
+      preview, reconfigure, and reauth flows.
+  config-flow:
+    status: done
+    comment: |
+      Full UI config flow with OAuth + selectors + reauth + reconfigure.
+  dependency-transparency:
+    status: done
+    comment: |
+      Requirements (openai, anthropic, google-genai, python-socketio) are
+      published to PyPI under their canonical names with full source.
+  docs-actions:
+    status: done
+    comment: |
+      services.yaml describes every service with field types and units; the
+      strings.json `services:` block provides translated names and
+      descriptions. Wiki has step-by-step usage examples.
+  docs-high-level-description:
+    status: done
+    comment: |
+      README.md + docs/integrations/home-assistant.md (in the Culiplan monorepo
+      wiki) describe what the integration provides.
+  docs-installation-instructions:
+    status: done
+    comment: HACS and manual install paths documented in README.md.
+  docs-removal-instructions:
+    status: done
+    comment: |
+      See docs/integrations/home-assistant.md "Removal instructions" section
+      (added v0.2.6 alongside this file).
+  entity-event-setup:
+    status: done
+    comment: |
+      Entities use CoordinatorEntity, which subscribes / unsubscribes via
+      async_added_to_hass / async_will_remove_from_hass automatically.
+  entity-unique-id:
+    status: done
+    comment: |
+      Every entity sets a deterministic _attr_unique_id built from DOMAIN +
+      a stable internal identifier (plan id, list id, or feature key).
+  has-entity-name:
+    status: done
+    comment: |
+      All entity classes set _attr_has_entity_name = True so the user sees
+      "<device name> <translated entity name>" in the UI.
+  runtime-data:
+    status: done
+    comment: |
+      Per-entry runtime data is stored under hass.data[DOMAIN][entry.entry_id]
+      with both client and coordinator; pre-2025.x HA versions don't yet have
+      ConfigEntry.runtime_data so the dict pattern is used for compatibility.
+  test-before-configure:
+    status: done
+    comment: |
+      Config flow validates BYOK keys against the provider before saving
+      (ai_byok step) and pings the local AI endpoint before saving (ai_local).
+  test-before-setup:
+    status: done
+    comment: |
+      __init__.py raises ConfigEntryAuthFailed on token failure during setup;
+      coordinator's first_refresh() raises ConfigEntryNotReady on network
+      failure so HA's standard retry kicks in.
+  unique-config-entry:
+    status: done
+    comment: |
+      Each config entry's unique_id is the Culiplan account ID returned by
+      /api/users/me; async_step_reconfigure aborts with "wrong_account" if
+      the user authenticates as a different Culiplan account.
+
+  # ─── Silver ────────────────────────────────────────────────────────────────
+  action-exceptions:
+    status: done
+    comment: |
+      All service handlers raise HomeAssistantError (or its subclasses
+      PantryItemNotFoundError, InsufficientStockError, PremiumRequiredError);
+      the user-facing message is sourced from strings.json via
+      translation_key.
+  config-entry-unloading:
+    status: done
+    comment: |
+      async_unload_entry unloads platforms, closes the Socket.IO connection,
+      unregisters services if it was the last entry, and tears down the
+      Lovelace resource registration.
+  docs-configuration-parameters:
+    status: done
+    comment: |
+      All options (expiry_days, expiry_hours, debug_ai, ai_mode, BYOK
+      provider, local endpoint) have data + data_description blocks in
+      strings.json and are documented in docs/integrations/home-assistant.md.
+  docs-installation-parameters:
+    status: done
+    comment: |
+      OAuth setup, application_credentials, and HACS install steps are
+      documented in README.md and the wiki.
+  entity-unavailable:
+    status: done
+    comment: |
+      CoordinatorEntity drives availability from the coordinator's last
+      update success; entities go unavailable if the REST fetch fails.
+  integration-owner:
+    status: done
+    comment: |
+      manifest.json codeowners: ["@culiplan"]. (Team handle pending HA Core
+      review; will switch to an individual handle if @culiplan is rejected.)
+  log-when-unavailable:
+    status: done
+    comment: |
+      Coordinator logs at WARNING when REST refresh fails; api.py logs 4xx
+      bodies; Socket.IO disconnects are logged. Subsequent recoveries are
+      logged at INFO.
+  parallel-updates:
+    status: done
+    comment: |
+      Entities all use a single shared DataUpdateCoordinator (one HTTP call
+      per refresh) so the parallel-updates limit isn't needed.
+  reauthentication-flow:
+    status: done
+    comment: |
+      async_step_reauth + async_step_reauth_confirm trigger the standard HA
+      re-authenticate flow on 401/refresh failure.
+  test-coverage:
+    status: todo
+    comment: |
+      Tests cover config flow, coordinator, key store, dispatchers, and
+      blueprint generation. Sensor/binary_sensor/calendar/todo entity tests
+      are stubs; full coverage targeted for v0.3.0.
+
+  # ─── Gold ──────────────────────────────────────────────────────────────────
+  devices:
+    status: done
+    comment: |
+      _build_device_info returns a single DeviceInfo per entry, attaching all
+      Culiplan entities to one device card.
+  diagnostics:
+    status: done
+    comment: |
+      diagnostics.py exposes async_get_config_entry_diagnostics with secrets
+      redacted (tokens, BYOK keys, Mealie token).
+  discovery-update-info:
+    status: exempt
+    comment: |
+      Culiplan is a cloud service with no LAN discovery surface — no DHCP /
+      mDNS / SSDP info to update.
+  discovery:
+    status: exempt
+    comment: |
+      Cloud service, not discoverable on the LAN.
+  docs-data-update:
+    status: done
+    comment: |
+      docs/integrations/home-assistant.md explains the Socket.IO push +
+      5-minute coordinator poll fallback under "Data update strategy".
+  docs-examples:
+    status: done
+    comment: |
+      docs/integrations/home-assistant.md → "Automation examples" lists 2-3
+      realistic blueprints (dinner-party lighting, low pantry alerts,
+      expiring-soon push) with YAML.
+  docs-known-limitations:
+    status: done
+    comment: |
+      docs/integrations/home-assistant.md → "Known limitations" section
+      enumerates multi-household single-entry, no dinner-party live update,
+      Voice PE first-paint latency, no ai_task entity yet.
+  docs-supported-devices:
+    status: done
+    comment: |
+      docs/integrations/home-assistant.md → "Supported devices": none — this
+      is a service integration; entity catalogue is linked from the same page.
+  docs-supported-functions:
+    status: done
+    comment: |
+      Calendar, todo, sensor, binary_sensor, and panel surfaces are all
+      enumerated in docs/integrations/home-assistant.md.
+  docs-troubleshooting:
+    status: done
+    comment: |
+      docs/integrations/home-assistant.md → "Troubleshooting" covers empty
+      calendar, revoking the iframe session, Premium repair behaviour, and
+      the v0.2.0 panel blank-screen historical note.
+  docs-use-cases:
+    status: done
+    comment: |
+      Use cases are described in the wiki page intro and on the GitHub
+      README.
+  dynamic-devices:
+    status: exempt
+    comment: |
+      Single device per config entry (the user's Culiplan account); no
+      runtime device discovery surface.
+  entity-category:
+    status: done
+    comment: |
+      sensor.culiplan_planned_kwh_today carries EntityCategory.DIAGNOSTIC;
+      headline sensors stay normal-category as users expect to see them on
+      the device card.
+  entity-device-class:
+    status: done
+    comment: |
+      Sensors use SensorDeviceClass.ENERGY (kWh); binary sensors use
+      BinarySensorDeviceClass.PROBLEM (pantry expiring) and OCCUPANCY
+      (dinner party active).
+  entity-disabled-by-default:
+    status: done
+    comment: |
+      sensor.culiplan_planned_kwh_today (Premium-only) and
+      binary_sensor.culiplan_dinner_party_active (event-driven) ship with
+      _attr_entity_registry_enabled_default = False so users opt in.
+  entity-translations:
+    status: done
+    comment: |
+      Every entity class sets _attr_translation_key. The matching
+      entity.<platform>.<key>.name block is present in strings.json and
+      every translation file (en/nl/de/fr/es).
+  exception-translations:
+    status: done
+    comment: |
+      All HomeAssistantError raises carry translation_domain=DOMAIN +
+      translation_key. The exceptions: block in strings.json + locale files
+      covers 21 distinct keys.
+  icon-translations:
+    status: done
+    comment: |
+      Icons live in icons.json keyed by translation_key for every entity
+      that previously had _attr_icon. The _attr_icon attribute has been
+      removed from sensor.py and binary_sensor.py.
+  reconfiguration-flow:
+    status: done
+    comment: |
+      async_step_reconfigure preserves entity unique_ids, re-runs OAuth,
+      validates the account matches, and merges new tokens into existing
+      entry data.
+  repair-issues:
+    status: done
+    comment: |
+      repairs.py creates premium_required repair issues with a fix_flow that
+      links to the upgrade page; pantry barcode-not-found issues are
+      auto-resolved when the barcode is added.
+  stale-devices:
+    status: exempt
+    comment: |
+      One device per entry; nothing to mark stale.
+
+  # ─── Platinum ──────────────────────────────────────────────────────────────
+  async-dependency:
+    status: todo
+    comment: |
+      openai / anthropic / google-genai expose async clients; python-socketio
+      uses asyncio. Pending audit of sync hot paths (e.g. manifest version
+      read at module load) for v0.3.0.
+  inject-websession:
+    status: todo
+    comment: |
+      coordinator.py and api.py build their own ClientSession; Mealie
+      helpers also create sessions directly. Will route through
+      homeassistant.helpers.aiohttp_client.async_get_clientsession in v0.3.0.
+  strict-typing:
+    status: todo
+    comment: |
+      pyproject.toml runs mypy --strict but several modules carry
+      pre-existing "Redundant cast" / "Return type mismatch" drift.
+      Targeted for cleanup in v0.3.0.

@@ -1,0 +1,26 @@
+{
+  "entity": {
+    "sensor": {
+      "meals_planned_this_week": {
+        "default": "mdi:calendar-week"
+      },
+      "shopping_items": {
+        "default": "mdi:cart"
+      },
+      "expiring_pantry_items": {
+        "default": "mdi:food-variant-off"
+      },
+      "planned_kwh_today": {
+        "default": "mdi:flash"
+      }
+    },
+    "binary_sensor": {
+      "pantry_has_expiring": {
+        "default": "mdi:food-variant-off"
+      },
+      "dinner_party_active": {
+        "default": "mdi:silverware-fork-knife"
+      }
+    }
+  }
+}

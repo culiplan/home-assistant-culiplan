@@ -36,5 +36,94 @@
       "oauth_error": "Error OAuth: {error}",
       "missing_configuration": "Integración no configurada. Por favor, configúrala en la interfaz de usuario."
     }
+  },
+  "entity": {
+    "sensor": {
+      "meals_planned_this_week": {
+        "name": "Comidas planificadas esta semana"
+      },
+      "shopping_items": {
+        "name": "Artículos de compras"
+      },
+      "expiring_pantry_items": {
+        "name": "Artículos de despensa que caducan pronto"
+      },
+      "planned_kwh_today": {
+        "name": "kWh previstos hoy"
+      }
+    },
+    "binary_sensor": {
+      "pantry_has_expiring": {
+        "name": "La despensa tiene artículos que caducan"
+      },
+      "dinner_party_active": {
+        "name": "Cena activa"
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Culiplan no está configurado."
+    },
+    "byok_key_missing": {
+      "message": "No se encontró ninguna clave BYOK para el proveedor {provider}. Vuelve a configurar la integración de Culiplan."
+    },
+    "ai_request_failed": {
+      "message": "La solicitud de IA de Culiplan ha fallado: {error}"
+    },
+    "pantry_decrement_failed": {
+      "message": "Error al decrementar la despensa: {error}"
+    },
+    "pantry_expiring_failed": {
+      "message": "Error al obtener los artículos que caducan: {error}"
+    },
+    "scale_servings_failed": {
+      "message": "Error al ajustar las raciones: {error}"
+    },
+    "pantry_item_not_found": {
+      "message": "No se encontró ningún artículo de despensa con el código de barras {barcode}. Añade primero el artículo a tu despensa en Culiplan."
+    },
+    "insufficient_stock": {
+      "message": "Stock insuficiente (artículo={item_id}): solicitado {requested}, disponible {available}."
+    },
+    "api_forbidden": {
+      "message": "La API de Culiplan devolvió 403 en {path}: {body}"
+    },
+    "blueprint_write_failed": {
+      "message": "Error al escribir el archivo de blueprint {path}: {error}"
+    },
+    "blueprint_generation_failed": {
+      "message": "Error al generar el blueprint: {error}"
+    },
+    "blueprint_envelope_failed": {
+      "message": "Error al obtener el sobre de blueprint: {error}"
+    },
+    "blueprint_envelope_missing": {
+      "message": "El backend no devolvió ningún sobre de prompt para la generación del blueprint."
+    },
+    "blueprint_local_ai_failed": {
+      "message": "Error en la generación de blueprint con IA local: {error}"
+    },
+    "cooking_session_fetch_failed": {
+      "message": "Error al obtener la sesión de cocina: {error}"
+    },
+    "cooking_session_update_failed": {
+      "message": "Error al actualizar la sesión de cocina: {error}"
+    },
+    "no_active_cooking_session": {
+      "message": "No hay una sesión de cocina activa. Llama primero a culiplan.start_cooking_mode."
+    },
+    "cooking_already_last_step": {
+      "message": "Ya estás en el último paso ({current}/{total}). Usa culiplan.complete_cooking_mode para finalizar."
+    },
+    "no_paused_cooking_session": {
+      "message": "No se encontró ninguna sesión de cocina en pausa. Nada que reanudar."
+    },
+    "paused_session_fetch_failed": {
+      "message": "Error al obtener la sesión en pausa: {error}"
+    },
+    "timer_not_found": {
+      "message": "No hay ningún temporizador con etiqueta o ID {label_or_id} en la sesión activa."
+    }
   }
 }

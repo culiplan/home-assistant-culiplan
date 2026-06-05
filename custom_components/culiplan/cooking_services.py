@@ -107,7 +107,11 @@ async def _get_active_session(
     except PremiumRequiredError:
         raise
     except Exception as exc:
-        raise HomeAssistantError(f"Failed to fetch cooking session: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="cooking_session_fetch_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
     # The backend returns either a list or {sessions: [...]}
     if isinstance(sessions, list):
@@ -119,7 +123,8 @@ async def _get_active_session(
 
     if not items:
         raise HomeAssistantError(
-            "No active cooking session. Call culiplan.start_cooking_mode first."
+            translation_domain=DOMAIN,
+            translation_key="no_active_cooking_session",
         )
     return cast(dict[str, Any], items[0])
 
@@ -143,7 +148,11 @@ async def _patch_session(
     except HomeAssistantError:
         raise
     except Exception as exc:
-        raise HomeAssistantError(f"Cooking session update failed: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="cooking_session_update_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
 
 # ─── HA timer entity helpers ──────────────────────────────────────────────────
@@ -229,7 +238,10 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
 
     def _get_client(entry_id: str | None) -> CuliplanApiClient:
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         return cast(CuliplanApiClient, hass.data[DOMAIN][entry_id]["client"])
 
     def _find_entry_id() -> str | None:
@@ -280,8 +292,12 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
 
         if current_step >= total_steps - 1:
             raise HomeAssistantError(
-                f"Already at the last step ({current_step + 1}/{total_steps}). "
-                "Use culiplan.complete_cooking_mode to finish."
+                translation_domain=DOMAIN,
+                translation_key="cooking_already_last_step",
+                translation_placeholders={
+                    "current": str(current_step + 1),
+                    "total": str(total_steps),
+                },
             )
 
         updated = await _patch_session(
@@ -371,7 +387,9 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
         ]
         if not to_cancel:
             raise HomeAssistantError(
-                f"No timer with label or id '{label_or_id}' found in the active session."
+                translation_domain=DOMAIN,
+                translation_key="timer_not_found",
+                translation_placeholders={"label_or_id": label_or_id},
             )
 
         remaining_timers = [
@@ -419,7 +437,11 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
                 "/api/cooking-sessions?status=paused&limit=1"
             )
         except Exception as exc:
-            raise HomeAssistantError(f"Failed to fetch paused session: {exc}") from exc
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="paused_session_fetch_failed",
+                translation_placeholders={"error": str(exc)},
+            ) from exc
 
         if isinstance(sessions, list):
             items = sessions
@@ -430,7 +452,8 @@ def async_register_cooking_services(hass: HomeAssistant) -> None:
 
         if not items:
             raise HomeAssistantError(
-                "No paused cooking session found. Nothing to resume."
+                translation_domain=DOMAIN,
+                translation_key="no_paused_cooking_session",
             )
 
         session = items[0]

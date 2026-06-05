@@ -36,5 +36,94 @@
       "oauth_error": "Erreur OAuth : {error}",
       "missing_configuration": "Intégration non configurée. Veuillez la configurer dans l'interface."
     }
+  },
+  "entity": {
+    "sensor": {
+      "meals_planned_this_week": {
+        "name": "Repas prévus cette semaine"
+      },
+      "shopping_items": {
+        "name": "Articles de courses"
+      },
+      "expiring_pantry_items": {
+        "name": "Articles de garde-manger expirant bientôt"
+      },
+      "planned_kwh_today": {
+        "name": "kWh prévus aujourd'hui"
+      }
+    },
+    "binary_sensor": {
+      "pantry_has_expiring": {
+        "name": "Le garde-manger contient des articles qui expirent"
+      },
+      "dinner_party_active": {
+        "name": "Dîner actif"
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Culiplan n'est pas configuré."
+    },
+    "byok_key_missing": {
+      "message": "Aucune clé BYOK trouvée pour le fournisseur {provider}. Veuillez reconfigurer l'intégration Culiplan."
+    },
+    "ai_request_failed": {
+      "message": "Échec de la requête IA Culiplan : {error}"
+    },
+    "pantry_decrement_failed": {
+      "message": "Échec du décrément du garde-manger : {error}"
+    },
+    "pantry_expiring_failed": {
+      "message": "Échec de la récupération des articles expirants : {error}"
+    },
+    "scale_servings_failed": {
+      "message": "Échec de l'ajustement des portions : {error}"
+    },
+    "pantry_item_not_found": {
+      "message": "Aucun article de garde-manger avec le code-barres {barcode} trouvé. Ajoutez d'abord l'article à votre garde-manger Culiplan."
+    },
+    "insufficient_stock": {
+      "message": "Stock insuffisant (article={item_id}) : demandé {requested}, disponible {available}."
+    },
+    "api_forbidden": {
+      "message": "L'API Culiplan a renvoyé 403 sur {path} : {body}"
+    },
+    "blueprint_write_failed": {
+      "message": "Échec de l'écriture du fichier blueprint {path} : {error}"
+    },
+    "blueprint_generation_failed": {
+      "message": "Échec de la génération du blueprint : {error}"
+    },
+    "blueprint_envelope_failed": {
+      "message": "Échec de la récupération de l'enveloppe du blueprint : {error}"
+    },
+    "blueprint_envelope_missing": {
+      "message": "Le backend n'a renvoyé aucune enveloppe de prompt pour la génération du blueprint."
+    },
+    "blueprint_local_ai_failed": {
+      "message": "Échec de la génération du blueprint en IA locale : {error}"
+    },
+    "cooking_session_fetch_failed": {
+      "message": "Échec de la récupération de la session de cuisine : {error}"
+    },
+    "cooking_session_update_failed": {
+      "message": "Échec de la mise à jour de la session de cuisine : {error}"
+    },
+    "no_active_cooking_session": {
+      "message": "Aucune session de cuisine active. Appelez d'abord culiplan.start_cooking_mode."
+    },
+    "cooking_already_last_step": {
+      "message": "Déjà à la dernière étape ({current}/{total}). Utilisez culiplan.complete_cooking_mode pour terminer."
+    },
+    "no_paused_cooking_session": {
+      "message": "Aucune session de cuisine en pause trouvée. Rien à reprendre."
+    },
+    "paused_session_fetch_failed": {
+      "message": "Échec de la récupération de la session en pause : {error}"
+    },
+    "timer_not_found": {
+      "message": "Aucun minuteur avec le libellé ou l'ID {label_or_id} dans la session active."
+    }
   }
 }

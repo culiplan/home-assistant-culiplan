@@ -123,8 +123,9 @@ class PantryItemNotFoundError(HomeAssistantError):
     def __init__(self, barcode: str) -> None:
         self.barcode = barcode
         super().__init__(
-            f"No pantry item with barcode '{barcode}' found. "
-            "Add the item to your pantry in Culiplan first."
+            translation_domain=DOMAIN,
+            translation_key="pantry_item_not_found",
+            translation_placeholders={"barcode": barcode},
         )
 
 
@@ -134,8 +135,13 @@ class InsufficientStockError(HomeAssistantError):
     def __init__(self, pantry_item_id: str, available: float, requested: float) -> None:
         self.pantry_item_id = pantry_item_id
         super().__init__(
-            f"Not enough stock (item={pantry_item_id}): "
-            f"requested {requested}, available {available}."
+            translation_domain=DOMAIN,
+            translation_key="insufficient_stock",
+            translation_placeholders={
+                "item_id": pantry_item_id,
+                "requested": str(requested),
+                "available": str(available),
+            },
         )
 
 
@@ -172,7 +178,11 @@ async def _run_cloud_intent(
         # Repairs upsell issue (task-1416: no string parsing needed).
         raise
     except Exception as exc:
-        raise HomeAssistantError(f"Culiplan AI request failed: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="ai_request_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
 
 def _build_dispatch_mode(ai_mode: str, entry_config: dict[str, Any]) -> str:
@@ -236,8 +246,9 @@ async def _run_byok_or_local_intent(
         api_key = key_store.get_key(provider) or ""
         if not api_key:
             raise HomeAssistantError(
-                f"No BYOK key found for provider '{provider}'. "
-                "Please reconfigure the Culiplan integration."
+                translation_domain=DOMAIN,
+                translation_key="byok_key_missing",
+                translation_placeholders={"provider": provider},
             )
     elif ai_mode == AI_MODE_LOCAL:
         endpoint = entry_config.get(CONF_LOCAL_ENDPOINT, "")
@@ -295,7 +306,11 @@ async def _call_pantry_decrement(
             except (ValueError, KeyError):
                 pass
             raise InsufficientStockError(barcode, available, qty) from exc
-        raise HomeAssistantError(f"Pantry decrement failed: {exc_str}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="pantry_decrement_failed",
+            translation_placeholders={"error": exc_str},
+        ) from exc
 
 
 async def _call_pantry_expiring(
@@ -311,7 +326,11 @@ async def _call_pantry_expiring(
             ),
         )
     except Exception as exc:
-        raise HomeAssistantError(f"Pantry expiring fetch failed: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="pantry_expiring_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
 
 async def _call_scale_servings(
@@ -332,7 +351,11 @@ async def _call_scale_servings(
     except HomeAssistantError:
         raise
     except Exception as exc:
-        raise HomeAssistantError(f"Scale servings failed: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="scale_servings_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
 
 def async_register_services(hass: HomeAssistant) -> None:
@@ -341,7 +364,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_suggest_meal(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         entry_data = hass.data[DOMAIN][entry_id]
         client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
@@ -389,7 +415,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_fill_shopping_list(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         entry_data = hass.data[DOMAIN][entry_id]
         client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
@@ -437,7 +466,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_pantry_decrement(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         barcode: str = call.data["barcode"]
         qty: float = call.data["qty"]
@@ -457,7 +489,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_pantry_expiring(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         window_hours: int = call.data["window_hours"]
         result = await _call_pantry_expiring(client, window_hours)
@@ -473,7 +508,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_scale_tonight_servings(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
         present_count: int = call.data["present_count"]
         plan_date: str | None = call.data.get("plan_date")
@@ -496,7 +534,10 @@ def async_register_services(hass: HomeAssistant) -> None:
     async def handle_generate_blueprint(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
-            raise HomeAssistantError("Culiplan is not configured.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
         await _handle_bp_gen(hass, call, entry_id)
 
     registrations = [

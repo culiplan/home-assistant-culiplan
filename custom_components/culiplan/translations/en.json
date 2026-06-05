@@ -111,5 +111,94 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "meals_planned_this_week": {
+        "name": "Meals planned this week"
+      },
+      "shopping_items": {
+        "name": "Shopping items"
+      },
+      "expiring_pantry_items": {
+        "name": "Expiring pantry items"
+      },
+      "planned_kwh_today": {
+        "name": "Planned kWh today"
+      }
+    },
+    "binary_sensor": {
+      "pantry_has_expiring": {
+        "name": "Pantry has expiring items"
+      },
+      "dinner_party_active": {
+        "name": "Dinner party active"
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Culiplan is not configured."
+    },
+    "byok_key_missing": {
+      "message": "No BYOK key found for provider {provider}. Please reconfigure the Culiplan integration."
+    },
+    "ai_request_failed": {
+      "message": "Culiplan AI request failed: {error}"
+    },
+    "pantry_decrement_failed": {
+      "message": "Pantry decrement failed: {error}"
+    },
+    "pantry_expiring_failed": {
+      "message": "Pantry expiring fetch failed: {error}"
+    },
+    "scale_servings_failed": {
+      "message": "Scale servings failed: {error}"
+    },
+    "pantry_item_not_found": {
+      "message": "No pantry item with barcode {barcode} found. Add the item to your pantry in Culiplan first."
+    },
+    "insufficient_stock": {
+      "message": "Not enough stock (item={item_id}): requested {requested}, available {available}."
+    },
+    "api_forbidden": {
+      "message": "Culiplan API returned 403 on {path}: {body}"
+    },
+    "blueprint_write_failed": {
+      "message": "Failed to write blueprint file {path}: {error}"
+    },
+    "blueprint_generation_failed": {
+      "message": "Blueprint generation failed: {error}"
+    },
+    "blueprint_envelope_failed": {
+      "message": "Failed to fetch blueprint envelope: {error}"
+    },
+    "blueprint_envelope_missing": {
+      "message": "Backend returned no prompt envelope for blueprint generation."
+    },
+    "blueprint_local_ai_failed": {
+      "message": "Local AI blueprint generation failed: {error}"
+    },
+    "cooking_session_fetch_failed": {
+      "message": "Failed to fetch cooking session: {error}"
+    },
+    "cooking_session_update_failed": {
+      "message": "Cooking session update failed: {error}"
+    },
+    "no_active_cooking_session": {
+      "message": "No active cooking session. Call culiplan.start_cooking_mode first."
+    },
+    "cooking_already_last_step": {
+      "message": "Already at the last step ({current}/{total}). Use culiplan.complete_cooking_mode to finish."
+    },
+    "no_paused_cooking_session": {
+      "message": "No paused cooking session found. Nothing to resume."
+    },
+    "paused_session_fetch_failed": {
+      "message": "Failed to fetch paused session: {error}"
+    },
+    "timer_not_found": {
+      "message": "No timer with label or id {label_or_id} found in the active session."
+    }
   }
 }

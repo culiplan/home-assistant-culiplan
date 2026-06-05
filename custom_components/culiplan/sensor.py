@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -58,8 +59,7 @@ class _CuliplanSensor(CoordinatorEntity[CuliplanCoordinator], SensorEntity):
 class MealsPlanedThisWeekSensor(_CuliplanSensor):
     """Number of meals planned in the current ISO week."""
 
-    _attr_name = "Meals planned this week"
-    _attr_icon = "mdi:calendar-week"
+    _attr_translation_key = "meals_planned_this_week"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "meals"
 
@@ -90,8 +90,7 @@ class MealsPlanedThisWeekSensor(_CuliplanSensor):
 class ShoppingItemsCountSensor(_CuliplanSensor):
     """Total unchecked items across all shopping lists."""
 
-    _attr_name = "Shopping items"
-    _attr_icon = "mdi:cart"
+    _attr_translation_key = "shopping_items"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "items"
 
@@ -116,8 +115,7 @@ class ShoppingItemsCountSensor(_CuliplanSensor):
 class ExpiringPantrySensor(_CuliplanSensor):
     """Number of pantry items expiring within the configured window."""
 
-    _attr_name = "Expiring pantry items"
-    _attr_icon = "mdi:food-variant-off"
+    _attr_translation_key = "expiring_pantry_items"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "items"
 
@@ -177,11 +175,12 @@ class PlannedKwhTodaySensor(_CuliplanSensor):
       WebSocket event is received.
     """
 
-    _attr_name = "Planned kWh today"
-    _attr_icon = "mdi:flash"
+    _attr_translation_key = "planned_kwh_today"
     _attr_state_class = SensorStateClass.TOTAL
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = "kWh"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
         super().__init__(coordinator, device)

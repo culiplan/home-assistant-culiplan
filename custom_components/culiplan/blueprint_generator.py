@@ -87,7 +87,9 @@ async def _install_blueprint(hass: HomeAssistant, name: str, yaml_content: str) 
         await hass.async_add_executor_job(dest_file.write_text, yaml_content, "utf-8")
     except OSError as exc:
         raise HomeAssistantError(
-            f"Failed to write blueprint file '{dest_file}': {exc}"
+            translation_domain=DOMAIN,
+            translation_key="blueprint_write_failed",
+            translation_placeholders={"path": str(dest_file), "error": str(exc)},
         ) from exc
 
     rel_path = str(dest_file.relative_to(hass.config.config_dir))
@@ -135,7 +137,11 @@ async def _cloud_generate_blueprint(
             raise PremiumRequiredError(
                 feature="ai.blueprint", upgrade_url=upgrade_url
             ) from exc
-        raise HomeAssistantError(f"Blueprint generation failed: {exc_str}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="blueprint_generation_failed",
+            translation_placeholders={"error": exc_str},
+        ) from exc
 
 
 async def _byok_local_generate_blueprint(
@@ -167,8 +173,9 @@ async def _byok_local_generate_blueprint(
         api_key = key_store.get_key(provider) or ""
         if not api_key:
             raise HomeAssistantError(
-                f"No BYOK key found for provider '{provider}'. "
-                "Please reconfigure the Culiplan integration."
+                translation_domain=DOMAIN,
+                translation_key="byok_key_missing",
+                translation_placeholders={"provider": provider},
             )
     elif ai_mode == AI_MODE_LOCAL:
         endpoint = entry_config.get(CONF_LOCAL_ENDPOINT, "")
@@ -209,12 +216,17 @@ async def _byok_local_generate_blueprint(
             "/api/blueprints/generate", envelope_payload
         )
     except Exception as exc:
-        raise HomeAssistantError(f"Failed to fetch blueprint envelope: {exc}") from exc
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="blueprint_envelope_failed",
+            translation_placeholders={"error": str(exc)},
+        ) from exc
 
     envelope = envelope_resp.get("envelope")
     if not envelope:
         raise HomeAssistantError(
-            "Backend returned no prompt envelope for blueprint generation."
+            translation_domain=DOMAIN,
+            translation_key="blueprint_envelope_missing",
         )
 
     # Execute AI call locally via dispatcher (no tool-call loop needed — YAML response)
@@ -226,7 +238,9 @@ async def _byok_local_generate_blueprint(
         raw_yaml = dispatch_result.text or ""
     except Exception as exc:
         raise HomeAssistantError(
-            f"Local AI blueprint generation failed: {exc}"
+            translation_domain=DOMAIN,
+            translation_key="blueprint_local_ai_failed",
+            translation_placeholders={"error": str(exc)},
         ) from exc
 
     # The raw YAML from local AI is unvalidated — return it in the standard shape.

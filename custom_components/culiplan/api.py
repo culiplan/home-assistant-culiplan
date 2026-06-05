@@ -10,7 +10,7 @@ from aiohttp import ClientSession
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .ai.types import PremiumRequiredError
-from .const import BASE_URL
+from .const import BASE_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -231,7 +231,11 @@ class CuliplanApiClient:
                         ),
                     )
                 # Non-premium 403 (e.g. forbidden scope) — raise as generic HA error
-                raise HomeAssistantError(f"Culiplan API returned 403 on {path}: {body}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="api_forbidden",
+                    translation_placeholders={"path": path, "body": str(body)},
+                )
             resp.raise_for_status()
             return await resp.json()
 

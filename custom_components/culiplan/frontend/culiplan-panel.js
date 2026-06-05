@@ -247,48 +247,38 @@ class CuliplanPanel extends HTMLElement {
     this._errorMessage = "";
     this._render();
 
-    let token;
-    try {
-      token = this._hass?.auth?.data?.access_token;
-    } catch (_) {
-      token = undefined;
-    }
-
-    if (!token) {
+    // Use hass.callApi() rather than a raw fetch + manual token extraction.
+    // It pulls a valid token off the hass object internally and handles
+    // refresh across HA versions, so we never have to read the private
+    // _hass.auth.data.access_token field (which broke when HA rotated the
+    // session today). Path is "culiplan/launch" — callApi auto-prefixes /api/.
+    // On non-2xx, callApi throws { status_code, body }.
+    if (!this._hass || typeof this._hass.callApi !== "function") {
       this._fail(
-        "Home Assistant access token not available. Try refreshing the page.",
-      );
-      return;
-    }
-
-    let response;
-    try {
-      response = await fetch("/api/culiplan/launch", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (_) {
-      this._fail(
-        "Could not reach the Culiplan integration. Check your internet connection.",
+        "Home Assistant is not ready yet. Try refreshing the page.",
       );
       return;
     }
 
     let data;
     try {
-      data = await response.json();
-    } catch (_) {
-      data = {};
-    }
-
-    if (!response.ok) {
-      this._fail(
-        data.message ??
-          `Unexpected error from launch endpoint (HTTP ${response.status}).`,
-      );
+      data = await this._hass.callApi("GET", "culiplan/launch");
+    } catch (err) {
+      this._fetchedAt = null;
+      if (err && err.status_code === 401) {
+        this._fail(
+          "Home Assistant session expired. Refresh the page and try again.",
+        );
+        return;
+      }
+      const message =
+        err?.body?.message ??
+        `Unexpected error from launch endpoint${err?.status_code ? ` (HTTP ${err.status_code})` : ""}.`;
+      this._fail(message);
       return;
     }
 
-    const redirectUrl = data.redirect_url;
+    const redirectUrl = data?.redirect_url;
     if (!redirectUrl || typeof redirectUrl !== "string") {
       this._fail(
         "Culiplan returned an unexpected response. Please try again.",

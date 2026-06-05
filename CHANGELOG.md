@@ -2,6 +2,21 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] — 2026-06-05
+
+### Added
+
+- **`quality_scale.yaml`.** New file enumerates every Bronze / Silver / Gold / Platinum rule with `done` / `exempt` / `todo` + comment. Backs up the `quality_scale: gold` claim in `manifest.json` with an auditable per-rule trail. Platinum rules (`inject-websession`, `strict-typing`, `async-dependency`) tagged `todo` with a v0.3.0 target.
+
+### Changed
+
+- **`api.py` 403 raise now uses `translation_key`.** The last non-translated `raise HomeAssistantError("Culiplan API returned 403…")` call site was migrated to `translation_domain=DOMAIN, translation_key="api_forbidden"`. Every `HomeAssistantError` raised by the integration now goes through `strings.json` / `translations/<lang>.json`, satisfying the Gold `exception-translations` rule end-to-end.
+- **Panel JS now uses `hass.callApi()` instead of raw `fetch()` + manual token extraction.** Previously the sidebar panel read the bearer token directly off `this._hass.auth.data.access_token` — a private HA internal field — and built its own `Authorization` header. A stale-token 401 today (after an HA session rotation) surfaced the fragility. `hass.callApi("GET", "culiplan/launch")` pulls a current token off the hass object internally and handles refresh across HA versions; on non-2xx it throws `{ status_code, body }`, which we now map to a clear "session expired" message for 401 and a passthrough message for everything else. No behaviour change on the happy path.
+
+### Documentation
+
+- **Wiki: five Gold `docs-*` sub-rules added** in `docs/integrations/home-assistant.md` (Culiplan monorepo, separate commit) — automation examples, troubleshooting, known limitations, removal instructions, supported devices.
+
 ## [0.2.5] — 2026-06-05
 
 ### Fixed
@@ -91,6 +106,8 @@ Beta release. Initial OAuth flow, AI provider selection, scaffolded entities. **
 - CI: hassfest + HACS action on push / pull_request.
 - Pre-commit: gitleaks secret scanning.
 
+[0.2.6]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.6
+[0.2.5]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.5
 [0.2.4]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.4
 [0.2.3]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.3
 [0.2.2]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.2

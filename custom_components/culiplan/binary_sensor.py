@@ -86,8 +86,8 @@ class PantryHasExpiringBinarySensor(
         expiry_window_hours — configured window
     """
 
-    _attr_name = "Pantry has expiring items"
-    _attr_icon = "mdi:food-variant-off"
+    _attr_translation_key = "pantry_has_expiring"
+    _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     def __init__(
@@ -157,9 +157,10 @@ class DinnerPartyActiveBinarySensor(
         recipe_ids   — list of recipe IDs across all courses (IDs only, §14.3)
     """
 
-    _attr_name = "Dinner party active"
-    _attr_icon = "mdi:silverware-fork-knife"
+    _attr_translation_key = "dinner_party_active"
+    _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
