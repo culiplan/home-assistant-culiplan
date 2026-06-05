@@ -70,7 +70,13 @@ class MealsPlanedThisWeekSensor(_CuliplanSensor):
     @property
     def native_value(self) -> int:
         now = datetime.now(tz=UTC)
-        week_start = now - timedelta(days=now.weekday())
+        # Normalize to midnight Monday so the window covers the *whole* ISO
+        # week. Using `now`'s time-of-day would drop earlier-in-week meals
+        # once the current time passes their slot time (e.g. on Friday
+        # afternoon a Monday 18:00 dinner would fall before the window).
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         week_end = week_start + timedelta(weeks=1)
         count = 0
         for plan in (self.coordinator.data or {}).get("meal_plans", []):

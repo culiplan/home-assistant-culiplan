@@ -85,17 +85,26 @@ def test_unregister_llm_api_safe_when_missing() -> None:
 @pytest.mark.asyncio
 async def test_get_api_instance_returns_tools() -> None:
     """async_get_api_instance returns an APIInstance with the tool list."""
+    import inspect
+
     from homeassistant.helpers import llm as ha_llm
 
     hass = MagicMock()
     api = CuliplanLLMAPI(hass)
+    # LLMContext's fields drift across HA releases (e.g. `user_prompt` was
+    # removed in HA 2026.x). Build kwargs from the live signature so this
+    # test passes on every HA version in the CI matrix.
+    ctx_params = inspect.signature(ha_llm.LLMContext).parameters
+    ctx_kwargs = {
+        "platform": "test",
+        "context": None,
+        "user_prompt": "test",
+        "language": "en",
+        "assistant": None,
+        "device_id": None,
+    }
     llm_context = ha_llm.LLMContext(
-        platform="test",
-        context=None,
-        user_prompt="test",
-        language="en",
-        assistant=None,
-        device_id=None,
+        **{k: v for k, v in ctx_kwargs.items() if k in ctx_params}
     )
     instance = await api.async_get_api_instance(llm_context)
     assert isinstance(instance, ha_llm.APIInstance)

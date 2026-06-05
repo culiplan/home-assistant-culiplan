@@ -2,6 +2,19 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] — 2026-06-05
+
+Bug-fix release. Corrects the "meals planned this week" sensor week window
+and unbreaks the CI test matrix on HA latest.
+
+### Fixed
+
+- **"Meals planned this week" sensor under-counted earlier-in-week meals.** `MealsPlanedThisWeekSensor.native_value` computed `week_start = now - timedelta(days=now.weekday())`, which keeps the *current time-of-day* instead of snapping to midnight Monday. The effect: once the current time passed a slot's time on a later weekday (e.g. on Friday afternoon), that earlier meal — a Monday 18:00 dinner — fell *before* the window and was dropped from the count. `week_start` is now normalized to `00:00:00` so the window always covers the full ISO week.
+
+### CI
+
+- **Test suite re-greened on HA 2026.6.0.** `test_llm_api.py::test_get_api_instance_returns_tools` constructed `LLMContext` with a hard-coded kwarg list; HA 2026.x removed the `user_prompt` field, raising `TypeError: LLMContext.__init__() got an unexpected keyword argument`. The test now builds its kwargs from the live `LLMContext` signature via `inspect.signature`, so it passes across every HA version in the matrix (2024.10.0 / 2025.1.4 / 2026.6.0).
+
 ## [0.3.1] — 2026-06-05
 
 Phase B of the Gold → Platinum (Diamant) roadmap. All four Platinum-tier
