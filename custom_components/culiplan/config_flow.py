@@ -134,11 +134,15 @@ def _is_loopback_host(endpoint: str) -> bool:
     return False
 
 
-class OAuth2FlowHandler(
+class OAuth2FlowHandler(  # type: ignore[call-arg]
     config_entry_oauth2_flow.AbstractOAuth2FlowHandler,
     domain=DOMAIN,
 ):
-    """Handle OAuth2 authentication, AI provider selection, and Mealie import."""
+    """Handle OAuth2 authentication, AI provider selection, and Mealie import.
+
+    Note: ``domain=DOMAIN`` is HA's class-registration kwarg via
+    ``__init_subclass__``; mypy can't see the signature, hence the ignore.
+    """
 
     DOMAIN = DOMAIN
 
