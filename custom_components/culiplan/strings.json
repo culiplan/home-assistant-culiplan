@@ -101,11 +101,66 @@
     "step": {
       "init": {
         "title": "Culiplan Settings",
-        "description": "Manage your Culiplan integration.",
+        "description": "Configure pantry alerts, AI behaviour, and integration diagnostics.\n\nCurrent AI mode: **{current_ai_mode}**.",
         "data": {
+          "expiry_days": "Pantry expiry window (days)",
+          "expiry_hours": "Imminent-expiry alert window (hours)",
+          "debug_ai": "Verbose AI logging",
+          "advanced_ai": "Show Advanced AI settings",
           "rollback": "Roll back Mealie import (available within 24 hours of import)"
+        },
+        "data_description": {
+          "expiry_days": "How far ahead the daily expiring-pantry sensor counts (1–30 days, default 3).",
+          "expiry_hours": "When the binary expiring-soon alert fires (1–168 hours, default 48).",
+          "debug_ai": "Write AI prompt/response logs to your HA config dir for 24 h. Off by default.",
+          "advanced_ai": "Reveals BYOK / Local AI configuration in a sub-step."
+        }
+      },
+      "advanced_ai": {
+        "title": "AI Mode",
+        "description": "Choose how Culiplan AI features run in Home Assistant.\n\n**Cloud** — Culiplan processes requests on your behalf. Free tier supported; Premium unlocks the advanced features.\n**BYOK** — Your API key is stored locally and sent directly to the AI provider. Culiplan never sees it.\n**Local** — Requests go to your local Ollama or LM Studio endpoint.",
+        "data": {
+          "ai_mode": "AI Mode"
+        }
+      },
+      "advanced_ai_byok": {
+        "title": "Bring Your Own Key",
+        "description": "Enter the provider and API key Culiplan should use. The key is stored in Home Assistant only — Culiplan never sees it.",
+        "data": {
+          "byok_provider": "AI Provider",
+          "byok_api_key": "API Key"
+        },
+        "data_description": {
+          "byok_api_key": "Stored in Home Assistant only — never sent to Culiplan."
+        }
+      },
+      "advanced_ai_local": {
+        "title": "Local AI",
+        "description": "Point Culiplan at your local Ollama or LM Studio instance.",
+        "data": {
+          "local_endpoint": "Local AI Endpoint URL",
+          "local_model": "Model Name"
+        },
+        "data_description": {
+          "local_endpoint": "e.g. http://localhost:11434",
+          "local_model": "e.g. llama3.2"
+        }
+      },
+      "advanced_ai_local_remote_warning": {
+        "title": "Remote AI Endpoint",
+        "description": "The endpoint **{endpoint}** is on a remote host. Your AI prompts (which may include recipe names, meal plans, and pantry contents) will be sent to this address over your network.\n\nIf this is intentional (e.g. a server on your home network), tick the box and continue. If you are unsure, go back and use `localhost` instead.",
+        "data": {
+          "confirmed": "I understand and want to continue"
         }
       }
+    },
+    "error": {
+      "byok_provider_required": "Please select an AI provider for BYOK mode.",
+      "byok_key_required": "An API key is required for BYOK mode.",
+      "byok_key_invalid": "The API key is invalid or was rejected by the provider. Please check your key and try again. Detail: {error_detail}",
+      "byok_validation_error": "An unexpected error occurred while validating the key. Please try again. Detail: {error_detail}",
+      "local_endpoint_unreachable": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
+      "local_endpoint_invalid": "The endpoint URL is not valid. Use the format http://host:port (e.g. http://localhost:11434)."
     },
     "abort": {
       "no_action": "No changes were made.",

@@ -218,7 +218,11 @@ async def _run_byok_or_local_intent(
     ai_mode = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
     api_key = ""
     base_url = None
-    debug = entry_data.get("options", {}).get("debug_ai", False)
+    # debug_ai is an OptionsFlow setting; it lives on entry.options. The
+    # caller merges entry.data + entry.options into entry_config so we read
+    # from there (entry_data here is hass.data[DOMAIN][entry_id], NOT the
+    # ConfigEntry; the previous read path was a bug).
+    debug = bool(entry_config.get("debug_ai", False))
     config_dir: str | None = getattr(hass.config, "config_dir", None)
 
     # task-1410: when debug mode is active, register the hourly purge job so
@@ -343,7 +347,11 @@ def async_register_services(hass: HomeAssistant) -> None:
         client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
         entry = next((e for e in entries if e.entry_id == entry_id), None)
-        entry_config = entry.data if entry else {}
+        # Merge entry.options over entry.data so Settings (OptionsFlow) changes
+        # to ai_mode / byok_provider / local_endpoint / debug_ai actually take
+        # effect at runtime. entry.data still wins as the fallback for keys
+        # the user has never touched in Settings.
+        entry_config = {**entry.data, **entry.options} if entry else {}
         ai_mode = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
         params = {
             k: v
@@ -387,7 +395,11 @@ def async_register_services(hass: HomeAssistant) -> None:
         client: CuliplanApiClient = entry_data["client"]
         entries = hass.config_entries.async_entries(DOMAIN)
         entry = next((e for e in entries if e.entry_id == entry_id), None)
-        entry_config = entry.data if entry else {}
+        # Merge entry.options over entry.data so Settings (OptionsFlow) changes
+        # to ai_mode / byok_provider / local_endpoint / debug_ai actually take
+        # effect at runtime. entry.data still wins as the fallback for keys
+        # the user has never touched in Settings.
+        entry_config = {**entry.data, **entry.options} if entry else {}
         ai_mode = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
         params: dict[str, Any] = {}
         if call.data.get("week_offset") is not None:

@@ -626,22 +626,72 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        """Show main options: rollback (if applicable) + Advanced AI settings."""
+        """Show main options: pantry windows + debug + Advanced AI + rollback.
+
+        Three previously-orphaned options (`expiry_days`, `expiry_hours`,
+        `debug_ai`) are surfaced here. Two pantry windows are consumed by
+        `sensor.py` and `binary_sensor.py`; `debug_ai` is consumed by the AI
+        dispatcher in `services.py`. Defaults match the consumer-side defaults
+        (3 days / 48 h / off) so existing entries don't observe a behavior
+        change on first save.
+        """
         job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID)
         import_at = self._config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
         elapsed = int(time.time()) - import_at
         rollback_available = bool(job_id and elapsed < MEALIE_ROLLBACK_WINDOW_SECONDS)
 
+        current_options = self._config_entry.options
+        current_expiry_days = int(current_options.get("expiry_days", 3))
+        current_expiry_hours = int(current_options.get("expiry_hours", 48))
+        current_debug_ai = bool(current_options.get("debug_ai", False))
+
         if user_input is not None:
             if user_input.get("rollback") and rollback_available:
                 return await self.async_step_mealie_rollback()
             if user_input.get(CONF_ADVANCED_AI):
+                # Carry the pantry/debug values into the Advanced AI sub-flow
+                # so the final create_entry call doesn't drop them.
+                self._advanced_ai_data = {
+                    "expiry_days": int(
+                        user_input.get("expiry_days", current_expiry_days)
+                    ),
+                    "expiry_hours": int(
+                        user_input.get("expiry_hours", current_expiry_hours)
+                    ),
+                    "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
+                }
                 # Probe local endpoints before entering Advanced AI step
                 self._detected_endpoints = await probe_local_ai_endpoints()
                 return await self.async_step_advanced_ai()
-            return cast(_FlowResult, self.async_create_entry(title="", data={}))
+            # No Advanced AI: persist the General/Pantry/Advanced fields.
+            options_data = {
+                "expiry_days": int(user_input.get("expiry_days", current_expiry_days)),
+                "expiry_hours": int(
+                    user_input.get("expiry_hours", current_expiry_hours)
+                ),
+                "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
+            }
+            # Preserve any existing AI mode keys the user already configured.
+            for key in (
+                CONF_AI_MODE,
+                CONF_BYOK_PROVIDER,
+                CONF_LOCAL_ENDPOINT,
+                CONF_LOCAL_MODEL,
+            ):
+                if key in current_options:
+                    options_data[key] = current_options[key]
+            return cast(
+                _FlowResult, self.async_create_entry(title="", data=options_data)
+            )
 
         schema: dict[Any, Any] = {
+            vol.Optional("expiry_days", default=current_expiry_days): vol.All(
+                int, vol.Range(min=1, max=30)
+            ),
+            vol.Optional("expiry_hours", default=current_expiry_hours): vol.All(
+                int, vol.Range(min=1, max=168)
+            ),
+            vol.Optional("debug_ai", default=current_debug_ai): bool,
             # task-1626: Toggle to enter the Advanced AI sub-flow
             vol.Optional(CONF_ADVANCED_AI, default=False): bool,
         }
@@ -676,18 +726,22 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         """
         if user_input is not None:
             ai_mode = user_input[CONF_AI_MODE]
-            self._advanced_ai_data = {CONF_AI_MODE: ai_mode}
+            # Preserve pantry/debug values stashed by async_step_init.
+            self._advanced_ai_data = {
+                **self._advanced_ai_data,
+                CONF_AI_MODE: ai_mode,
+            }
 
             if ai_mode == AI_MODE_BYOK:
                 return await self.async_step_advanced_ai_byok()
             if ai_mode == AI_MODE_LOCAL:
                 return await self.async_step_advanced_ai_local()
-            # Cloud AI — commit immediately
+            # Cloud AI — commit immediately (carry pantry/debug forward)
             return cast(
                 _FlowResult,
                 self.async_create_entry(
                     title="",
-                    data={CONF_AI_MODE: AI_MODE_CLOUD},
+                    data={**self._advanced_ai_data, CONF_AI_MODE: AI_MODE_CLOUD},
                 ),
             )
 
@@ -748,6 +802,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                         self.async_create_entry(
                             title="",
                             data={
+                                **self._advanced_ai_data,
                                 CONF_AI_MODE: AI_MODE_BYOK,
                                 CONF_BYOK_PROVIDER: provider,
                                 # Key NOT in options data — zero-custody §13.2
@@ -802,21 +857,14 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 self._advanced_ai_data[CONF_LOCAL_MODEL] = local_model
 
             if not errors:
-                return cast(
-                    _FlowResult,
-                    self.async_create_entry(
-                        title="",
-                        data={
-                            CONF_AI_MODE: AI_MODE_LOCAL,
-                            CONF_LOCAL_ENDPOINT: self._advanced_ai_data.get(
-                                CONF_LOCAL_ENDPOINT, ""
-                            ),
-                            CONF_LOCAL_MODEL: self._advanced_ai_data.get(
-                                CONF_LOCAL_MODEL, ""
-                            ),
-                        },
-                    ),
-                )
+                # task-1413 parity: warn before saving a non-loopback endpoint
+                # in the OptionsFlow. The initial config flow does this; the
+                # OptionsFlow previously skipped it (security regression for
+                # users reconfiguring to a remote host).
+                committed_endpoint = self._advanced_ai_data.get(CONF_LOCAL_ENDPOINT, "")
+                if committed_endpoint and not _is_loopback_host(committed_endpoint):
+                    return await self.async_step_advanced_ai_local_remote_warning()
+                return self._async_commit_advanced_ai_local()
 
         detected: list[LocalAIEndpoint] = getattr(self, "_detected_endpoints", [])
         schema_fields: dict[Any, Any] = {}
@@ -843,6 +891,51 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 data_schema=vol.Schema(schema_fields),
                 errors=errors,
                 description_placeholders=description_placeholders,
+            ),
+        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Advanced AI: remote-endpoint warning (parity with config flow)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_advanced_ai_local_remote_warning(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Warn that the chosen Local AI endpoint is on a remote host.
+
+        Mirrors `async_step_local_endpoint_remote_warning` in the initial
+        config flow. The user is informed (not blocked) and must tick a
+        checkbox to continue — same UX as the initial-setup warning.
+        """
+        if user_input is not None:
+            return self._async_commit_advanced_ai_local()
+
+        local_ep = self._advanced_ai_data.get(CONF_LOCAL_ENDPOINT, "")
+        return cast(
+            _FlowResult,
+            self.async_show_form(
+                step_id="advanced_ai_local_remote_warning",
+                data_schema=vol.Schema(
+                    {vol.Required("confirmed", default=False): bool}
+                ),
+                description_placeholders={"endpoint": local_ep},
+            ),
+        )
+
+    def _async_commit_advanced_ai_local(self) -> dict[str, Any]:
+        """Persist the Local AI configuration and finish the options flow."""
+        return cast(
+            _FlowResult,
+            self.async_create_entry(
+                title="",
+                data={
+                    **self._advanced_ai_data,
+                    CONF_AI_MODE: AI_MODE_LOCAL,
+                    CONF_LOCAL_ENDPOINT: self._advanced_ai_data.get(
+                        CONF_LOCAL_ENDPOINT, ""
+                    ),
+                    CONF_LOCAL_MODEL: self._advanced_ai_data.get(CONF_LOCAL_MODEL, ""),
+                },
             ),
         )
 

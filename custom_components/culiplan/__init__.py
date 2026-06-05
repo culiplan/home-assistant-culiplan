@@ -214,7 +214,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(coordinator.async_stop)
     entry.async_on_unload(lambda: async_unregister_services(hass))
     entry.async_on_unload(lambda: async_unregister_cooking_services(hass))
+    # Reload the entry whenever OptionsFlow saves so the new ai_mode / pantry
+    # windows / debug toggle take effect without requiring the user to
+    # disable+enable the integration. Equivalent to OptionsFlowWithReload
+    # (HA ≥ 2025.5) but compatible with the supported 2024.10 / 2025.4 matrix.
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the integration when its options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:

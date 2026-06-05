@@ -271,7 +271,9 @@ async def handle_generate_blueprint(
     entry_data = hass.data[DOMAIN][entry_id]
     entries = hass.config_entries.async_entries(DOMAIN)
     entry = next((e for e in entries if e.entry_id == entry_id), None)
-    entry_config = entry.data if entry else {}
+    # Merge entry.options over entry.data so OptionsFlow changes to ai_mode
+    # and BYOK/Local config take effect at runtime.
+    entry_config = {**entry.data, **entry.options} if entry else {}
 
     client: CuliplanApiClient = entry_data["client"]
     ai_mode: str = entry_config.get(CONF_AI_MODE, AI_MODE_CLOUD)
