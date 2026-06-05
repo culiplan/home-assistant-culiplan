@@ -20,10 +20,14 @@ jobs:
         # 2026.6.0 was the user-facing breakage point in 2026-06 (OptionsFlow
         # ctor removal + openai 1.77 wheel gap); keep it in the matrix so we
         # catch deprecations on HA latest before users hit them on HAOS.
+        # HA 2025.2 onward requires Python ≥3.13; HA 2026.3 onward requires
+        # ≥3.14. Each lane must pin the right Python for its HA version or
+        # pip can't resolve the homeassistant pin. 2025.1.4 is the last
+        # HA release on Python 3.12 (the prior 2025.4 lane was unresolvable).
         include:
           - ha-version: "2024.10.0"
             python-version: "3.12"
-          - ha-version: "2025.4.0"
+          - ha-version: "2025.1.4"
             python-version: "3.12"
           - ha-version: "2026.6.0"
             python-version: "3.14"

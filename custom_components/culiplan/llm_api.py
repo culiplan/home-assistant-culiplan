@@ -324,9 +324,7 @@ class _FindRecipesByIngredientsTool(llm.Tool):
     )
     parameters = vol.Schema(
         {
-            vol.Required("ingredients"): vol.All(
-                [str], vol.Length(min=1, max=20)
-            ),
+            vol.Required("ingredients"): vol.All([str], vol.Length(min=1, max=20)),
         }
     )
 
@@ -432,9 +430,7 @@ class _GetRecipeTool(llm.Tool):
             "calories",
             "nutritionPerServing",
         }
-        trimmed: dict[str, Any] = {
-            k: v for k, v in recipe.items() if k in keep_keys
-        }
+        trimmed: dict[str, Any] = {k: v for k, v in recipe.items() if k in keep_keys}
         return {"recipe": trimmed}
 
 
@@ -496,9 +492,7 @@ class _GetPantryItemsTool(llm.Tool):
 # ─── Date helpers ────────────────────────────────────────────────────────────
 
 
-def _slot_in_range(
-    date_value: Any, start: str | None, end: str | None
-) -> bool:
+def _slot_in_range(date_value: Any, start: str | None, end: str | None) -> bool:
     """Return True if a slot's date falls within [start, end] (ISO YYYY-MM-DD)."""
     if not isinstance(date_value, str):
         return True  # Don't filter out slots with unparseable dates.

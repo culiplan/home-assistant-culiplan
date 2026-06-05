@@ -263,7 +263,9 @@ class OAuth2FlowHandler(
         """
         try:
             token = oauth_data.get("token", {})
-            access_token = token.get("access_token") if isinstance(token, dict) else None
+            access_token = (
+                token.get("access_token") if isinstance(token, dict) else None
+            )
             if not access_token:
                 return None
             # Platinum rule `inject-websession`: use HA's shared aiohttp session
