@@ -157,8 +157,14 @@ class OAuth2FlowHandler(
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
-        """Return the options flow handler."""
-        return MealieOptionsFlow(config_entry)
+        """Return the options flow handler.
+
+        HA 2025.12+ removed the legacy ``OptionsFlow(config_entry)`` ctor
+        pattern; the framework now injects ``self.config_entry`` after
+        construction. We construct without args and read state from
+        ``self.config_entry`` inside the flow.
+        """
+        return MealieOptionsFlow()
 
     async def async_oauth_create_entry(self, data: dict[str, Any]) -> dict[str, Any]:
         """Handle successful OAuth completion.
@@ -737,11 +743,20 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
 
     task-1422: Allow rolling back a Mealie import within 24 hours.
     task-1626: Expose BYOK / Local AI mode selection under "Advanced AI settings".
+
+    HA 2025.12+ removed the legacy ``OptionsFlow(config_entry)`` constructor;
+    the framework now sets ``self.config_entry`` after construction so we
+    read state from there. We retain the same field names internally — only
+    the constructor pattern changed.
     """
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    # Declared for type-checkers (HA stubs in the pinned CI version don't
+    # surface this attribute); HA's framework assigns it at runtime before
+    # any step method is called.
+    config_entry: config_entries.ConfigEntry
+
+    def __init__(self) -> None:
         super().__init__()
-        self._config_entry = config_entry
         # Temporary store for AI config changes during the Advanced AI sub-flow
         self._advanced_ai_data: dict[str, Any] = {}
         # Auto-detected Local AI endpoints (populated on entering advanced_ai_local)
@@ -759,12 +774,12 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         (3 days / 48 h / off) so existing entries don't observe a behavior
         change on first save.
         """
-        job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID)
-        import_at = self._config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
+        job_id = self.config_entry.data.get(CONF_MEALIE_JOB_ID)
+        import_at = self.config_entry.data.get(CONF_MEALIE_IMPORT_AT, 0)
         elapsed = int(time.time()) - import_at
         rollback_available = bool(job_id and elapsed < MEALIE_ROLLBACK_WINDOW_SECONDS)
 
-        current_options = self._config_entry.options
+        current_options = self.config_entry.options
         current_expiry_days = int(current_options.get("expiry_days", 3))
         current_expiry_hours = int(current_options.get("expiry_hours", 48))
         current_debug_ai = bool(current_options.get("debug_ai", False))
@@ -846,7 +861,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 description_placeholders={
                     "rollback_available": str(rollback_available).lower(),
                     "job_id": job_id or "",
-                    "current_ai_mode": self._config_entry.data.get(
+                    "current_ai_mode": self.config_entry.data.get(
                         CONF_AI_MODE, AI_MODE_CLOUD
                     ),
                 },
@@ -885,7 +900,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 ),
             )
 
-        current_mode = self._config_entry.data.get(CONF_AI_MODE, AI_MODE_CLOUD)
+        current_mode = self.config_entry.data.get(CONF_AI_MODE, AI_MODE_CLOUD)
         # Selector renders as a vertical list with mode-specific labels.
         # Plain vol.In(AI_MODES) showed bare values ("cloud" / "byok" / "local")
         # with no description — see strings.json options.step.advanced_ai for
@@ -1152,7 +1167,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Call the backend rollback endpoint and report the result."""
-        job_id = self._config_entry.data.get(CONF_MEALIE_JOB_ID, "")
+        job_id = self.config_entry.data.get(CONF_MEALIE_JOB_ID, "")
 
         try:
             # NOTE: CuliplanApiClient(session, access_token) — the variable was
@@ -1162,7 +1177,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 async with session.delete(
                     f"{BASE_URL}/api/migrate/mealie",
                     headers={
-                        "Authorization": f"Bearer {self._config_entry.data.get('access_token', '')}",
+                        "Authorization": f"Bearer {self.config_entry.data.get('access_token', '')}",
                     },
                     json={"jobId": job_id},
                     timeout=aiohttp.ClientTimeout(total=30),
