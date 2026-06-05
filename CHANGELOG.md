@@ -2,6 +2,12 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-06-05
+
+### Added
+
+- **Welcome Lovelace card.** Drop-in YAML at `lovelace/cards/culiplan-welcome-card.yaml` gives users a one-tap "Open Culiplan" tile on any HA dashboard. Uses the built-in `button` card (no custom JS), shows the live "meals planned this week" count, and taps through to the Culiplan sidebar panel. See `lovelace/README.md` for import instructions.
+
 ## [0.2.3] — 2026-06-05
 
 ### Added
@@ -79,6 +85,7 @@ Beta release. Initial OAuth flow, AI provider selection, scaffolded entities. **
 - CI: hassfest + HACS action on push / pull_request.
 - Pre-commit: gitleaks secret scanning.
 
+[0.2.4]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.4
 [0.2.3]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.3
 [0.2.2]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.2
 [0.2.1]: https://github.com/culiplan/home-assistant-culiplan/releases/tag/v0.2.1
