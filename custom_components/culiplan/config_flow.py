@@ -53,6 +53,7 @@ from .const import (
     CONF_MEALIE_URL,
     DOMAIN,
     MEALIE_ROLLBACK_WINDOW_SECONDS,
+    OAUTH_CLIENT_ID,
 )
 from .ai.key_store import BYOKKeyStore, validate_byok_key
 from .ai.local_ai import (
@@ -152,6 +153,41 @@ class OAuth2FlowHandler(
     @property
     def logger(self) -> logging.Logger:
         return _LOGGER
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Ensure the built-in OAuth credential is registered, then start OAuth.
+
+        HA only invokes the integration's ``async_setup`` when an entry
+        already exists OR when configuration.yaml references the domain.
+        On a fresh install both are false, so the ``async_import_client_
+        credential`` call in ``async_setup`` never runs before the user
+        clicks Add Integration → Culiplan — which is exactly when HA reads
+        the credential list to launch OAuth.
+
+        The reliable place is inside the config flow itself. Importing here
+        is idempotent: HA stores the credential keyed by (domain, auth_domain),
+        and ``async_import_client_credential`` is a no-op if it already
+        exists. The fixed ``ha-core`` client is a public OAuth 2.1 PKCE
+        client; ``client_secret=""`` is required by the framework but
+        ignored by the Culiplan backend per OAuth 2.1 §2.3.
+        """
+        from homeassistant.components.application_credentials import (  # noqa: PLC0415
+            ClientCredential,
+            async_import_client_credential,
+        )
+
+        _LOGGER.debug(
+            "[culiplan][flow] Ensuring built-in OAuth client credential is "
+            "registered before pick_implementation",
+        )
+        await async_import_client_credential(
+            self.hass,
+            DOMAIN,
+            ClientCredential(client_id=OAUTH_CLIENT_ID, client_secret=""),
+        )
+        return cast(_FlowResult, await super().async_step_user(user_input))
 
     @staticmethod
     def async_get_options_flow(
