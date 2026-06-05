@@ -15,7 +15,12 @@ from homeassistant.components.application_credentials import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow, intent
+from homeassistant.helpers import (
+    aiohttp_client,
+    config_entry_oauth2_flow,
+    config_validation as cv,
+    intent,
+)
 from homeassistant.helpers.typing import ConfigType
 
 from .api import CuliplanApiClient
@@ -74,6 +79,13 @@ _LOVELACE_RESOURCES: tuple[dict[str, str], ...] = (
 PANEL_URL_PATH = "culiplan"
 
 _LOGGER = logging.getLogger(__name__)
+
+# Hassfest CONFIG_SCHEMA requirement: this integration is config_entry-only.
+# YAML configuration is intentionally unsupported — users set it up via the UI
+# (config flow) which performs OAuth via the application_credentials framework.
+# `cv.config_entry_only_config_schema` raises a deprecation warning if anyone
+# tries to add a `culiplan:` block to configuration.yaml.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _INTENTS_DIR = Path(__file__).parent / "intents"
 

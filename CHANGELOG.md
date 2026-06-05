@@ -2,6 +2,12 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] — 2026-06-05
+
+### Fixed
+
+- **Hassfest `CONFIG_SCHEMA` warning.** HA Core's hassfest linter (dev branch) warns when an integration defines `async_setup` without declaring a config schema. Added `CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)` to signal that Culiplan is config-entry-only — YAML setup is unsupported and will surface HA's standard deprecation warning if attempted. No runtime behaviour change. Verified with `python -m script.hassfest --action validate` (HA dev container): "Integrations: 1, Invalid integrations: 0" with zero warnings.
+
 ## [0.2.4] — 2026-06-05
 
 ### Added
