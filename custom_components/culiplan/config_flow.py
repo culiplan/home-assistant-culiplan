@@ -20,6 +20,19 @@ import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.selector import (
+    BooleanSelector,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import (
     AI_MODE_BYOK,
@@ -684,19 +697,35 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 _FlowResult, self.async_create_entry(title="", data=options_data)
             )
 
+        # HA selectors render with units, sliders, and inline helper text
+        # (from strings.json data_description). Plain vol types render as
+        # raw schema keys with no affordances — see backlog/docs/
+        # ha-integration-settings-redesign-2026-06-05.md §4 for IA rationale.
         schema: dict[Any, Any] = {
-            vol.Optional("expiry_days", default=current_expiry_days): vol.All(
-                int, vol.Range(min=1, max=30)
+            vol.Optional("expiry_days", default=current_expiry_days): NumberSelector(
+                NumberSelectorConfig(
+                    min=1,
+                    max=30,
+                    step=1,
+                    mode=NumberSelectorMode.SLIDER,
+                    unit_of_measurement="days",
+                )
             ),
-            vol.Optional("expiry_hours", default=current_expiry_hours): vol.All(
-                int, vol.Range(min=1, max=168)
+            vol.Optional("expiry_hours", default=current_expiry_hours): NumberSelector(
+                NumberSelectorConfig(
+                    min=1,
+                    max=168,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="hours",
+                )
             ),
-            vol.Optional("debug_ai", default=current_debug_ai): bool,
+            vol.Optional("debug_ai", default=current_debug_ai): BooleanSelector(),
             # task-1626: Toggle to enter the Advanced AI sub-flow
-            vol.Optional(CONF_ADVANCED_AI, default=False): bool,
+            vol.Optional(CONF_ADVANCED_AI, default=False): BooleanSelector(),
         }
         if rollback_available:
-            schema[vol.Optional("rollback", default=False)] = bool
+            schema[vol.Optional("rollback", default=False)] = BooleanSelector()
 
         return cast(
             _FlowResult,
@@ -746,12 +775,39 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             )
 
         current_mode = self._config_entry.data.get(CONF_AI_MODE, AI_MODE_CLOUD)
+        # Selector renders as a vertical list with mode-specific labels.
+        # Plain vol.In(AI_MODES) showed bare values ("cloud" / "byok" / "local")
+        # with no description — see strings.json options.step.advanced_ai for
+        # the long-form explanation that renders above the selector.
         return cast(
             _FlowResult,
             self.async_show_form(
                 step_id="advanced_ai",
                 data_schema=vol.Schema(
-                    {vol.Required(CONF_AI_MODE, default=current_mode): vol.In(AI_MODES)}
+                    {
+                        vol.Required(
+                            CONF_AI_MODE, default=current_mode
+                        ): SelectSelector(
+                            SelectSelectorConfig(
+                                options=[
+                                    SelectOptionDict(
+                                        value=AI_MODE_CLOUD,
+                                        label="Cloud (Culiplan-hosted)",
+                                    ),
+                                    SelectOptionDict(
+                                        value=AI_MODE_BYOK,
+                                        label="Bring your own key (BYOK)",
+                                    ),
+                                    SelectOptionDict(
+                                        value=AI_MODE_LOCAL,
+                                        label="Local (Ollama / LM Studio)",
+                                    ),
+                                ],
+                                mode=SelectSelectorMode.LIST,
+                                translation_key="ai_mode",
+                            )
+                        )
+                    }
                 ),
             ),
         )
@@ -810,14 +866,30 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                         ),
                     )
 
+        # Use SelectSelector (dropdown) for the provider list and a password-
+        # typed TextSelector for the API key so the key is masked in the form
+        # and not echoed in browser autocomplete history.
         return cast(
             _FlowResult,
             self.async_show_form(
                 step_id="advanced_ai_byok",
                 data_schema=vol.Schema(
                     {
-                        vol.Required(CONF_BYOK_PROVIDER): vol.In(BYOK_PROVIDERS),
-                        vol.Required(CONF_BYOK_API_KEY): str,
+                        vol.Required(CONF_BYOK_PROVIDER): SelectSelector(
+                            SelectSelectorConfig(
+                                options=[
+                                    SelectOptionDict(value=p, label=p.capitalize())
+                                    for p in BYOK_PROVIDERS
+                                ],
+                                mode=SelectSelectorMode.DROPDOWN,
+                            )
+                        ),
+                        vol.Required(CONF_BYOK_API_KEY): TextSelector(
+                            TextSelectorConfig(
+                                type=TextSelectorType.PASSWORD,
+                                autocomplete="off",
+                            )
+                        ),
                     }
                 ),
                 errors=errors,
@@ -868,21 +940,43 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
 
         detected: list[LocalAIEndpoint] = getattr(self, "_detected_endpoints", [])
         schema_fields: dict[Any, Any] = {}
+        # Use SelectSelector(custom_value=True) so users can paste a URL not
+        # in the detected list without needing a separate __manual__ step.
         if detected:
             endpoint_options = [
-                f"{ep.base_url} ({ep.display_name})" for ep in detected
-            ] + [_MANUAL_ENTRY]
-            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = vol.In(endpoint_options)
+                SelectOptionDict(
+                    value=ep.base_url,
+                    label=f"{ep.base_url} ({ep.display_name})",
+                )
+                for ep in detected
+            ]
+            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = SelectSelector(
+                SelectSelectorConfig(
+                    options=endpoint_options,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
             all_models: list[str] = []
             for ep in detected:
                 all_models.extend(ep.available_models)
             if all_models:
-                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = vol.In(all_models)
+                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(value=m, label=m) for m in all_models
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
+                    )
+                )
             else:
-                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
+                schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = TextSelector()
         else:
-            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = str
-            schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = str
+            schema_fields[vol.Required(CONF_LOCAL_ENDPOINT)] = TextSelector(
+                TextSelectorConfig(type=TextSelectorType.URL)
+            )
+            schema_fields[vol.Optional(CONF_LOCAL_MODEL)] = TextSelector()
 
         return cast(
             _FlowResult,
@@ -916,7 +1010,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             self.async_show_form(
                 step_id="advanced_ai_local_remote_warning",
                 data_schema=vol.Schema(
-                    {vol.Required("confirmed", default=False): bool}
+                    {vol.Required("confirmed", default=False): BooleanSelector()}
                 ),
                 description_placeholders={"endpoint": local_ep},
             ),

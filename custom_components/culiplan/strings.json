@@ -43,7 +43,7 @@
       },
       "mealie_offer": {
         "title": "Import from Mealie",
-        "description": "Culiplan can import your existing Mealie recipe library in one click. This is optional — you can always import later from the integration settings.",
+        "description": "Culiplan can import your existing Mealie recipe library in one click. This step is optional — you can skip it now and import later from your Culiplan account.",
         "data": {
           "migrate_mealie": "Import my Mealie recipe library now"
         }
@@ -69,7 +69,7 @@
       },
       "mealie_done": {
         "title": "Import Complete",
-        "description": "Your Mealie recipe library has been imported into Culiplan.\n\n- **Job ID**: {job_id}\n- **Errors**: {errors} recipes could not be imported\n\nYou can roll back this import within 24 hours from the integration settings (Settings → Integrations → Culiplan → Configure)."
+        "description": "Your Mealie recipe library has been imported into Culiplan.\n\n- **Job ID**: {job_id}\n- **Errors**: {errors} recipes could not be imported\n\nYou can roll back this import within 24 hours from Settings → Devices & Services → Culiplan → Configure."
       },
       "reauth_confirm": {
         "title": "Re-authenticate Culiplan",
