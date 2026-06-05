@@ -37,6 +37,35 @@
  */
 const CODE_VALID_MS = 50_000;
 
+/**
+ * Origin of the embedded Culiplan web app. The launch endpoint returns a
+ * `redirect_url` on this origin (https://culiplan.com/ha-bridge#...), so
+ * postMessage must target it explicitly — `"*"` would leak the message to
+ * whatever happens to be in the iframe if the URL ever changed.
+ */
+const CULIPLAN_ORIGIN = "https://culiplan.com";
+
+/**
+ * HA design tokens we forward to the embedded app. The web app keeps a
+ * matching whitelist so an arbitrary postMessage cannot inject arbitrary
+ * CSS variables. Keep this list in sync with `ALLOWED_HA_TOKENS` in
+ * `packages/front/src/main.tsx`.
+ */
+const HA_THEME_TOKEN_NAMES = [
+  "--primary-color",
+  "--primary-background-color",
+  "--secondary-background-color",
+  "--card-background-color",
+  "--primary-text-color",
+  "--secondary-text-color",
+  "--divider-color",
+  "--text-primary-color",
+  "--accent-color",
+  "--error-color",
+  "--success-color",
+  "--warning-color",
+];
+
 const STYLES = `
   :host {
     display: block;
@@ -128,12 +157,24 @@ class CuliplanPanel extends HTMLElement {
     /** @type {object | null} HA frontend injects this after the element is attached. */
     this._hass = null;
     this._hasLaunched = false;
+
+    /**
+     * Reference to the currently-mounted iframe (once `state === "ready"`),
+     * and a flag set after its `load` event has fired. The hass setter uses
+     * these to forward theme-token updates without re-posting before the
+     * iframe is ready to receive them.
+     * @type {HTMLIFrameElement | null}
+     */
+    this._iframe = null;
+    this._iframeLoaded = false;
   }
 
   /**
    * HA's frontend sets the `hass` property on the panel element on every
    * state update. We trigger the first launch as soon as it appears so we
-   * can read the access token.
+   * can read the access token. We also re-post the theme tokens on every
+   * update so a user switching HA themes mid-session sees the embedded app
+   * follow along.
    */
   set hass(value) {
     this._hass = value;
@@ -141,9 +182,42 @@ class CuliplanPanel extends HTMLElement {
       this._hasLaunched = true;
       this._launch();
     }
+    if (this._iframe && this._iframeLoaded) {
+      this._postThemeTokens(this._iframe);
+    }
   }
   get hass() {
     return this._hass;
+  }
+
+  /**
+   * Read HA's design tokens off `document.documentElement` and post them
+   * to the embedded Culiplan app. Called on iframe load and on every
+   * `hass` state update (cheap — getComputedStyle reads are fast, and the
+   * receiving side ignores unknown keys).
+   *
+   * Wrapped in try/catch because postMessage can throw if the iframe has
+   * been torn down between scheduling and firing.
+   */
+  _postThemeTokens(iframe) {
+    try {
+      if (!iframe || !iframe.contentWindow) return;
+      const styles = getComputedStyle(document.documentElement);
+      /** @type {Record<string, string>} */
+      const tokens = {};
+      for (const name of HA_THEME_TOKEN_NAMES) {
+        const value = styles.getPropertyValue(name);
+        if (value && value.trim()) {
+          tokens[name] = value.trim();
+        }
+      }
+      iframe.contentWindow.postMessage(
+        { type: "culiplan.theme", tokens },
+        CULIPLAN_ORIGIN,
+      );
+    } catch (_) {
+      // Defensive: never let theme bridging affect the rest of the panel.
+    }
   }
 
   connectedCallback() {
@@ -268,6 +342,13 @@ class CuliplanPanel extends HTMLElement {
   }
 
   _buildContent() {
+    // Any non-"ready" state means the iframe is being torn down. Drop the
+    // stale ref so the hass setter doesn't try to postMessage into it.
+    if (this._state !== "ready") {
+      this._iframe = null;
+      this._iframeLoaded = false;
+    }
+
     if (this._state === "loading") {
       const wrap = document.createElement("div");
       wrap.className = "loading-container";
@@ -310,13 +391,23 @@ class CuliplanPanel extends HTMLElement {
     // state === "ready"
     const iframe = document.createElement("iframe");
     iframe.className = "fill";
-    iframe.src = this._redirectUrl;
     iframe.title = "Culiplan";
     iframe.setAttribute(
       "sandbox",
       "allow-scripts allow-same-origin allow-forms allow-popups",
     );
     iframe.addEventListener("error", this._onIframeError);
+    // Attach the load handler BEFORE setting `src` so we don't miss the
+    // load event for fast-cached responses. The handler forwards HA's
+    // current theme tokens into the iframe; the hass setter re-posts on
+    // every subsequent state update.
+    this._iframeLoaded = false;
+    iframe.addEventListener("load", () => {
+      this._iframeLoaded = true;
+      this._postThemeTokens(iframe);
+    });
+    iframe.src = this._redirectUrl;
+    this._iframe = iframe;
     return iframe;
   }
 }
