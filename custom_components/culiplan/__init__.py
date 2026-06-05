@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import logging
 from pathlib import Path
 from typing import Any, cast
@@ -26,6 +27,22 @@ from .cooking_services import (
 )
 from .launch_view import CuliplanLaunchView
 from .services import async_register_services, async_unregister_services
+
+
+def _read_manifest_version() -> str:
+    """Read the integration version from manifest.json at module load time.
+
+    Used to cache-bust the sidebar panel module URL so version bumps don't
+    require users to hard-refresh.
+    """
+    try:
+        manifest_path = Path(__file__).parent / "manifest.json"
+        return str(_json.loads(manifest_path.read_text()).get("version", "dev"))
+    except Exception:  # noqa: BLE001
+        return "dev"
+
+
+MANIFEST_VERSION: str = _read_manifest_version()
 
 # ─── Lovelace resource auto-registration (task-1408) ─────────────────────────
 #
@@ -288,7 +305,7 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
             config={
                 "_panel_custom": {
                     "name": "culiplan-panel",
-                    "module_url": "/culiplan_static/culiplan-panel.js",
+                    "module_url": f"/culiplan_static/culiplan-panel.js?v={MANIFEST_VERSION}",
                     "embed_iframe": False,
                     "trust_external": False,
                 },
