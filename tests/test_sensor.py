@@ -26,6 +26,7 @@ def _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans):
 
 def _device(entry):
     from custom_components.culiplan.helpers import _build_device_info
+
     return _build_device_info(entry)
 
 
@@ -114,7 +115,9 @@ def test_meals_planned_this_week_excludes_outside_week(
 
 
 @pytest.mark.asyncio
-async def test_sensor_counts_after_api_normalisation(hass, mock_api_client, mock_config_entry):
+async def test_sensor_counts_after_api_normalisation(
+    hass, mock_api_client, mock_config_entry
+):
     """Verify end-to-end: grouped backend response → normalised plans → sensor count."""
     from custom_components.culiplan.api import CuliplanApiClient
     from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor
@@ -137,10 +140,58 @@ async def test_sensor_counts_after_api_normalisation(hass, mock_api_client, mock
         }
     }
 
-    client = CuliplanApiClient(session=MagicMock(spec=ClientSession), access_token="tok")
+    client = CuliplanApiClient(
+        session=MagicMock(spec=ClientSession), access_token="tok"
+    )
     with patch.object(client, "_get", new_callable=AsyncMock, return_value=grouped):
         meal_plans = await client.async_get_meal_plans()
 
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans)
     sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
     assert sensor.native_value == 1
+
+
+@pytest.mark.asyncio
+async def test_sensor_counts_multi_date_after_single_plan_collapse(
+    hass, mock_api_client, mock_config_entry
+):
+    """Multi-date grouped response collapses into 1 plan; sensor counts all in-week slots."""
+    from custom_components.culiplan.api import CuliplanApiClient
+    from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor
+    from unittest.mock import patch
+    from aiohttp import ClientSession
+
+    # Build three in-week entries spread across Mon/Wed/Fri.
+    today = dt.date.today()
+    monday = today - dt.timedelta(days=today.weekday())
+
+    def _iso_for(offset_days: int, hour: int) -> str:
+        d = monday + dt.timedelta(days=offset_days)
+        return datetime(
+            d.year, d.month, d.day, hour, 0, tzinfo=timezone.utc
+        ).isoformat()
+
+    grouped: dict = {}
+    for offset, slot, hour, eid in (
+        (0, "DINNER", 18, "mon-d"),
+        (2, "LUNCH", 12, "wed-l"),
+        (4, "DINNER", 19, "fri-d"),
+    ):
+        iso = _iso_for(offset, hour)
+        grouped.setdefault(iso[:10], {}).setdefault(slot, []).append(
+            {"id": eid, "date": iso, "mealSlot": slot, "recipeId": None, "recipe": None}
+        )
+
+    client = CuliplanApiClient(
+        session=MagicMock(spec=ClientSession), access_token="tok"
+    )
+    with patch.object(client, "_get", new_callable=AsyncMock, return_value=grouped):
+        meal_plans = await client.async_get_meal_plans()
+
+    # Single collapsed plan with all 3 slots flattened.
+    assert len(meal_plans) == 1
+    assert len(meal_plans[0]["slots"]) == 3
+
+    coord = _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans)
+    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    assert sensor.native_value == 3
