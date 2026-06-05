@@ -282,7 +282,7 @@ async def _async_register_sidebar_panel(hass: HomeAssistant) -> None:
             hass,
             component_name="custom",
             sidebar_title="Culiplan",
-            sidebar_icon="mdi:silverware-fork-knife",
+            sidebar_icon="mdi:chef-hat",
             frontend_url_path=PANEL_URL_PATH,
             require_admin=False,
             config={
