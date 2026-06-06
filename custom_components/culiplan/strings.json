@@ -109,13 +109,15 @@
           "expiry_hours": "Imminent-expiry alert window (hours)",
           "debug_ai": "Verbose AI logging",
           "advanced_ai": "Show Advanced AI settings",
+          "check_for_update": "Check for updates",
           "rollback": "Roll back Mealie import (available within 24 hours of import)"
         },
         "data_description": {
           "expiry_days": "How far ahead the daily expiring-pantry sensor counts (1–30 days, default 3).",
           "expiry_hours": "When the binary expiring-soon alert fires (1–168 hours, default 48).",
           "debug_ai": "Write AI prompt/response logs to your HA config dir for 24 h. Off by default.",
-          "advanced_ai": "Reveals BYOK / Local AI configuration in a sub-step."
+          "advanced_ai": "Reveals BYOK / Local AI configuration in a sub-step.",
+          "check_for_update": "Checks GitHub for a newer release and lets you update with one click — no HACS or terminal required."
         }
       },
       "advanced_ai": {
@@ -154,6 +156,16 @@
         "data": {
           "confirmed": "I understand and want to continue"
         }
+      },
+      "update": {
+        "title": "Update Culiplan",
+        "description": "Update available: **{current}** → **{latest}**. Home Assistant will restart automatically to apply the new version.\n\n{notes}",
+        "data": {
+          "confirm": "Update now"
+        },
+        "data_description": {
+          "confirm": "Downloads the release from GitHub, backs up the current integration directory, swaps the files, and restarts Home Assistant. A backup is kept until the swap succeeds; on failure the old version is restored automatically."
+        }
       }
     },
     "error": {
@@ -162,12 +174,17 @@
       "byok_key_invalid": "The API key is invalid or was rejected by the provider. Please check your key and try again. Detail: {error_detail}",
       "byok_validation_error": "An unexpected error occurred while validating the key. Please try again. Detail: {error_detail}",
       "local_endpoint_unreachable": "Could not reach the local AI endpoint. Check the URL and that the service is running.",
-      "local_endpoint_invalid": "The endpoint URL is not valid. Use the format http://host:port (e.g. http://localhost:11434)."
+      "local_endpoint_invalid": "The endpoint URL is not valid. Use the format http://host:port (e.g. http://localhost:11434).",
+      "update_check_failed": "Could not reach GitHub to check for updates. Check your internet connection and try again.",
+      "update_failed": "The update failed. The previous version has been restored automatically. Check the Home Assistant logs for details."
     },
     "abort": {
       "no_action": "No changes were made.",
       "rollback_complete": "The Mealie import has been rolled back. Your Culiplan recipe library has been restored to its previous state.",
-      "rollback_failed": "The rollback request failed. Please try again or contact Culiplan support."
+      "rollback_failed": "The rollback request failed. Please try again or contact Culiplan support.",
+      "up_to_date": "You're already on the latest version of Culiplan.",
+      "update_check_failed": "Could not reach GitHub to check for updates. Check your internet connection and try again.",
+      "update_started": "Updating… Home Assistant is restarting to apply the new version of Culiplan."
     }
   },
   "services": {

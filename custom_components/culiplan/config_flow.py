@@ -5,14 +5,17 @@ task-1391: Local AI auto-detection (Ollama + LM Studio)
 task-1413: Non-loopback Local AI endpoint warning
 task-1422: Mealie config_flow wizard steps + OptionsFlow rollback
 task-1626: Default to Cloud AI on first run; BYOK/Local behind OptionsFlow Advanced
+task-self-updater: One-button update via Options flow (v0.6.0)
 """
 
 from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json as _json
 import logging
 import time
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -63,6 +66,7 @@ from .ai.local_ai import (
     probe_local_ai_endpoints,
 )
 from .ai.types import ProviderAuthError
+from .updater import LatestRelease, async_check_latest, async_perform_update, is_newer
 
 # HA FlowResult is dict[str, Any] at runtime; cast is used to satisfy strict mypy
 # since the HA stubs type flow helper returns as Any.
@@ -75,6 +79,24 @@ _MANUAL_ENTRY = "__manual__"
 
 # Hostnames that are definitively loopback (task-1413)
 _LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _read_manifest_version() -> str:
+    """Read the integration version from manifest.json at module load time.
+
+    Duplicates the same helper in ``__init__.py`` deliberately — importing
+    MANIFEST_VERSION from the package ``__init__`` would create a circular
+    import because HA's config-entry framework loads ``config_flow`` before
+    the package init has finished.
+    """
+    try:
+        manifest_path = Path(__file__).parent / "manifest.json"
+        return str(_json.loads(manifest_path.read_text()).get("version", "dev"))
+    except Exception:  # noqa: BLE001
+        return "dev"
+
+
+_MANIFEST_VERSION: str = _read_manifest_version()
 
 
 def _is_loopback_host(endpoint: str) -> bool:
@@ -836,6 +858,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         self._advanced_ai_data: dict[str, Any] = {}
         # Auto-detected Local AI endpoints (populated on entering advanced_ai_local)
         self._detected_endpoints: list[LocalAIEndpoint] = []
+        # Pending update metadata (populated in async_step_update on first entry)
+        self._pending_update: LatestRelease | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -860,6 +884,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         current_debug_ai = bool(current_options.get("debug_ai", False))
 
         if user_input is not None:
+            if user_input.get("check_for_update"):
+                return await self.async_step_update()
             if user_input.get("rollback") and rollback_available:
                 return await self.async_step_mealie_rollback()
             if user_input.get(CONF_ADVANCED_AI):
@@ -924,6 +950,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             vol.Optional("debug_ai", default=current_debug_ai): BooleanSelector(),
             # task-1626: Toggle to enter the Advanced AI sub-flow
             vol.Optional(CONF_ADVANCED_AI, default=False): BooleanSelector(),
+            # self-updater: toggle to open the update sub-flow
+            vol.Optional("check_for_update", default=False): BooleanSelector(),
         }
         if rollback_available:
             schema[vol.Optional("rollback", default=False)] = BooleanSelector()
@@ -1235,6 +1263,100 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 },
             ),
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Self-updater  (v0.6.0)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_step_update(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Check GitHub for a newer release and offer a one-click update.
+
+        First call (user_input is None):
+          - Fetches the latest release from GitHub.
+          - Aborts with ``update_check_failed`` if the network call fails.
+          - Aborts with ``up_to_date`` if the installed version is current.
+          - Stashes ``_pending_update`` and shows a confirmation form with
+            version details if a newer release is found.
+
+        Second call (user_input submitted):
+          - If ``confirm`` is False: abort with ``no_action``.
+          - If ``confirm`` is True: performs the update, schedules a 2-second
+            delayed HA restart, and aborts with ``update_started``.
+          - On download/swap failure: re-shows the form with an error.
+        """
+        errors: dict[str, str] = {}
+
+        if user_input is None:
+            # ── First entry: check GitHub ──────────────────────────────────────
+            latest = await async_check_latest(self.hass)
+            if latest is None:
+                return cast(
+                    _FlowResult,
+                    self.async_abort(reason="update_check_failed"),
+                )
+            if not is_newer(latest.version, _MANIFEST_VERSION):
+                return cast(
+                    _FlowResult,
+                    self.async_abort(reason="up_to_date"),
+                )
+            # Newer version found — stash and show confirmation form
+            self._pending_update = latest
+            return cast(
+                _FlowResult,
+                self.async_show_form(
+                    step_id="update",
+                    data_schema=vol.Schema(
+                        {vol.Required("confirm", default=False): BooleanSelector()}
+                    ),
+                    description_placeholders={
+                        "current": _MANIFEST_VERSION,
+                        "latest": latest.version,
+                        "notes": (latest.notes or "")[:500],
+                    },
+                ),
+            )
+
+        # ── Second entry: user submitted the confirmation form ─────────────────
+        if not user_input.get("confirm"):
+            return cast(_FlowResult, self.async_abort(reason="no_action"))
+
+        pending = self._pending_update
+        if pending is None:
+            # Should never happen — re-show without a pending update stashed
+            return cast(_FlowResult, self.async_abort(reason="update_check_failed"))
+
+        try:
+            await async_perform_update(self.hass, pending.zipball_url)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.error("[culiplan][updater] Update failed: %s", exc)
+            errors["base"] = "update_failed"
+            return cast(
+                _FlowResult,
+                self.async_show_form(
+                    step_id="update",
+                    data_schema=vol.Schema(
+                        {vol.Required("confirm", default=False): BooleanSelector()}
+                    ),
+                    description_placeholders={
+                        "current": _MANIFEST_VERSION,
+                        "latest": pending.version,
+                        "notes": (pending.notes or "")[:500],
+                    },
+                    errors=errors,
+                ),
+            )
+
+        # Success — schedule a delayed restart so the flow can return first
+        async def _restart() -> None:
+            await asyncio.sleep(2)
+            await self.hass.services.async_call(
+                "homeassistant", "restart", blocking=False
+            )
+
+        self.hass.async_create_task(_restart())
+        return cast(_FlowResult, self.async_abort(reason="update_started"))
 
     # ──────────────────────────────────────────────────────────────────────────
     # Mealie rollback  (task-1422)

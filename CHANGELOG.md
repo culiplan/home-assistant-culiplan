@@ -2,6 +2,16 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-06
+
+Feature release. One-button self-updater — no HACS, no terminal required.
+
+### Added
+
+- **Self-updater in Options flow.** A new "Check for updates" toggle in **Settings → Devices & Services → Culiplan → Configure** checks GitHub for the latest release. If a newer version is found, a confirmation step shows the current version, the available version, and the release notes. Ticking "Update now" downloads the release zip directly from GitHub, backs up the current `custom_components/culiplan/` directory to `culiplan.bak`, extracts the new files into place, and schedules a 2-second delayed Home Assistant restart. On any failure after the backup step the old version is restored automatically from `.bak` and an error is shown — safe to retry. The `.bak` is removed only on success.
+- **`updater.py` module** — new stdlib-only (no extra dependencies) async helper module with three public symbols: `LatestRelease` dataclass, `async_check_latest(hass)` (GitHub API call via HA shared session), `is_newer(latest, current)` (numeric dotted-semver comparison), and `async_perform_update(hass, zipball_url)` (download → extract → zip-slip guard → backup → swap → cleanup). All blocking filesystem/zip work runs via `hass.async_add_executor_job` to keep the event loop free.
+- **New translation keys** (both `strings.json` and `translations/en.json`): `options.step.update`, `options.error.update_check_failed`, `options.error.update_failed`, `options.abort.up_to_date`, `options.abort.update_check_failed`, `options.abort.update_started`, and `options.step.init.data.check_for_update` with its `data_description`.
+
 ## [0.5.0] — 2026-06-06
 
 Feature release. Self-service updates from inside the Culiplan panel.
