@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — 2026-06-06
+
+Feature release. Native Home Assistant update entity — updates now appear the standard HA way.
+
+### Added
+
+- **`update.culiplan_update` entity.** A first-class HA `update` entity now surfaces the integration's own updates on the **device page** and in **Settings → Updates** (alongside HA core / OS / add-ons), with installed vs latest version, release notes, and an **Install** button — no HACS required. It polls GitHub for the latest release every 6 hours (and on demand). Pressing **Install** reuses the v0.6.0 self-updater (`updater.async_perform_update`: download → backup → swap → rollback-on-failure) and then restarts Home Assistant. This is now the recommended way to update; the v0.6.0 Options-flow "Check for updates" toggle remains as a fallback.
+
 ## [0.6.0] — 2026-06-06
 
 Feature release. One-button self-updater — no HACS, no terminal required.

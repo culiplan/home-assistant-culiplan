@@ -52,7 +52,7 @@ CONF_LOCAL_MODEL = "local_model"
 CONF_ADVANCED_AI = "advanced_ai"
 
 # binary_sensor added in Phase 2 (tasks 1378 + 1380)
-PLATFORMS: list[str] = ["binary_sensor", "calendar", "sensor", "todo"]
+PLATFORMS: list[str] = ["binary_sensor", "calendar", "sensor", "todo", "update"]
 
 # ─── Mealie migration (Phase 2, task-1394) ────────────────────────────────────
 CONF_MEALIE_URL = "mealie_url"
