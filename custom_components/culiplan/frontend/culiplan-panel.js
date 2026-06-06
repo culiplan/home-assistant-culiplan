@@ -167,6 +167,9 @@ class CuliplanPanel extends HTMLElement {
      */
     this._iframe = null;
     this._iframeLoaded = false;
+
+    // Bound once so addEventListener/removeEventListener pair up correctly.
+    this._onMessage = this._onMessage.bind(this);
   }
 
   /**
@@ -184,6 +187,7 @@ class CuliplanPanel extends HTMLElement {
     }
     if (this._iframe && this._iframeLoaded) {
       this._postThemeTokens(this._iframe);
+      this._postIntegrationStatus(this._iframe);
     }
   }
   get hass() {
@@ -220,8 +224,121 @@ class CuliplanPanel extends HTMLElement {
     }
   }
 
+  /**
+   * Find the HACS-managed `update.*` entity for this integration, if present.
+   * HACS exposes one update entity per managed repo; we match by entity_id or
+   * its `title`/friendly name containing "culiplan". Returns the HA state
+   * object or null (e.g. integration installed manually, or HACS update
+   * entities disabled).
+   */
+  _findUpdateEntity() {
+    const states = this._hass && this._hass.states;
+    if (!states) return null;
+    for (const entityId in states) {
+      if (!entityId.startsWith("update.")) continue;
+      const st = states[entityId];
+      const attrs = (st && st.attributes) || {};
+      const title = String(attrs.title || attrs.friendly_name || "").toLowerCase();
+      if (entityId.toLowerCase().includes("culiplan") || title.includes("culiplan")) {
+        return st;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Post the integration's update status into the embedded app so it can show
+   * the in-panel nudge / Settings section. Sourced from the HACS update entity
+   * (installed/latest versions, whether an update is available). The web app
+   * sends `culiplan.haUpdateCommand` messages back (see `_onMessage`).
+   */
+  _postIntegrationStatus(iframe) {
+    try {
+      if (!iframe || !iframe.contentWindow) return;
+      const st = this._findUpdateEntity();
+      let payload;
+      if (st) {
+        const attrs = st.attributes || {};
+        payload = {
+          type: "culiplan.haUpdate",
+          hasEntity: true,
+          entityId: st.entity_id,
+          installed: attrs.installed_version || null,
+          latest: attrs.latest_version || null,
+          updateAvailable: st.state === "on",
+          inProgress: !!attrs.in_progress,
+          releaseUrl: attrs.release_url || null,
+        };
+      } else {
+        payload = { type: "culiplan.haUpdate", hasEntity: false };
+      }
+      iframe.contentWindow.postMessage(payload, CULIPLAN_ORIGIN);
+    } catch (_) {
+      // Defensive: never let status bridging affect the rest of the panel.
+    }
+  }
+
+  /**
+   * Handle commands the embedded app sends back: refresh (force HACS to
+   * re-check GitHub), install (download the new version via HACS), restart
+   * (apply it). Strictly validated: must come from our iframe at the Culiplan
+   * origin, and only the three known actions are honoured.
+   */
+  _onMessage(event) {
+    try {
+      if (event.origin !== CULIPLAN_ORIGIN) return;
+      const iframe = this._iframe;
+      if (!iframe || event.source !== iframe.contentWindow) return;
+      const data = event.data;
+      if (!data || data.type !== "culiplan.haUpdateCommand") return;
+      if (!this._hass || typeof this._hass.callService !== "function") return;
+
+      const entityId = data.entityId;
+      const post = (extra) => {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.postMessage(
+            { type: "culiplan.haUpdate", ...extra },
+            CULIPLAN_ORIGIN,
+          );
+        }
+      };
+
+      switch (data.action) {
+        case "refresh":
+          if (entityId) {
+            this._hass
+              .callService("homeassistant", "update_entity", { entity_id: entityId })
+              .catch(() => {});
+          }
+          // Re-post once the refreshed state has had time to propagate.
+          setTimeout(() => this._postIntegrationStatus(this._iframe), 4000);
+          break;
+        case "install":
+          if (!entityId) return;
+          this._hass
+            .callService("update", "install", { entity_id: entityId })
+            .then(() => {
+              post({ installComplete: true });
+              this._postIntegrationStatus(this._iframe);
+            })
+            .catch((e) => post({ installError: String((e && e.message) || e) }));
+          break;
+        case "restart":
+          this._hass.callService("homeassistant", "restart").catch(() => {});
+          break;
+      }
+    } catch (_) {
+      // Never let a stray message break the panel.
+    }
+  }
+
   connectedCallback() {
+    window.addEventListener("message", this._onMessage);
     this._render();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("message", this._onMessage);
   }
 
   /**
@@ -402,6 +519,7 @@ class CuliplanPanel extends HTMLElement {
     iframe.addEventListener("load", () => {
       this._iframeLoaded = true;
       this._postThemeTokens(iframe);
+      this._postIntegrationStatus(iframe);
     });
     iframe.src = this._redirectUrl;
     this._iframe = iframe;

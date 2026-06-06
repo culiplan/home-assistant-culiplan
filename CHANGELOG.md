@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-06-06
+
+Feature release. Self-service updates from inside the Culiplan panel.
+
+### Added
+
+- **In-panel update helper.** The custom panel now reads the HACS-managed `update.*` entity for this integration and bridges it to the embedded app via `postMessage`: it posts the installed/latest versions and whether an update is available, and accepts three commands back — `refresh` (force HACS to re-check GitHub via `homeassistant.update_entity`), `install` (download the new version via `update.install`), and `restart` (`homeassistant.restart`). The app uses this to show an update nudge, a "Home Assistant" section in Settings with a **Check for updates** button and an **Auto-update** toggle, and an explicit **Restart now / Later** prompt after a download (a restart is always user-confirmed, never silent). Falls back gracefully (no nudge) when no HACS update entity is present.
+
 ## [0.4.0] — 2026-06-06
 
 Feature release. Enables in-panel barcode scanning for the kitchen-tablet use case.
