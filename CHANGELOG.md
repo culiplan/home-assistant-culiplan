@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-06
+
+Fix release. No more login screen inside the panel — silent session re-launch.
+
+### Fixed
+
+- **Panel session expiry no longer shows a (broken) web login.** The iframe gets a short-lived access token and no refresh token by design, so when it expired the embedded app fell back to its normal web login — including "Login with Google", which Google **refuses to render inside an iframe** (resulting in a `403`). Now, on token expiry the app posts a `culiplan.haRelaunch` message to the panel; the panel fetches a fresh one-time launch code (it already holds the OAuth grant) and reloads the iframe with a new session — silently, no login screen. Paired with a front-end change that routes the in-iframe 401 path to this re-launch instead of the web login modal. Requires the matching front-end deploy.
+
 ## [0.7.0] — 2026-06-06
 
 Feature release. Native Home Assistant update entity — updates now appear the standard HA way.

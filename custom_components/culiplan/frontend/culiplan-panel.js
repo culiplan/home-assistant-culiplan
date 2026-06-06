@@ -290,7 +290,20 @@ class CuliplanPanel extends HTMLElement {
       const iframe = this._iframe;
       if (!iframe || event.source !== iframe.contentWindow) return;
       const data = event.data;
-      if (!data || data.type !== "culiplan.haUpdateCommand") return;
+      if (!data) return;
+
+      // Session re-launch: the embedded app's short-lived access token expired
+      // (the iframe holds no refresh token by design). Fetch a fresh one-time
+      // launch code and reload the iframe with a new session — instead of the
+      // app falling back to the web login, which can't work in an iframe
+      // (Google blocks its OAuth pages from being framed).
+      if (data.type === "culiplan.haRelaunch") {
+        this._fetchedAt = null; // force _isCodeFresh() to return false
+        this._launch();
+        return;
+      }
+
+      if (data.type !== "culiplan.haUpdateCommand") return;
       if (!this._hass || typeof this._hass.callService !== "function") return;
 
       const entityId = data.entityId;
