@@ -2,6 +2,15 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-06-06
+
+Fix release. Stale "up-to-date" on startup fixed; real, persistent auto-update owned by the integration.
+
+### Fixed
+
+- **Update entity now re-checks GitHub hourly and immediately on startup.** `SCAN_INTERVAL` reduced from 6 hours to 1 hour. An `async_added_to_hass` hook triggers an immediate GitHub check on every HA restart, so the entity never shows a false "up-to-date" when a release was published between polls.
+- **Real, persistent auto-update owned by the integration (default on, toggle in Configure).** The read-only `auto_update` UI property never actually persisted state — toggling it in the HA UI had no lasting effect and HA core does not auto-install based on it. v0.9.0 introduces a genuine `auto_update` boolean in config-entry options (default `True`), surfaced as a toggle in **Settings → Devices & Services → Culiplan → Configure**. When enabled, `async_update` installs each new version exactly once (guarded by `_auto_installed_version` so it never loops) and schedules the standard 2-second delayed HA restart. The preference is threaded through both the direct-save path and the Advanced-AI sub-flow path so it is never silently dropped.
+
 ## [0.8.0] — 2026-06-06
 
 Fix release. No more login screen inside the panel — silent session re-launch.

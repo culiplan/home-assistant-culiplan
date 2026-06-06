@@ -84,6 +84,7 @@
           "expiry_days": "Pantry expiry window (days)",
           "expiry_hours": "Imminent-expiry alert window (hours)",
           "debug_ai": "Verbose AI logging",
+          "auto_update": "Update Culiplan automatically",
           "advanced_ai": "Show Advanced AI settings",
           "check_for_update": "Check for updates",
           "rollback": "Roll back Mealie import (available within 24 hours of import)"
@@ -92,6 +93,7 @@
           "expiry_days": "How far ahead the daily expiring-pantry sensor counts (1–30 days, default 3).",
           "expiry_hours": "When the binary expiring-soon alert fires (1–168 hours, default 48).",
           "debug_ai": "Write AI prompt/response logs to your HA config dir for 24 h. Off by default.",
+          "auto_update": "When on, Culiplan installs new releases itself and restarts Home Assistant to apply them.",
           "advanced_ai": "Reveals BYOK / Local AI configuration in a sub-step.",
           "check_for_update": "Checks GitHub for a newer release and lets you update with one click — no HACS or terminal required."
         }

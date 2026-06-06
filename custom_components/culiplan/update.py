@@ -6,6 +6,15 @@ card on the device page AND in Settings → Updates, with release notes. No HACS
 required. ``Install`` reuses :func:`updater.async_perform_update` then restarts
 HA to apply the new code. The entity polls GitHub for the latest release on
 ``SCAN_INTERVAL`` (and whenever HA refreshes it on demand).
+
+v0.9.0 additions
+----------------
+* Polls every 1 hour instead of 6 (faster detection of new releases).
+* Performs an immediate GitHub check on HA restart via ``async_added_to_hass``
+  so the entity never shows "up-to-date" on startup when a newer release exists.
+* Reads the ``auto_update`` preference from config-entry options (persisted via
+  the Options flow). When enabled (default) the entity auto-installs each new
+  version exactly once per version string, then restarts HA.
 """
 
 from __future__ import annotations
@@ -25,12 +34,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .helpers import _build_device_info
-from .updater import LatestRelease, async_check_latest, async_perform_update
+from .updater import LatestRelease, async_check_latest, async_perform_update, is_newer
 
 _LOGGER = logging.getLogger(__name__)
 
 # How often HA polls GitHub for a newer release (also refreshable on demand).
-SCAN_INTERVAL = timedelta(hours=6)
+SCAN_INTERVAL = timedelta(hours=1)
 
 _MANIFEST_PATH = Path(__file__).parent / "manifest.json"
 
@@ -65,6 +74,7 @@ class CuliplanUpdateEntity(UpdateEntity):
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialise from the config entry (device grouping + version)."""
+        self._entry = entry
         self._attr_unique_id = f"{DOMAIN}_update"
         self._attr_device_info = _build_device_info(entry)
         installed = _installed_version()
@@ -72,15 +82,69 @@ class CuliplanUpdateEntity(UpdateEntity):
         # Until the first poll we report "no update" by mirroring installed.
         self._attr_latest_version = installed
         self._latest_release: LatestRelease | None = None
+        # Loop-guard: track the latest version for which we already triggered
+        # an auto-install so we never fire twice for the same release.
+        self._auto_installed_version: str | None = None
+
+    # ------------------------------------------------------------------
+    # Auto-update preference (read live from config-entry options)
+    # ------------------------------------------------------------------
+
+    def _auto_update_enabled(self) -> bool:
+        """Return whether auto-update is enabled (persisted in options, default True)."""
+        return bool(self._entry.options.get("auto_update", True))
+
+    @property
+    def auto_update(self) -> bool:
+        """Reflect the persisted auto-update preference to the HA UI."""
+        return self._auto_update_enabled()
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    async def async_added_to_hass(self) -> None:
+        """Run an immediate GitHub check on startup so we never show a false 'up-to-date'."""
+        await super().async_added_to_hass()
+        try:
+            await self.async_update()
+            self.async_write_ha_state()
+        except Exception:  # noqa: BLE001
+            # Never let a startup network failure break the entity setup.
+            pass
 
     async def async_update(self) -> None:
-        """Poll GitHub for the latest release (silent on network failure)."""
+        """Poll GitHub for the latest release (silent on network failure).
+
+        If auto-update is enabled and a genuinely newer version is found that
+        we have not yet auto-installed, trigger installation immediately. The
+        ``_auto_installed_version`` guard ensures each version fires at most
+        once (across the lifetime of the entity object; a restart resets the
+        guard, but by then installed==latest so the condition won't re-fire).
+        """
         release = await async_check_latest(self.hass)
         if release is None:
             return
         self._latest_release = release
         self._attr_latest_version = release.version
         self._attr_release_url = release.html_url
+
+        installed = self._attr_installed_version or _installed_version()
+
+        if (
+            self._auto_update_enabled()
+            and is_newer(release.version, installed)
+            and not self._attr_in_progress
+            and self._auto_installed_version != release.version
+        ):
+            _LOGGER.info(
+                "[culiplan][update] Auto-update: installing %s (installed: %s)",
+                release.version,
+                installed,
+            )
+            # Mark before the await so a concurrent poll can't double-trigger.
+            self._auto_installed_version = release.version
+            await self.async_install(None, False)
 
     async def async_release_notes(self) -> str | None:
         """Return the latest release's notes for the update dialog."""

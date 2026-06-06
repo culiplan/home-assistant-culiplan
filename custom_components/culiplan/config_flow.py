@@ -882,6 +882,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
         current_expiry_days = int(current_options.get("expiry_days", 3))
         current_expiry_hours = int(current_options.get("expiry_hours", 48))
         current_debug_ai = bool(current_options.get("debug_ai", False))
+        current_auto_update = bool(current_options.get("auto_update", True))
 
         if user_input is not None:
             if user_input.get("check_for_update"):
@@ -889,8 +890,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
             if user_input.get("rollback") and rollback_available:
                 return await self.async_step_mealie_rollback()
             if user_input.get(CONF_ADVANCED_AI):
-                # Carry the pantry/debug values into the Advanced AI sub-flow
-                # so the final create_entry call doesn't drop them.
+                # Carry the pantry/debug/auto_update values into the Advanced
+                # AI sub-flow so the final create_entry call doesn't drop them.
                 self._advanced_ai_data = {
                     "expiry_days": int(
                         user_input.get("expiry_days", current_expiry_days)
@@ -899,6 +900,9 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                         user_input.get("expiry_hours", current_expiry_hours)
                     ),
                     "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
+                    "auto_update": bool(
+                        user_input.get("auto_update", current_auto_update)
+                    ),
                 }
                 # Probe local endpoints before entering Advanced AI step
                 self._detected_endpoints = await probe_local_ai_endpoints(self.hass)
@@ -910,6 +914,9 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                     user_input.get("expiry_hours", current_expiry_hours)
                 ),
                 "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
+                "auto_update": bool(
+                    user_input.get("auto_update", current_auto_update)
+                ),
             }
             # Preserve any existing AI mode keys the user already configured.
             for key in (
@@ -948,6 +955,8 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 )
             ),
             vol.Optional("debug_ai", default=current_debug_ai): BooleanSelector(),
+            # v0.9.0: persisted auto-update preference (default on)
+            vol.Optional("auto_update", default=current_auto_update): BooleanSelector(),
             # task-1626: Toggle to enter the Advanced AI sub-flow
             vol.Optional(CONF_ADVANCED_AI, default=False): BooleanSelector(),
             # self-updater: toggle to open the update sub-flow
@@ -994,7 +1003,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_advanced_ai_byok()
             if ai_mode == AI_MODE_LOCAL:
                 return await self.async_step_advanced_ai_local()
-            # Cloud AI — commit immediately (carry pantry/debug forward)
+            # Cloud AI — commit immediately (carry pantry/debug/auto_update forward)
             return cast(
                 _FlowResult,
                 self.async_create_entry(
