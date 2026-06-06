@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-06
+
+Feature release. Enables in-panel barcode scanning for the kitchen-tablet use case.
+
+### Added
+
+- **Camera barcode scanning in the embedded app.** The custom panel's iframe now sets `allow="camera"`, delegating camera permission into the cross-origin Culiplan app so it can use `getUserMedia` to scan product barcodes and add them straight to the pantry — without leaving Home Assistant. HA's *built-in* iframe panel hardcodes `allow="fullscreen"` and cannot do this; this integration owns its iframe, so it grants camera itself. On a wall-mounted tablet the app defaults to the **front** camera (the rear faces the wall) with a flip control, and decodes via `html5-qrcode`, which works in Safari / iOS WKWebView (the HA Companion app) where the browser `BarcodeDetector` API is unavailable. A camera icon appears in the app's embed top-bar only when a camera is present.
+
 ## [0.3.2] — 2026-06-05
 
 Bug-fix release. Corrects the "meals planned this week" sensor week window

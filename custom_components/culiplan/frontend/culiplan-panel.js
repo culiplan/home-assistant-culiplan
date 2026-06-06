@@ -386,6 +386,13 @@ class CuliplanPanel extends HTMLElement {
       "sandbox",
       "allow-scripts allow-same-origin allow-forms allow-popups",
     );
+    // Delegate camera permission into the cross-origin iframe so the embedded
+    // Culiplan app can call getUserMedia for barcode scanning (kitchen-tablet
+    // use case — scan a product to add it to the pantry). HA's *built-in*
+    // iframe panel hardcodes allow="fullscreen" and can't do this, but this
+    // custom panel owns its iframe, so we grant camera here. On a wall-mounted
+    // tablet the app defaults to the front camera (the rear faces the wall).
+    iframe.setAttribute("allow", "camera; fullscreen");
     iframe.addEventListener("error", this._onIframeError);
     // Attach the load handler BEFORE setting `src` so we don't miss the
     // load event for fast-cached responses. The handler forwards HA's
