@@ -411,3 +411,106 @@ class TestBlueprintInstall:
 
         blueprint_dir = tmp_path / "blueprints"
         assert not blueprint_dir.exists()
+
+
+# ─── Extra coverage for _cloud_generate_blueprint (v0.13.0) ──────────────────
+
+
+@pytest.mark.asyncio
+async def test_cloud_generate_blueprint_403_premium_required():
+    from custom_components.culiplan.blueprint_generator import _cloud_generate_blueprint
+    from custom_components.culiplan.services import PremiumRequiredError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(
+        side_effect=Exception(
+            '403 {"error":"premium_required","upgradeUrl":"https://x.test"}'
+        )
+    )
+    with pytest.raises(PremiumRequiredError) as excinfo:
+        await _cloud_generate_blueprint(client, "prompt", None)
+    assert excinfo.value.upgrade_url == "https://x.test"
+
+
+@pytest.mark.asyncio
+async def test_cloud_generate_blueprint_403_unparseable_body():
+    """A 403 with non-JSON body still raises PremiumRequiredError with default URL."""
+    from custom_components.culiplan.blueprint_generator import _cloud_generate_blueprint
+    from custom_components.culiplan.services import PremiumRequiredError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(
+        side_effect=Exception("403 Forbidden — premium_required")
+    )
+    with pytest.raises(PremiumRequiredError) as excinfo:
+        await _cloud_generate_blueprint(client, "prompt", None)
+    assert "culiplan.com" in excinfo.value.upgrade_url
+
+
+@pytest.mark.asyncio
+async def test_cloud_generate_blueprint_other_error_wraps():
+    from custom_components.culiplan.blueprint_generator import _cloud_generate_blueprint
+    from homeassistant.exceptions import HomeAssistantError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(side_effect=RuntimeError("network"))
+    with pytest.raises(HomeAssistantError) as excinfo:
+        await _cloud_generate_blueprint(client, "prompt", None)
+    assert (
+        getattr(excinfo.value, "translation_key", "")
+        == "blueprint_generation_failed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_cloud_generate_blueprint_appends_available_entities():
+    """available_entities are truncated to 100 + passed in context."""
+    from custom_components.culiplan.blueprint_generator import _cloud_generate_blueprint
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(return_value={"yaml": "", "validation": {}})
+    await _cloud_generate_blueprint(
+        client, "prompt", available_entities=[f"e{i}" for i in range(150)]
+    )
+    payload = client.async_post.call_args[0][1]
+    assert payload["context"]["available_entities"][-1] == "e99"
+    assert len(payload["context"]["available_entities"]) == 100
+
+
+# ─── _extract_name_from_yaml / _extract_description_from_yaml ────────────────
+
+
+def test_extract_name_from_yaml_matches():
+    from custom_components.culiplan.blueprint_generator import _extract_name_from_yaml
+
+    assert (
+        _extract_name_from_yaml('blueprint:\n  name: "My BP"\n')
+        == "My BP"
+    )
+
+
+def test_extract_name_from_yaml_fallback():
+    from custom_components.culiplan.blueprint_generator import _extract_name_from_yaml
+
+    assert _extract_name_from_yaml("blueprint:") == "blueprint"
+
+
+def test_extract_description_from_yaml_matches():
+    from custom_components.culiplan.blueprint_generator import (
+        _extract_description_from_yaml,
+    )
+
+    assert (
+        _extract_description_from_yaml(
+            'blueprint:\n  description: "My description"\n'
+        )
+        == "My description"
+    )
+
+
+def test_extract_description_from_yaml_fallback():
+    from custom_components.culiplan.blueprint_generator import (
+        _extract_description_from_yaml,
+    )
+
+    assert _extract_description_from_yaml("blueprint:") == ""
