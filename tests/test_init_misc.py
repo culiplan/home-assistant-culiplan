@@ -329,3 +329,108 @@ async def test_async_unload_entry_pops_entry_data():
     result = await async_unload_entry(hass, entry)
     assert result is True
     assert "e1" not in hass.data[DOMAIN]
+
+
+# ─── async_setup_entry + _async_register_sidebar_panel ────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_wires_everything():
+    """async_setup_entry registers coordinator, services, panel and intents.
+
+    Mocks every heavy collaborator so the test pins ONLY the wiring of the
+    integration's own setup logic — not HA's frontend/intents internals.
+    """
+    from custom_components.culiplan import async_setup_entry
+
+    hass = MagicMock()
+    hass.data = {}
+    hass.config_entries = MagicMock()
+    hass.config_entries.async_forward_entry_setups = AsyncMock()
+
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.data = {"token": {"access_token": "tok"}, "ai_mode": "cloud"}
+    entry.options = {}
+    entry.async_on_unload = MagicMock()
+    entry.add_update_listener = MagicMock(return_value=lambda: None)
+
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    coordinator.async_start = AsyncMock()
+
+    impl = MagicMock()
+    session = MagicMock()
+    session.async_ensure_token_valid = AsyncMock()
+    session.token = {"access_token": "tok"}
+
+    with (
+        patch(
+            "custom_components.culiplan.config_entry_oauth2_flow"
+            ".async_get_config_entry_implementation",
+            new=AsyncMock(return_value=impl),
+        ),
+        patch(
+            "custom_components.culiplan.config_entry_oauth2_flow.OAuth2Session",
+            return_value=session,
+        ),
+        patch(
+            "custom_components.culiplan.aiohttp_client.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.culiplan.CuliplanApiClient",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.culiplan.CuliplanCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.culiplan._register_intents", new=AsyncMock()),
+        patch("custom_components.culiplan.async_register_services"),
+        patch("custom_components.culiplan.async_register_cooking_services"),
+        patch("custom_components.culiplan.async_register_llm_api"),
+        patch(
+            "custom_components.culiplan._async_register_lovelace_resources",
+            new=AsyncMock(),
+        ),
+        patch(
+            "custom_components.culiplan._async_register_sidebar_panel",
+            new=AsyncMock(),
+        ),
+    ):
+        assert await async_setup_entry(hass, entry) is True
+
+    # Coordinator was started; data slot populated; platforms forwarded.
+    coordinator.async_config_entry_first_refresh.assert_awaited_once()
+    coordinator.async_start.assert_awaited_once()
+    assert hass.data[DOMAIN]["e1"]["coordinator"] is coordinator
+    hass.config_entries.async_forward_entry_setups.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_register_intents_handles_unknown_language():
+    """The integration falls back to English for unsupported languages."""
+    from custom_components.culiplan import _register_intents
+
+    hass = MagicMock()
+    hass.config.language = "xx-YY"  # unknown locale
+    hass.async_add_executor_job = AsyncMock(return_value={"intents": {}})
+
+    entry = MagicMock()
+    # Must not raise.
+    await _register_intents(hass, entry)
+
+
+@pytest.mark.asyncio
+async def test_options_updated_triggers_reload():
+    """The OptionsFlow add_update_listener callback reloads the entry."""
+    from custom_components.culiplan import _async_options_updated
+
+    hass = MagicMock()
+    hass.config_entries.async_reload = AsyncMock()
+    entry = MagicMock()
+    entry.entry_id = "e1"
+
+    await _async_options_updated(hass, entry)
+    hass.config_entries.async_reload.assert_awaited_once_with("e1")

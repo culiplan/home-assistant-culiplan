@@ -377,3 +377,88 @@ def test_schedule_reconnect_noop_when_task_running(coordinator):
     coordinator._schedule_reconnect()
     # No new task created (still the same one).
     assert coordinator._reconnect_task is running
+
+
+# ─── Socket.IO connect path (v0.13.0) ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_async_start_initiates_connect(coordinator):
+    """async_start clears _stopped and calls _connect."""
+    coordinator._stopped = True
+    with patch.object(coordinator, "_connect", new=AsyncMock()) as connect:
+        await coordinator.async_start()
+    assert coordinator._stopped is False
+    connect.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_connect_returns_early_when_stopped(coordinator):
+    """_connect must early-return if async_stop already fired."""
+    coordinator._stopped = True
+    # Should not even reach the token call.
+    with patch.object(coordinator, "_get_valid_token", new=AsyncMock()) as get_tok:
+        await coordinator._connect()
+    get_tok.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_connect_creates_socketio_client_and_connects(coordinator):
+    """_connect wires up the socket.io client and calls connect()."""
+    coordinator._stopped = False
+    fake_sio = MagicMock()
+    fake_sio.connect = AsyncMock()
+    fake_sio.event = MagicMock(return_value=lambda fn: fn)
+    fake_sio.on = MagicMock(return_value=lambda fn: fn)
+    with (
+        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch(
+            "custom_components.culiplan.coordinator.socketio.AsyncClient",
+            return_value=fake_sio,
+        ),
+    ):
+        await coordinator._connect()
+    fake_sio.connect.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_connect_socketio_connection_error_schedules_reconnect(coordinator):
+    """A ConnectionError on connect() triggers _schedule_reconnect."""
+    import socketio
+
+    coordinator._stopped = False
+    fake_sio = MagicMock()
+    fake_sio.connect = AsyncMock(side_effect=socketio.exceptions.ConnectionError("nope"))
+    fake_sio.event = MagicMock(return_value=lambda fn: fn)
+    fake_sio.on = MagicMock(return_value=lambda fn: fn)
+    with (
+        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch(
+            "custom_components.culiplan.coordinator.socketio.AsyncClient",
+            return_value=fake_sio,
+        ),
+        patch.object(coordinator, "_schedule_reconnect") as schedule,
+    ):
+        await coordinator._connect()
+    schedule.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_stop_cancels_running_reconnect_task(coordinator):
+    """async_stop awaits the reconnect task cancellation."""
+    import asyncio
+
+    async def _slow():
+        await asyncio.sleep(60)
+
+    task = asyncio.create_task(_slow())
+    coordinator._reconnect_task = task
+    await coordinator.async_stop()
+    assert task.done() or task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_handle_event_unknown_type_is_noop(coordinator):
+    """Unknown event types must NOT raise."""
+    coordinator.data = {}
+    await coordinator._handle_event({"type": "weird.event.you.never.heard.of"})

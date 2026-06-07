@@ -409,3 +409,173 @@ async def test_async_step_reauth_routes_to_confirm(hass):
     result = await flow.async_step_reauth()
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
+
+
+# ─── async_step_advanced_ai_byok / advanced_ai_local (Options flow) ──────────
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_valid_creates_entry(hass):
+    """A valid BYOK key in the Options flow commits."""
+    from custom_components.culiplan.const import (
+        AI_MODE_BYOK,
+        CONF_AI_MODE,
+        CONF_BYOK_API_KEY,
+        CONF_BYOK_PROVIDER,
+    )
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {"expiry_days": 3, "expiry_hours": 48, "debug_ai": False}
+    with (
+        patch(
+            "custom_components.culiplan.config_flow.validate_byok_key",
+            new=AsyncMock(return_value=True),
+        ),
+        patch(
+            "custom_components.culiplan.config_flow.BYOKKeyStore"
+        ) as MockKeyStore,
+    ):
+        store = MagicMock()
+        store.async_load = AsyncMock()
+        store.async_set_key = AsyncMock()
+        MockKeyStore.return_value = store
+        result = await flow.async_step_advanced_ai_byok(
+            user_input={
+                CONF_BYOK_PROVIDER: "openai",
+                CONF_BYOK_API_KEY: "sk-test",
+            }
+        )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AI_MODE] == AI_MODE_BYOK
+    assert result["data"][CONF_BYOK_PROVIDER] == "openai"
+    assert CONF_BYOK_API_KEY not in result["data"]
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_invalid_shows_error(hass):
+    from custom_components.culiplan.ai.types import ProviderAuthError
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    with patch(
+        "custom_components.culiplan.config_flow.validate_byok_key",
+        new=AsyncMock(side_effect=ProviderAuthError("bad key")),
+    ):
+        result = await flow.async_step_advanced_ai_byok(
+            user_input={
+                CONF_BYOK_PROVIDER: "openai",
+                CONF_BYOK_API_KEY: "sk-bad",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_BYOK_API_KEY in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_loopback_commits_immediately(hass):
+    """A loopback local endpoint commits without the remote-warning step."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+    from custom_components.culiplan.const import (
+        AI_MODE_LOCAL,
+        CONF_AI_MODE,
+        CONF_LOCAL_ENDPOINT,
+        CONF_LOCAL_MODEL,
+    )
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {"expiry_days": 3, "expiry_hours": 48, "debug_ai": False}
+    flow._detected_endpoints = []
+    probed = LocalAIEndpoint(
+        host="localhost", port=11434, provider="ollama", available_models=["llama3.2"]
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=probed),
+    ):
+        result = await flow.async_step_advanced_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://localhost:11434",
+                CONF_LOCAL_MODEL: "llama3.2",
+            }
+        )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AI_MODE] == AI_MODE_LOCAL
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_remote_routes_to_warning(hass):
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    flow._detected_endpoints = []
+    probed = LocalAIEndpoint(
+        host="192.168.1.50", port=11434, provider="ollama", available_models=["llama3.2"]
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=probed),
+    ):
+        result = await flow.async_step_advanced_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://192.168.1.50:11434",
+                CONF_LOCAL_MODEL: "llama3.2",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "advanced_ai_local_remote_warning"
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_invalid_endpoint_shows_error(hass):
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    result = await flow.async_step_advanced_ai_local(
+        user_input={CONF_LOCAL_ENDPOINT: "http://no-port", CONF_LOCAL_MODEL: ""}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_LOCAL_ENDPOINT in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_unreachable_shows_error(hass):
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    flow._detected_endpoints = []
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=None),
+    ):
+        result = await flow.async_step_advanced_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://localhost:11434",
+                CONF_LOCAL_MODEL: "llama3.2",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_LOCAL_ENDPOINT in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_remote_warning_confirm_commits(hass):
+    from custom_components.culiplan.const import (
+        AI_MODE_LOCAL,
+        CONF_AI_MODE,
+        CONF_LOCAL_ENDPOINT,
+    )
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {
+        CONF_LOCAL_ENDPOINT: "http://192.168.1.50:11434",
+    }
+    result = await flow.async_step_advanced_ai_local_remote_warning(
+        user_input={"confirmed": True}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AI_MODE] == AI_MODE_LOCAL
