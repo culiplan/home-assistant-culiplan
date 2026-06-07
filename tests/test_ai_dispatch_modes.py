@@ -92,6 +92,15 @@ class TestCreateDispatcherNoValueError:
         assert dispatcher is not None
 
     def test_byok_gemini_no_error(self) -> None:
+        try:
+            import google.genai  # noqa: F401
+        except ImportError:
+            import pytest
+
+            pytest.skip(
+                "google-genai not installed on this lane (HA 2024.10/2025.1 "
+                "lanes skip it due to httpx<0.28 conflict)"
+            )
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
 
         mode = _build_dispatch_mode(AI_MODE_BYOK, self._make_config("google"))
