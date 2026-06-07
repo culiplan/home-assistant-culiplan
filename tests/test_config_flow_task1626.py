@@ -54,10 +54,12 @@ def _build_options_flow(hass, entry_data: dict | None = None, options: dict | No
     entry.add_to_hass(hass)
     flow = MealieOptionsFlow()
     flow.hass = hass
+    # See test_config_flow_options._make_options_flow for the cross-HA
+    # rationale. Set handler always; swallow the 2025.1 deprecation guard.
     flow.handler = entry.entry_id
     try:
         flow.config_entry = entry
-    except AttributeError:
+    except (AttributeError, RuntimeError):
         pass
     return flow, entry
 
@@ -72,7 +74,7 @@ def _set_config_entry_compat(flow, entry) -> None:
     flow.handler = getattr(entry, "entry_id", "test_entry_id")
     try:
         flow.config_entry = entry
-    except AttributeError:
+    except (AttributeError, RuntimeError):
         pass
 
 

@@ -41,7 +41,7 @@ def _set_config_entry_compat(flow, entry) -> None:
     flow.handler = getattr(entry, "entry_id", "test_entry_id")
     try:
         flow.config_entry = entry
-    except AttributeError:
+    except (AttributeError, RuntimeError):
         pass
 
 

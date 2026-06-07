@@ -46,13 +46,20 @@ def _make_options_flow(
     # HA 2026.6+ — `config_entry` is a property reading `_config_entry_id`
     # via the manager. HA 2024.10 — plain attribute. Setting both keeps
     # the tests passing across the whole matrix.
-    # On HA 2026.6+, `_config_entry_id` is a property that returns
-    # `self.handler`, so setting `handler` to the entry id is sufficient
-    # for the property to resolve via `hass.config_entries.async_get_known_entry`.
+    # Three HA generations, three setter shapes:
+    #   - HA 2024.10: `config_entry` is a plain attribute we must set
+    #     ourselves, because there's no property to read it from.
+    #   - HA 2025.1+: `config_entry = entry` raises RuntimeError with a
+    #     deprecation message; the property already resolves it via the
+    #     manager.
+    #   - HA 2026.6+: `_config_entry_id` is a property returning
+    #     `self.handler`, so setting `handler` is enough.
+    # Set `handler` always; try `config_entry` and swallow the
+    # deprecation guard.
     flow.handler = entry.entry_id
     try:
         flow.config_entry = entry
-    except AttributeError:
+    except (AttributeError, RuntimeError):
         pass
     return flow
 
