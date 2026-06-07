@@ -895,3 +895,97 @@ async def test_async_step_user_imports_credential(hass):
         result = await flow.async_step_user()
     imp.assert_awaited_once()
     assert result["step_id"] == "pick_implementation"
+
+
+# ─── Advanced AI Local form with detected endpoints (v0.13.0) ────────────────
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_form_with_detected_endpoints_and_models(hass):
+    """When endpoints are auto-detected, the form offers them as dropdown choices."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    flow._detected_endpoints = [
+        LocalAIEndpoint(
+            host="localhost",
+            port=11434,
+            provider="ollama",
+            available_models=["llama3.2", "gemma3"],
+        )
+    ]
+    result = await flow.async_step_advanced_ai_local()
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "advanced_ai_local"
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_form_with_endpoints_no_models(hass):
+    """An endpoint with no models still renders the form."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    flow._detected_endpoints = [
+        LocalAIEndpoint(host="localhost", port=11434, provider="ollama")
+    ]
+    result = await flow.async_step_advanced_ai_local()
+    assert result["type"] == FlowResultType.FORM
+
+
+@pytest.mark.asyncio
+async def test_ai_local_form_with_detected_endpoints(hass):
+    """Same path in the initial config flow's ai_local step."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+
+    flow = _make_oauth_flow(hass)
+    flow._detected_endpoints = [
+        LocalAIEndpoint(
+            host="localhost",
+            port=11434,
+            provider="ollama",
+            available_models=["llama3.2"],
+        )
+    ]
+    result = await flow.async_step_ai_local()
+    assert result["type"] == FlowResultType.FORM
+
+
+@pytest.mark.asyncio
+async def test_ai_local_form_with_endpoints_no_models(hass):
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+
+    flow = _make_oauth_flow(hass)
+    flow._detected_endpoints = [
+        LocalAIEndpoint(host="localhost", port=11434, provider="ollama")
+    ]
+    result = await flow.async_step_ai_local()
+    assert result["type"] == FlowResultType.FORM
+
+
+# ─── Misc small coverage adds ────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ai_local_step_model_warning_path(hass):
+    """An unrecognized model emits a warning placeholder but still proceeds."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_oauth_flow(hass)
+    probed = LocalAIEndpoint(
+        host="localhost", port=11434, provider="ollama", available_models=["weird"]
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=probed),
+    ):
+        result = await flow.async_step_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://localhost:11434",
+                CONF_LOCAL_MODEL: "phi3",  # not in the function-calling list
+            }
+        )
+    # The flow proceeds (form is mealie_offer / create_entry depending on Mealie)
+    assert result["type"] != FlowResultType.FORM or result["step_id"] != "ai_local"

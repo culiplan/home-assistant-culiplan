@@ -277,3 +277,135 @@ class TestAsyncPerformUpdate:
         ):
             with pytest.raises(FileNotFoundError):
                 await async_perform_update(hass, "https://example.test/release.zip")
+
+
+# ─── async_perform_update happy path (v0.13.0) ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_perform_update_complete_swap(tmp_path, monkeypatch):
+    """End-to-end: download → extract → backup → swap → backup removed."""
+    import zipfile
+
+    from custom_components.culiplan import updater
+
+    # Build a release zip that contains custom_components/culiplan/foo.txt
+    src_zip_path = tmp_path / "release.zip"
+    with zipfile.ZipFile(src_zip_path, "w") as zf:
+        zf.writestr("repo/custom_components/culiplan/foo.txt", "new content")
+    zip_bytes = src_zip_path.read_bytes()
+
+    # Live integration dir (would normally be the package's own __file__ parent)
+    live_dir = tmp_path / "live"
+    live_dir.mkdir()
+    (live_dir / "old.txt").write_text("old content")
+
+    # Patch `Path(__file__).parent` so `target_dir` resolves to our temp dir.
+    real_path_cls = updater.Path
+    file_path = real_path_cls(updater.__file__)
+
+    class _ScopedPath(type(file_path)):  # type: ignore[misc]
+        pass  # Just a marker subclass; we override Path with a function.
+
+    def _patched_path(value):
+        # Redirect the integration's own __file__ to our temp dir's updater.py
+        if str(value) == updater.__file__:
+            return real_path_cls(live_dir / "updater.py")
+        return real_path_cls(value)
+
+    monkeypatch.setattr(updater, "Path", _patched_path)
+
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+
+    async def _iter_chunked(_size):
+        yield zip_bytes
+
+    resp.content.iter_chunked = _iter_chunked
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.get = MagicMock(return_value=resp)
+
+    async def _aej(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    hass = MagicMock()
+    hass.async_add_executor_job = _aej
+
+    with patch(
+        "custom_components.culiplan.updater.async_get_clientsession",
+        return_value=session,
+    ):
+        await updater.async_perform_update(
+            hass, "https://example.test/release.zip"
+        )
+
+    # New file in place
+    assert (live_dir / "foo.txt").exists()
+    assert (live_dir / "foo.txt").read_text() == "new content"
+    # Old file gone
+    assert not (live_dir / "old.txt").exists()
+    # Backup cleaned up
+    assert not (live_dir.with_suffix(".bak").exists())
+
+
+@pytest.mark.asyncio
+async def test_perform_update_removes_stale_backup_first(tmp_path, monkeypatch):
+    """An existing `.bak` is wiped before the new backup is taken."""
+    import zipfile
+
+    from custom_components.culiplan import updater
+
+    src_zip_path = tmp_path / "release.zip"
+    with zipfile.ZipFile(src_zip_path, "w") as zf:
+        zf.writestr("repo/custom_components/culiplan/foo.txt", "new content")
+    zip_bytes = src_zip_path.read_bytes()
+
+    live_dir = tmp_path / "live"
+    live_dir.mkdir()
+    (live_dir / "old.txt").write_text("old")
+
+    # Pre-existing stale backup that should be removed before swap.
+    stale_backup = live_dir.with_suffix(".bak")
+    stale_backup.mkdir()
+    (stale_backup / "stale.txt").write_text("stale")
+
+    real_path_cls = updater.Path
+
+    def _patched_path(value):
+        if str(value) == updater.__file__:
+            return real_path_cls(live_dir / "updater.py")
+        return real_path_cls(value)
+
+    monkeypatch.setattr(updater, "Path", _patched_path)
+
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+
+    async def _iter_chunked(_size):
+        yield zip_bytes
+
+    resp.content.iter_chunked = _iter_chunked
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.get = MagicMock(return_value=resp)
+
+    async def _aej(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    hass = MagicMock()
+    hass.async_add_executor_job = _aej
+
+    with patch(
+        "custom_components.culiplan.updater.async_get_clientsession",
+        return_value=session,
+    ):
+        await updater.async_perform_update(
+            hass, "https://example.test/release.zip"
+        )
+
+    # Stale backup gone, swap completed cleanly.
+    assert (live_dir / "foo.txt").exists()
+    assert not stale_backup.exists()
