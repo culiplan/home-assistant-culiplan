@@ -117,7 +117,7 @@
           "expiry_days": "How far ahead the daily expiring-pantry sensor counts (1–30 days, default 3).",
           "expiry_hours": "When the binary expiring-soon alert fires (1–168 hours, default 48).",
           "debug_ai": "Write AI prompt/response logs to your HA config dir for 24 h. Off by default.",
-          "auto_update": "When on, Culiplan installs new releases itself and restarts Home Assistant to apply them.",
+          "auto_update": "When on (default), Culiplan installs new releases itself and restarts Home Assistant to apply them. Turn off on Core/venv installs where you'd rather restart Home Assistant manually.",
           "advanced_ai": "Reveals BYOK / Local AI configuration in a sub-step.",
           "check_for_update": "Checks GitHub for a newer release and lets you update with one click — no HACS or terminal required."
         }

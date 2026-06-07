@@ -953,7 +953,9 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                 )
             ),
             vol.Optional("debug_ai", default=current_debug_ai): BooleanSelector(),
-            # v0.9.0: persisted auto-update preference (default on)
+            # v0.9.0: persisted auto-update preference (default on). This is
+            # the *only* persistent on/off; the entity's more-info dialog no
+            # longer exposes a toggle (see update.py v0.12.0 notes).
             vol.Optional("auto_update", default=current_auto_update): BooleanSelector(),
             # task-1626: Toggle to enter the Advanced AI sub-flow
             vol.Optional(CONF_ADVANCED_AI, default=False): BooleanSelector(),

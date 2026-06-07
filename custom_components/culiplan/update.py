@@ -15,6 +15,19 @@ v0.9.0 additions
 * Reads the ``auto_update`` preference from config-entry options (persisted via
   the Options flow). When enabled (default) the entity auto-installs each new
   version exactly once per version string, then restarts HA.
+
+v0.12.0 change
+--------------
+* The HA UpdateEntity ``auto_update`` property is **no longer overridden** here.
+  Previously we returned the persisted preference, which surfaced an
+  ``auto_update`` switch in the entity's more-info dialog — but that switch is
+  read-only at the framework level, so taps appeared to do nothing and then
+  reverted. Auto-update behavior is unchanged (silent install on next poll if
+  the persisted preference is on, default on); the persistent on/off control
+  is the Options-flow checkbox at Settings → Devices & Services → Culiplan →
+  Configure → "Update Culiplan automatically". This matters on Core/venv
+  installs where the automatic HA restart leaves HA down — those users need
+  the opt-out path.
 """
 
 from __future__ import annotations
@@ -91,13 +104,14 @@ class CuliplanUpdateEntity(UpdateEntity):
     # ------------------------------------------------------------------
 
     def _auto_update_enabled(self) -> bool:
-        """Return whether auto-update is enabled (persisted in options, default True)."""
-        return bool(self._entry.options.get("auto_update", True))
+        """Return whether auto-update is enabled (persisted in options, default True).
 
-    @property
-    def auto_update(self) -> bool:
-        """Reflect the persisted auto-update preference to the HA UI."""
-        return self._auto_update_enabled()
+        Intentionally NOT exposed as the ``auto_update`` property because the
+        HA UpdateEntity framework renders that as a read-only switch — taps
+        appear to toggle but revert on the next state write. Users change the
+        preference via the Options flow instead. See module docstring (v0.12.0).
+        """
+        return bool(self._entry.options.get("auto_update", True))
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -116,11 +130,12 @@ class CuliplanUpdateEntity(UpdateEntity):
     async def async_update(self) -> None:
         """Poll GitHub for the latest release (silent on network failure).
 
-        If auto-update is enabled and a genuinely newer version is found that
-        we have not yet auto-installed, trigger installation immediately. The
-        ``_auto_installed_version`` guard ensures each version fires at most
-        once (across the lifetime of the entity object; a restart resets the
-        guard, but by then installed==latest so the condition won't re-fire).
+        If auto-update is enabled (Options flow, default on) and a genuinely
+        newer version is found that we have not yet auto-installed, trigger
+        installation immediately. The ``_auto_installed_version`` guard ensures
+        each version fires at most once (across the lifetime of the entity
+        object; a restart resets the guard, but by then installed==latest so
+        the condition won't re-fire).
         """
         release = await async_check_latest(self.hass)
         if release is None:

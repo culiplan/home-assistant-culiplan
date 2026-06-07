@@ -2,6 +2,19 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-06-07
+
+Polish release. Fixes the misleading auto-update switch on the update entity.
+
+### Fixed
+
+- **Removed the broken auto-update switch from the entity's more-info dialog.** Tapping the `auto_update` switch on `update.culiplan_update` looked like it toggled the setting but always reverted, because the HA UpdateEntity framework treats that property as read-only. The persistent on/off control is — and always was — the **"Update Culiplan automatically"** checkbox in Settings → Devices & Services → Culiplan → Configure (default on). Auto-update behavior itself is unchanged: when on, new releases install within ~1 hour and Home Assistant restarts automatically. Users on Core/venv installs (where the restart leaves HA down) can still opt out via the Options-flow checkbox; the option description in the Options flow now also mentions this.
+
+### Docs
+
+- Added `info.md` (HACS overview).
+- README install instructions lead with HACS default-store search; custom-repository instructions kept as a fallback until [hacs/default#8290](https://github.com/hacs/default/pull/8290) merges.
+
 ## [0.11.0] — 2026-06-07
 
 Camera scanning over HTTP: simplified to a clear warning. Reverts the v0.10.0 secure-tab approach.
