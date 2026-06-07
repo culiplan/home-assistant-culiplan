@@ -1,0 +1,411 @@
+"""Additional config-flow coverage focused on the OptionsFlow Advanced AI
+sub-flow and the self-updater wizard reachable from the Options form.
+
+The Mealie offer / import wizard is covered by test_mealie_config_flow.py;
+this file covers the rest.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from homeassistant.data_entry_flow import FlowResultType
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _make_options_flow(hass, entry_data: dict | None = None, options: dict | None = None):
+    from custom_components.culiplan.config_flow import MealieOptionsFlow
+
+    entry = MagicMock()
+    entry.data = entry_data or {}
+    entry.options = options or {}
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
+    flow.hass = hass
+    return flow
+
+
+# ─── Advanced AI sub-flow ─────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_init_advanced_ai_toggle_routes_to_advanced_ai_step(hass):
+    """Submitting Advanced AI toggle moves into async_step_advanced_ai."""
+    from custom_components.culiplan.config_flow import CONF_ADVANCED_AI
+
+    flow = _make_options_flow(hass, entry_data={"ai_mode": "cloud"})
+    with patch(
+        "custom_components.culiplan.config_flow.probe_local_ai_endpoints",
+        new=AsyncMock(return_value=[]),
+    ):
+        result = await flow.async_step_init(user_input={CONF_ADVANCED_AI: True})
+
+    # Lands on the advanced_ai form (next sub-step)
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "advanced_ai"
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_cloud_creates_entry_immediately(hass):
+    """Cloud AI submission commits — no further sub-steps."""
+    from custom_components.culiplan.config_flow import AI_MODE_CLOUD, CONF_AI_MODE
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {"expiry_days": 3, "expiry_hours": 48, "debug_ai": False}
+    result = await flow.async_step_advanced_ai(
+        user_input={CONF_AI_MODE: AI_MODE_CLOUD}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_AI_MODE] == AI_MODE_CLOUD
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_routes_to_byok_step(hass):
+    """BYOK selection moves into the advanced_ai_byok step."""
+    from custom_components.culiplan.config_flow import AI_MODE_BYOK, CONF_AI_MODE
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    result = await flow.async_step_advanced_ai(
+        user_input={CONF_AI_MODE: AI_MODE_BYOK}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "advanced_ai_byok"
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_local_routes_to_local_step(hass):
+    """Local AI selection moves into the advanced_ai_local step."""
+    from custom_components.culiplan.config_flow import AI_MODE_LOCAL, CONF_AI_MODE
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    flow._detected_endpoints = []
+    result = await flow.async_step_advanced_ai(
+        user_input={CONF_AI_MODE: AI_MODE_LOCAL}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "advanced_ai_local"
+
+
+# ─── Update wizard ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_update_step_up_to_date(hass):
+    """If the manifest matches the latest release, abort with up_to_date."""
+    from custom_components.culiplan.config_flow import _MANIFEST_VERSION
+    from custom_components.culiplan.updater import LatestRelease
+
+    flow = _make_options_flow(hass)
+    release = LatestRelease(
+        version=_MANIFEST_VERSION,
+        zipball_url="https://example.test/z.zip",
+        html_url="https://example.test/r",
+        notes="",
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.async_check_latest",
+        new=AsyncMock(return_value=release),
+    ):
+        result = await flow.async_step_update()
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "up_to_date"
+
+
+@pytest.mark.asyncio
+async def test_update_step_check_failed(hass):
+    """If GitHub is unreachable, abort with update_check_failed."""
+    flow = _make_options_flow(hass)
+    with patch(
+        "custom_components.culiplan.config_flow.async_check_latest",
+        new=AsyncMock(return_value=None),
+    ):
+        result = await flow.async_step_update()
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "update_check_failed"
+
+
+@pytest.mark.asyncio
+async def test_update_step_newer_version_shows_form(hass):
+    """A newer version shows the confirmation form with version metadata."""
+    from custom_components.culiplan.updater import LatestRelease
+
+    flow = _make_options_flow(hass)
+    release = LatestRelease(
+        version="99.99.99",
+        zipball_url="https://example.test/z.zip",
+        html_url="https://example.test/r",
+        notes="Massive update",
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.async_check_latest",
+        new=AsyncMock(return_value=release),
+    ):
+        result = await flow.async_step_update()
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "update"
+    assert "99.99.99" in str(result.get("description_placeholders", {}).get("latest"))
+
+
+@pytest.mark.asyncio
+async def test_update_step_user_declines(hass):
+    """If the user submits confirm=False, abort with no_action."""
+    flow = _make_options_flow(hass)
+    result = await flow.async_step_update(user_input={"confirm": False})
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "no_action"
+
+
+@pytest.mark.asyncio
+async def test_update_step_no_pending_release_aborts(hass):
+    """If the user submits confirm=True but no pending release is stashed,
+    abort with update_check_failed (defensive guard).
+    """
+    flow = _make_options_flow(hass)
+    flow._pending_update = None
+    result = await flow.async_step_update(user_input={"confirm": True})
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "update_check_failed"
+
+
+@pytest.mark.asyncio
+async def test_update_step_perform_update_failure_re_shows_form(hass):
+    """A failure during async_perform_update re-shows the form with the error."""
+    from custom_components.culiplan.updater import LatestRelease
+
+    flow = _make_options_flow(hass)
+    flow._pending_update = LatestRelease(
+        version="99.99.99",
+        zipball_url="https://example.test/z.zip",
+        html_url="https://example.test/r",
+        notes="",
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.async_perform_update",
+        new=AsyncMock(side_effect=RuntimeError("zipfile broken")),
+    ):
+        result = await flow.async_step_update(user_input={"confirm": True})
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "update"
+    assert "base" in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_update_step_success_starts_restart(hass):
+    """A successful update schedules a delayed HA restart and aborts."""
+    from custom_components.culiplan.updater import LatestRelease
+
+    flow = _make_options_flow(hass)
+    flow._pending_update = LatestRelease(
+        version="99.99.99",
+        zipball_url="https://example.test/z.zip",
+        html_url="https://example.test/r",
+        notes="",
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.async_perform_update",
+        new=AsyncMock(),
+    ):
+        # async_create_task schedules a background _restart() coroutine that
+        # sleeps 2s before calling homeassistant.restart. Patch the create_task
+        # helper so we don't actually wait or fire the restart in the test.
+        with patch.object(flow.hass, "async_create_task") as create_task:
+            result = await flow.async_step_update(user_input={"confirm": True})
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "update_started"
+    create_task.assert_called_once()
+
+
+# ─── _parse_local_endpoint ───────────────────────────────────────────────────
+
+
+class TestParseLocalEndpoint:
+    """The helper turns user-typed endpoints into (host, port)."""
+
+    def _parse(self, endpoint):
+        from custom_components.culiplan.config_flow import _parse_local_endpoint
+
+        return _parse_local_endpoint(endpoint)
+
+    def test_full_url(self):
+        assert self._parse("http://localhost:11434") == ("localhost", "11434")
+
+    def test_host_port_no_scheme(self):
+        assert self._parse("localhost:11434") == ("localhost", "11434")
+
+    def test_with_path(self):
+        assert self._parse("http://192.168.1.50:11434/v1") == ("192.168.1.50", "11434")
+
+    def test_no_port_raises(self):
+        from custom_components.culiplan.config_flow import _parse_local_endpoint
+
+        with pytest.raises(ValueError):
+            _parse_local_endpoint("http://localhost")
+
+
+# ─── async_step_ai_local (config flow) ───────────────────────────────────────
+
+
+def _make_oauth_flow(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    flow._oauth_data = {"token": {"access_token": "tok"}}
+    flow._entry_data = {**flow._oauth_data, "ai_mode": "local"}
+    flow._detected_endpoints = []
+    return flow
+
+
+@pytest.mark.asyncio
+async def test_ai_local_step_shows_form_when_no_input(hass):
+    flow = _make_oauth_flow(hass)
+    result = await flow.async_step_ai_local()
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "ai_local"
+
+
+@pytest.mark.asyncio
+async def test_ai_local_step_unreachable_endpoint_shows_error(hass):
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_oauth_flow(hass)
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=None),
+    ):
+        result = await flow.async_step_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://192.168.1.50:11434",
+                CONF_LOCAL_MODEL: "llama3.2",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_LOCAL_ENDPOINT in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_ai_local_step_invalid_endpoint_format_error(hass):
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_oauth_flow(hass)
+    result = await flow.async_step_ai_local(
+        user_input={CONF_LOCAL_ENDPOINT: "http://no-port", CONF_LOCAL_MODEL: ""}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert "errors" in result
+
+
+@pytest.mark.asyncio
+async def test_ai_local_step_remote_endpoint_triggers_warning(hass):
+    """A non-loopback endpoint diverts to async_step_local_endpoint_remote_warning."""
+    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
+    from custom_components.culiplan.const import CONF_LOCAL_ENDPOINT, CONF_LOCAL_MODEL
+
+    flow = _make_oauth_flow(hass)
+    probed = LocalAIEndpoint(
+        host="192.168.1.50", port=11434, provider="ollama", available_models=["llama3.2"]
+    )
+    with patch(
+        "custom_components.culiplan.config_flow.probe_custom_endpoint",
+        new=AsyncMock(return_value=probed),
+    ):
+        result = await flow.async_step_ai_local(
+            user_input={
+                CONF_LOCAL_ENDPOINT: "http://192.168.1.50:11434",
+                CONF_LOCAL_MODEL: "llama3.2",
+            }
+        )
+    # Routed into the remote-warning step
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "local_endpoint_remote_warning"
+
+
+@pytest.mark.asyncio
+async def test_local_endpoint_remote_warning_confirm_continues(hass):
+    """Confirming the warning continues to the mealie offer."""
+    flow = _make_oauth_flow(hass)
+    flow._entry_data["local_endpoint"] = "http://192.168.1.50:11434"
+
+    # mealie_offer self-skips without a Mealie entry → returns CREATE_ENTRY.
+    result = await flow.async_step_local_endpoint_remote_warning(
+        user_input={"confirm_remote": True}
+    )
+    # mealie_offer skipped because no Mealie entries → entry created.
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+
+
+@pytest.mark.asyncio
+async def test_local_endpoint_remote_warning_form_shown_with_no_input(hass):
+    """Without user input, the warning step shows its form."""
+    flow = _make_oauth_flow(hass)
+    flow._entry_data["local_endpoint"] = "http://192.168.1.50:11434"
+    result = await flow.async_step_local_endpoint_remote_warning()
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "local_endpoint_remote_warning"
+
+
+# ─── async_step_ai_byok validation (defaults / error paths) ──────────────────
+
+
+@pytest.mark.asyncio
+async def test_ai_byok_step_missing_key_shows_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_oauth_flow(hass)
+    result = await flow.async_step_ai_byok(
+        user_input={CONF_BYOK_PROVIDER: "openai", CONF_BYOK_API_KEY: ""}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert "errors" in result
+    assert CONF_BYOK_API_KEY in result["errors"]
+
+
+@pytest.mark.asyncio
+async def test_ai_byok_step_missing_provider_shows_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_oauth_flow(hass)
+    result = await flow.async_step_ai_byok(
+        user_input={CONF_BYOK_PROVIDER: "", CONF_BYOK_API_KEY: "sk-test"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_BYOK_PROVIDER in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_ai_byok_step_unexpected_error_shows_base_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_oauth_flow(hass)
+    with patch(
+        "custom_components.culiplan.config_flow.validate_byok_key",
+        new=AsyncMock(side_effect=RuntimeError("unexpected")),
+    ):
+        result = await flow.async_step_ai_byok(
+            user_input={
+                CONF_BYOK_PROVIDER: "openai",
+                CONF_BYOK_API_KEY: "sk-test",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert "base" in result.get("errors", {})
+
+
+# ─── async_step_reauth ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_async_step_reauth_routes_to_confirm(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    result = await flow.async_step_reauth()
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
