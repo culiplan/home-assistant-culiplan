@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-06-07
+
+Feature release. Barcode scanning now works even when Home Assistant is served over plain HTTP.
+
+### Fixed
+
+- **Camera barcode scanning works on HTTP-hosted Home Assistant (no Nabu Casa / HTTPS required).** Browsers only expose the camera (`getUserMedia`) in a *secure context*, which requires the whole frame chain — including the HA page — to be HTTPS. On a kitchen tablet opening HA over `http://…:8123`, the embedded Culiplan iframe is therefore non-secure and the inline camera can never run (a hard browser rule, not a Culiplan bug). The app now detects this and hands scanning off to a **full-screen secure scanner opened as a top-level `https://culiplan.com/scan` tab** — a real secure context where the camera works, even on iOS Safari. The scanned barcode is passed back to the embedded pantry dialog automatically (same-origin), the tab closes, and HA returns to view. The panel iframe now sets `allow-popups-to-escape-sandbox` so that secure scan tab isn't sandboxed. Requires the matching front-end deploy.
+
 ## [0.9.0] — 2026-06-06
 
 Fix release. Stale "up-to-date" on startup fixed; real, persistent auto-update owned by the integration.
