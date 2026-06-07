@@ -46,7 +46,9 @@ def _make_options_flow(
     # HA 2026.6+ — `config_entry` is a property reading `_config_entry_id`
     # via the manager. HA 2024.10 — plain attribute. Setting both keeps
     # the tests passing across the whole matrix.
-    flow._config_entry_id = entry.entry_id  # type: ignore[attr-defined]
+    # On HA 2026.6+, `_config_entry_id` is a property that returns
+    # `self.handler`, so setting `handler` to the entry id is sufficient
+    # for the property to resolve via `hass.config_entries.async_get_known_entry`.
     flow.handler = entry.entry_id
     try:
         flow.config_entry = entry

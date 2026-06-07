@@ -38,7 +38,6 @@ def _set_config_entry_compat(flow, entry) -> None:
     self._config_entry_id)``, so the entry MUST be registered with hass.
     HA 2024.10 (the CI floor) keeps ``config_entry`` as a plain attribute.
     """
-    flow._config_entry_id = getattr(entry, "entry_id", "test_entry_id")  # type: ignore[attr-defined]
     flow.handler = getattr(entry, "entry_id", "test_entry_id")
     try:
         flow.config_entry = entry

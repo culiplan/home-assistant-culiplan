@@ -54,7 +54,6 @@ def _build_options_flow(hass, entry_data: dict | None = None, options: dict | No
     entry.add_to_hass(hass)
     flow = MealieOptionsFlow()
     flow.hass = hass
-    flow._config_entry_id = entry.entry_id  # type: ignore[attr-defined]
     flow.handler = entry.entry_id
     try:
         flow.config_entry = entry
@@ -70,7 +69,6 @@ def _set_config_entry_compat(flow, entry) -> None:
     it after manually registering the entry. Sets the attribute path that
     works on whatever HA version is loaded.
     """
-    flow._config_entry_id = getattr(entry, "entry_id", "test_entry_id")  # type: ignore[attr-defined]
     flow.handler = getattr(entry, "entry_id", "test_entry_id")
     try:
         flow.config_entry = entry
