@@ -222,7 +222,10 @@ def test_strings_json_has_24h_ttl_description():
     candidates.append(init_step.get("data_description", {}).get("debug_ai", ""))
     # Legacy location: config.step.ai_provider.description
     candidates.append(
-        data.get("config", {}).get("step", {}).get("ai_provider", {}).get("description", "")
+        data.get("config", {})
+        .get("step", {})
+        .get("ai_provider", {})
+        .get("description", "")
     )
 
     joined = "\n".join(candidates)

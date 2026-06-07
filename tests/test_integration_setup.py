@@ -15,7 +15,7 @@ so the integration's `async_setup_entry` never runs.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -36,8 +36,6 @@ from custom_components.culiplan.const import (
     CONF_AI_MODE,
     DOMAIN,
     OAUTH_CLIENT_ID,
-    OAUTH2_AUTHORIZE,
-    OAUTH2_TOKEN,
 )
 
 

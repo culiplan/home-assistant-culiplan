@@ -411,7 +411,9 @@ async def test_connect_creates_socketio_client_and_connects(coordinator):
     fake_sio.event = MagicMock(return_value=lambda fn: fn)
     fake_sio.on = MagicMock(return_value=lambda fn: fn)
     with (
-        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch.object(
+            coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")
+        ),
         patch(
             "custom_components.culiplan.coordinator.socketio.AsyncClient",
             return_value=fake_sio,
@@ -428,11 +430,15 @@ async def test_connect_socketio_connection_error_schedules_reconnect(coordinator
 
     coordinator._stopped = False
     fake_sio = MagicMock()
-    fake_sio.connect = AsyncMock(side_effect=socketio.exceptions.ConnectionError("nope"))
+    fake_sio.connect = AsyncMock(
+        side_effect=socketio.exceptions.ConnectionError("nope")
+    )
     fake_sio.event = MagicMock(return_value=lambda fn: fn)
     fake_sio.on = MagicMock(return_value=lambda fn: fn)
     with (
-        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch.object(
+            coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")
+        ),
         patch(
             "custom_components.culiplan.coordinator.socketio.AsyncClient",
             return_value=fake_sio,
@@ -494,7 +500,9 @@ async def test_socketio_handlers_invoke_expected_behaviour(coordinator):
     fake_sio.connect = AsyncMock()
 
     with (
-        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch.object(
+            coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")
+        ),
         patch(
             "custom_components.culiplan.coordinator.socketio.AsyncClient",
             return_value=fake_sio,

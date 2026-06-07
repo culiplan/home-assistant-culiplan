@@ -151,9 +151,8 @@ class TestRunCloudIntent:
         with pytest.raises(HomeAssistantError) as exc_info:
             await _run_cloud_intent(client, "suggest_meal", {})
         # Translation_placeholders carry the underlying error text.
-        assert (
-            "Connection refused"
-            in exc_info.value.translation_placeholders.get("error", "")
+        assert "Connection refused" in exc_info.value.translation_placeholders.get(
+            "error", ""
         )
 
     @pytest.mark.asyncio

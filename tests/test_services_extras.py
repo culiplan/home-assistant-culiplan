@@ -65,9 +65,7 @@ def test_build_dispatch_mode_local_endpoint_parse_failure():
     from custom_components.culiplan.services import _build_dispatch_mode
 
     assert (
-        _build_dispatch_mode(
-            AI_MODE_LOCAL, {CONF_LOCAL_ENDPOINT: "completely-garbage"}
-        )
+        _build_dispatch_mode(AI_MODE_LOCAL, {CONF_LOCAL_ENDPOINT: "completely-garbage"})
         == "local-ollama"
     )
 
@@ -90,9 +88,7 @@ async def test_pantry_decrement_404_raises_item_not_found():
     )
 
     client = MagicMock()
-    client.async_post = AsyncMock(
-        side_effect=Exception("404 PANTRY_ITEM_NOT_FOUND")
-    )
+    client.async_post = AsyncMock(side_effect=Exception("404 PANTRY_ITEM_NOT_FOUND"))
     with pytest.raises(PantryItemNotFoundError):
         await _call_pantry_decrement(client, "1234567890123", 1.0)
 
@@ -209,3 +205,33 @@ def test_async_unregister_services_skips_already_removed():
     hass.services.async_remove = MagicMock()
     async_unregister_services(hass)
     hass.services.async_remove.assert_not_called()
+
+
+# ─── handle_generate_blueprint missing-entry path ───────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_handle_generate_blueprint_missing_entry_raises():
+    """The blueprint service raises HomeAssistantError when no Culiplan entry exists."""
+    from custom_components.culiplan.services import async_register_services
+
+    hass = MagicMock()
+    hass.data = {"culiplan": {}}
+    hass.services = MagicMock()
+    hass.services.has_service.return_value = False
+    hass.services.async_register = MagicMock()
+
+    async_register_services(hass)
+    # Locate the blueprint service handler by name.
+    handler = None
+    for call in hass.services.async_register.call_args_list:
+        if call.args[1] == "generate_blueprint":
+            handler = call.args[2]
+            break
+    assert handler is not None
+
+    call_obj = MagicMock()
+    call_obj.data = {"prompt": "Make a blueprint"}
+    with pytest.raises(HomeAssistantError) as excinfo:
+        await handler(call_obj)
+    assert getattr(excinfo.value, "translation_key", "") == "not_configured"

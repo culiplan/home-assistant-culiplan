@@ -35,7 +35,9 @@ async def test_calendar_setup_adds_one_per_meal_plan():
     from custom_components.culiplan.calendar import async_setup_entry
 
     coordinator = MagicMock()
-    coordinator.data = {"meal_plans": [{"id": "p1", "name": "P1"}, {"id": "p2", "name": "P2"}]}
+    coordinator.data = {
+        "meal_plans": [{"id": "p1", "name": "P1"}, {"id": "p2", "name": "P2"}]
+    }
     hass = _make_hass_with_coordinator(coordinator)
     entry = _make_entry()
     add_entities = MagicMock()

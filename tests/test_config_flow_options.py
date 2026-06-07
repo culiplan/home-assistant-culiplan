@@ -17,7 +17,9 @@ from homeassistant.data_entry_flow import FlowResultType
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _make_options_flow(hass, entry_data: dict | None = None, options: dict | None = None):
+def _make_options_flow(
+    hass, entry_data: dict | None = None, options: dict | None = None
+):
     from custom_components.culiplan.config_flow import MealieOptionsFlow
 
     entry = MagicMock()
@@ -56,9 +58,7 @@ async def test_advanced_ai_cloud_creates_entry_immediately(hass):
 
     flow = _make_options_flow(hass)
     flow._advanced_ai_data = {"expiry_days": 3, "expiry_hours": 48, "debug_ai": False}
-    result = await flow.async_step_advanced_ai(
-        user_input={CONF_AI_MODE: AI_MODE_CLOUD}
-    )
+    result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AI_MODE] == AI_MODE_CLOUD
 
@@ -70,9 +70,7 @@ async def test_advanced_ai_byok_routes_to_byok_step(hass):
 
     flow = _make_options_flow(hass)
     flow._advanced_ai_data = {}
-    result = await flow.async_step_advanced_ai(
-        user_input={CONF_AI_MODE: AI_MODE_BYOK}
-    )
+    result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_BYOK})
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "advanced_ai_byok"
 
@@ -85,9 +83,7 @@ async def test_advanced_ai_local_routes_to_local_step(hass):
     flow = _make_options_flow(hass)
     flow._advanced_ai_data = {}
     flow._detected_endpoints = []
-    result = await flow.async_step_advanced_ai(
-        user_input={CONF_AI_MODE: AI_MODE_LOCAL}
-    )
+    result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_LOCAL})
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "advanced_ai_local"
 
@@ -309,7 +305,10 @@ async def test_ai_local_step_remote_endpoint_triggers_warning(hass):
 
     flow = _make_oauth_flow(hass)
     probed = LocalAIEndpoint(
-        host="192.168.1.50", port=11434, provider="ollama", available_models=["llama3.2"]
+        host="192.168.1.50",
+        port=11434,
+        provider="ollama",
+        available_models=["llama3.2"],
     )
     with patch(
         "custom_components.culiplan.config_flow.probe_custom_endpoint",
@@ -431,9 +430,7 @@ async def test_advanced_ai_byok_valid_creates_entry(hass):
             "custom_components.culiplan.config_flow.validate_byok_key",
             new=AsyncMock(return_value=True),
         ),
-        patch(
-            "custom_components.culiplan.config_flow.BYOKKeyStore"
-        ) as MockKeyStore,
+        patch("custom_components.culiplan.config_flow.BYOKKeyStore") as MockKeyStore,
     ):
         store = MagicMock()
         store.async_load = AsyncMock()
@@ -512,7 +509,10 @@ async def test_advanced_ai_local_remote_routes_to_warning(hass):
     flow._advanced_ai_data = {}
     flow._detected_endpoints = []
     probed = LocalAIEndpoint(
-        host="192.168.1.50", port=11434, provider="ollama", available_models=["llama3.2"]
+        host="192.168.1.50",
+        port=11434,
+        provider="ollama",
+        available_models=["llama3.2"],
     )
     with patch(
         "custom_components.culiplan.config_flow.probe_custom_endpoint",
@@ -888,7 +888,10 @@ async def test_async_step_user_imports_credential(hass):
             type(flow).__mro__[1],
             "async_step_user",
             new=AsyncMock(
-                return_value={"type": FlowResultType.FORM, "step_id": "pick_implementation"}
+                return_value={
+                    "type": FlowResultType.FORM,
+                    "step_id": "pick_implementation",
+                }
             ),
         ),
     ):

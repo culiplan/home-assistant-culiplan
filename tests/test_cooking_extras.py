@@ -86,8 +86,7 @@ async def test_get_active_session_other_error_wraps():
     with pytest.raises(HomeAssistantError) as excinfo:
         await _get_active_session(client)
     assert (
-        getattr(excinfo.value, "translation_key", "")
-        == "cooking_session_fetch_failed"
+        getattr(excinfo.value, "translation_key", "") == "cooking_session_fetch_failed"
     )
 
 
@@ -125,8 +124,7 @@ async def test_patch_session_other_error_wraps():
     with pytest.raises(HomeAssistantError) as excinfo:
         await _patch_session(client, "s1", {})
     assert (
-        getattr(excinfo.value, "translation_key", "")
-        == "cooking_session_update_failed"
+        getattr(excinfo.value, "translation_key", "") == "cooking_session_update_failed"
     )
 
 

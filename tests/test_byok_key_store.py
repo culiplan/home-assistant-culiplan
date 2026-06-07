@@ -151,9 +151,7 @@ class TestValidateOpenAIKey:
 class TestValidateAnthropicKey:
     @pytest.mark.asyncio
     async def test_valid_key_succeeds(self):
-        with patch(
-            "anthropic.AsyncAnthropic"
-        ) as MockClass:
+        with patch("anthropic.AsyncAnthropic") as MockClass:
             instance = MockClass.return_value
             instance.messages.create = AsyncMock(
                 return_value=MagicMock(content=[MagicMock(type="text", text="Hi")])
@@ -163,9 +161,7 @@ class TestValidateAnthropicKey:
 
     @pytest.mark.asyncio
     async def test_invalid_key_raises_provider_auth_error(self):
-        with patch(
-            "anthropic.AsyncAnthropic"
-        ) as MockClass:
+        with patch("anthropic.AsyncAnthropic") as MockClass:
             instance = MockClass.return_value
             instance.messages.create = AsyncMock(
                 side_effect=Exception("401 invalid_api_key: Authentication failed")

@@ -4,7 +4,7 @@ sensor edge cases, api endpoint helpers, and dispatcher reconnect branches.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -295,9 +295,7 @@ async def test_api_call_voice_tool_post_body():
     resp.__aexit__ = AsyncMock(return_value=False)
     session.post = MagicMock(return_value=resp)
     client = CuliplanApiClient(session=session, access_token="tok")
-    result = await client.async_call_voice_tool(
-        "suggest_meal", {"mealSlot": "dinner"}
-    )
+    result = await client.async_call_voice_tool("suggest_meal", {"mealSlot": "dinner"})
     assert result["speakable"] == "OK"
     # Body contains tool name + params.
     body = session.post.call_args.kwargs["json"]
@@ -341,5 +339,3 @@ async def test_api_get_energy_today_proxies():
     client = CuliplanApiClient(session=session, access_token="tok")
     result = await client.async_get_energy_today()
     assert result["estimated_kwh"] == 1.0
-
-

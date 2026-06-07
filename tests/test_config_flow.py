@@ -11,7 +11,6 @@ from custom_components.culiplan.const import (
     AI_MODE_CLOUD,
     AI_MODE_LOCAL,
     CONF_AI_MODE,
-    DOMAIN,
 )
 
 

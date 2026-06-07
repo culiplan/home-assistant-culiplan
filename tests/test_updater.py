@@ -52,7 +52,9 @@ class TestIsNewer:
 # ─── async_check_latest ──────────────────────────────────────────────────────
 
 
-def _make_session(payload: dict | None, status: int = 200, raise_exc: Exception | None = None):
+def _make_session(
+    payload: dict | None, status: int = 200, raise_exc: Exception | None = None
+):
     """Return a session whose .get() yields a context manager exposing
     `status` and `json()`.
     """
@@ -139,7 +141,9 @@ class TestAsyncCheckLatest:
 # ─── async_perform_update ────────────────────────────────────────────────────
 
 
-def _build_release_zip(zip_path: Path, top_level: str = "culiplan-home-assistant-culiplan-abc") -> None:
+def _build_release_zip(
+    zip_path: Path, top_level: str = "culiplan-home-assistant-culiplan-abc"
+) -> None:
     """Build a minimal release.zip mimicking a GitHub source archive."""
     with zipfile.ZipFile(zip_path, "w") as zf:
         zf.writestr(f"{top_level}/README.md", "fake")
@@ -337,9 +341,7 @@ async def test_perform_update_complete_swap(tmp_path, monkeypatch):
         "custom_components.culiplan.updater.async_get_clientsession",
         return_value=session,
     ):
-        await updater.async_perform_update(
-            hass, "https://example.test/release.zip"
-        )
+        await updater.async_perform_update(hass, "https://example.test/release.zip")
 
     # New file in place
     assert (live_dir / "foo.txt").exists()
@@ -402,9 +404,7 @@ async def test_perform_update_removes_stale_backup_first(tmp_path, monkeypatch):
         "custom_components.culiplan.updater.async_get_clientsession",
         return_value=session,
     ):
-        await updater.async_perform_update(
-            hass, "https://example.test/release.zip"
-        )
+        await updater.async_perform_update(hass, "https://example.test/release.zip")
 
     # Stale backup gone, swap completed cleanly.
     assert (live_dir / "foo.txt").exists()

@@ -457,8 +457,7 @@ async def test_cloud_generate_blueprint_other_error_wraps():
     with pytest.raises(HomeAssistantError) as excinfo:
         await _cloud_generate_blueprint(client, "prompt", None)
     assert (
-        getattr(excinfo.value, "translation_key", "")
-        == "blueprint_generation_failed"
+        getattr(excinfo.value, "translation_key", "") == "blueprint_generation_failed"
     )
 
 
@@ -483,10 +482,7 @@ async def test_cloud_generate_blueprint_appends_available_entities():
 def test_extract_name_from_yaml_matches():
     from custom_components.culiplan.blueprint_generator import _extract_name_from_yaml
 
-    assert (
-        _extract_name_from_yaml('blueprint:\n  name: "My BP"\n')
-        == "My BP"
-    )
+    assert _extract_name_from_yaml('blueprint:\n  name: "My BP"\n') == "My BP"
 
 
 def test_extract_name_from_yaml_fallback():
@@ -501,9 +497,7 @@ def test_extract_description_from_yaml_matches():
     )
 
     assert (
-        _extract_description_from_yaml(
-            'blueprint:\n  description: "My description"\n'
-        )
+        _extract_description_from_yaml('blueprint:\n  description: "My description"\n')
         == "My description"
     )
 
@@ -590,10 +584,7 @@ async def test_local_generate_blueprint_envelope_missing():
             "prompt",
             None,
         )
-    assert (
-        getattr(excinfo.value, "translation_key", "")
-        == "blueprint_envelope_missing"
-    )
+    assert getattr(excinfo.value, "translation_key", "") == "blueprint_envelope_missing"
 
 
 @pytest.mark.asyncio
@@ -628,15 +619,15 @@ async def test_local_generate_blueprint_dispatch_failure_wraps():
             await _byok_local_generate_blueprint(
                 hass,
                 {"options": {}},
-                {CONF_AI_MODE: AI_MODE_LOCAL, "local_endpoint": "http://localhost:11434"},
+                {
+                    CONF_AI_MODE: AI_MODE_LOCAL,
+                    "local_endpoint": "http://localhost:11434",
+                },
                 client,
                 "prompt",
                 None,
             )
-    assert (
-        getattr(excinfo.value, "translation_key", "")
-        == "blueprint_local_ai_failed"
-    )
+    assert getattr(excinfo.value, "translation_key", "") == "blueprint_local_ai_failed"
 
 
 @pytest.mark.asyncio
@@ -651,7 +642,7 @@ async def test_install_blueprint_writes_file(tmp_path):
         return fn(*args, **kwargs)
 
     hass.async_add_executor_job = _aej
-    rel_path = await _install_blueprint(hass, "Daily meals", "yaml: here")
+    await _install_blueprint(hass, "Daily meals", "yaml: here")
     target = tmp_path / "blueprints" / "automation" / "culiplan" / "daily_meals.yaml"
     assert target.exists()
     assert target.read_text() == "yaml: here"
@@ -671,3 +662,95 @@ async def test_install_blueprint_write_failure_raises(tmp_path):
     hass.async_add_executor_job = _aej
     with pytest.raises(HomeAssistantError):
         await _install_blueprint(hass, "x", "yaml: here")
+
+
+# ─── More edge-case coverage for the BYOK/Local envelope flow ────────────────
+
+
+@pytest.mark.asyncio
+async def test_byok_local_envelope_failure_wraps():
+    """A network failure fetching the envelope wraps as HomeAssistantError."""
+    from custom_components.culiplan.blueprint_generator import (
+        _byok_local_generate_blueprint,
+    )
+    from custom_components.culiplan.const import AI_MODE_BYOK
+    from homeassistant.exceptions import HomeAssistantError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(side_effect=RuntimeError("network down"))
+    hass = MagicMock()
+    with patch(
+        "custom_components.culiplan.blueprint_generator.BYOKKeyStore"
+    ) as MockKeyStore:
+        store = MagicMock()
+        store.async_load = AsyncMock()
+        store.get_key = MagicMock(return_value="sk-test")
+        MockKeyStore.return_value = store
+        with patch(
+            "custom_components.culiplan.blueprint_generator.create_dispatcher",
+            return_value=MagicMock(),
+        ):
+            with pytest.raises(HomeAssistantError) as excinfo:
+                await _byok_local_generate_blueprint(
+                    hass,
+                    {"options": {}},
+                    {CONF_AI_MODE: AI_MODE_BYOK, CONF_BYOK_PROVIDER: "openai"},
+                    client,
+                    "prompt",
+                    None,
+                )
+    assert getattr(excinfo.value, "translation_key", "") == "blueprint_envelope_failed"
+
+
+@pytest.mark.asyncio
+async def test_byok_local_envelope_with_available_entities():
+    """The available_entities list is forwarded into the envelope payload."""
+    from custom_components.culiplan.blueprint_generator import (
+        _byok_local_generate_blueprint,
+    )
+    from custom_components.culiplan.const import AI_MODE_LOCAL
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(
+        return_value={
+            "envelope": {
+                "messages": [],
+                "tools": [],
+                "model": "x",
+                "intent_id": "x",
+                "mode": "local-ollama",
+            }
+        }
+    )
+    hass = MagicMock()
+    dispatcher = MagicMock()
+    dispatcher.dispatch = AsyncMock(return_value=MagicMock(text="yaml"))
+    with patch(
+        "custom_components.culiplan.blueprint_generator.create_dispatcher",
+        return_value=dispatcher,
+    ):
+        await _byok_local_generate_blueprint(
+            hass,
+            {"options": {}},
+            {CONF_AI_MODE: AI_MODE_LOCAL, "local_endpoint": "http://localhost:11434"},
+            client,
+            "prompt",
+            available_entities=[f"e{i}" for i in range(120)],
+        )
+    payload = client.async_post.call_args[0][1]
+    assert "context" in payload
+    assert len(payload["context"]["available_entities"]) == 100
+
+
+@pytest.mark.asyncio
+async def test_cloud_403_unparseable_url_falls_back_to_default():
+    """A 403 with malformed JSON in the body keeps the default upgrade URL."""
+    from custom_components.culiplan.blueprint_generator import _cloud_generate_blueprint
+    from custom_components.culiplan.services import PremiumRequiredError
+
+    client = AsyncMock()
+    # JSON is intentionally invalid → falls back to the hard-coded default URL.
+    client.async_post = AsyncMock(side_effect=Exception('403 {bogus: json")'))
+    with pytest.raises(PremiumRequiredError) as excinfo:
+        await _cloud_generate_blueprint(client, "prompt", None)
+    assert "culiplan.com" in excinfo.value.upgrade_url

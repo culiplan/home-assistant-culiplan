@@ -234,15 +234,23 @@ async def test_meal_plan_tool_all_slots():
     plans = [{"id": "p1", "slots": [{"date": "2026-06-07"}, {"date": "2026-06-08"}]}]
     client = MagicMock()
     client.async_get_meal_plans = AsyncMock(return_value=plans)
-    result = await _GetMealPlanTool().async_call(_hass_with_client(client), _ti({}), MagicMock())
+    result = await _GetMealPlanTool().async_call(
+        _hass_with_client(client), _ti({}), MagicMock()
+    )
     assert result["count"] == 2
 
 
 @pytest.mark.asyncio
 async def test_meal_plan_tool_filtered():
-    plans = [{"id": "p1", "slots": [
-        {"date": "2026-06-07"}, {"date": "2026-06-30"},
-    ]}]
+    plans = [
+        {
+            "id": "p1",
+            "slots": [
+                {"date": "2026-06-07"},
+                {"date": "2026-06-30"},
+            ],
+        }
+    ]
     client = MagicMock()
     client.async_get_meal_plans = AsyncMock(return_value=plans)
     result = await _GetMealPlanTool().async_call(
@@ -268,7 +276,9 @@ async def test_suggest_tool_no_service():
 async def test_suggest_tool_captures_event():
     hass = _hass_with_client(MagicMock())
     callbacks: list = []
-    hass.bus.async_listen = MagicMock(side_effect=lambda name, cb: callbacks.append(cb) or MagicMock())
+    hass.bus.async_listen = MagicMock(
+        side_effect=lambda name, cb: callbacks.append(cb) or MagicMock()
+    )
 
     async def _fire(*a, **k):
         ev = MagicMock()
@@ -317,7 +327,9 @@ async def test_add_to_shopping_list_no_client():
 @pytest.mark.asyncio
 async def test_find_recipes_envelope():
     client = MagicMock()
-    client.async_get = AsyncMock(return_value={"data": [{"id": "r1", "title": "Pasta"}]})
+    client.async_get = AsyncMock(
+        return_value={"data": [{"id": "r1", "title": "Pasta"}]}
+    )
     result = await _FindRecipesByIngredientsTool().async_call(
         _hass_with_client(client), _ti({"ingredients": ["chicken"]}), MagicMock()
     )
@@ -395,9 +407,12 @@ async def test_get_recipe_not_configured():
 @pytest.mark.asyncio
 async def test_pantry_tool_all_items():
     client = MagicMock()
-    client.async_get_pantry_items = AsyncMock(return_value=[
-        {"id": "p1", "name": "Milk"}, {"id": "p2", "name": "Cheese"},
-    ])
+    client.async_get_pantry_items = AsyncMock(
+        return_value=[
+            {"id": "p1", "name": "Milk"},
+            {"id": "p2", "name": "Cheese"},
+        ]
+    )
     result = await _GetPantryItemsTool().async_call(
         _hass_with_client(client), _ti({}), MagicMock()
     )
@@ -412,10 +427,12 @@ async def test_pantry_tool_filtered_by_expiry():
     soon = (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat()
     far = (datetime.now(tz=timezone.utc) + timedelta(days=30)).isoformat()
     client = MagicMock()
-    client.async_get_pantry_items = AsyncMock(return_value=[
-        {"id": "p1", "expiresAt": soon},
-        {"id": "p2", "expiresAt": far},
-    ])
+    client.async_get_pantry_items = AsyncMock(
+        return_value=[
+            {"id": "p1", "expiresAt": soon},
+            {"id": "p2", "expiresAt": far},
+        ]
+    )
     result = await _GetPantryItemsTool().async_call(
         _hass_with_client(client), _ti({"expiring_within_days": 3}), MagicMock()
     )
@@ -425,9 +442,9 @@ async def test_pantry_tool_filtered_by_expiry():
 @pytest.mark.asyncio
 async def test_pantry_tool_caps_at_50():
     client = MagicMock()
-    client.async_get_pantry_items = AsyncMock(return_value=[
-        {"id": str(i)} for i in range(60)
-    ])
+    client.async_get_pantry_items = AsyncMock(
+        return_value=[{"id": str(i)} for i in range(60)]
+    )
     result = await _GetPantryItemsTool().async_call(
         _hass_with_client(client), _ti({}), MagicMock()
     )

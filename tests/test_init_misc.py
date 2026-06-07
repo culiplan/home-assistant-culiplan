@@ -525,3 +525,43 @@ async def test_async_unload_entry_handles_panel_remove_failure():
         # Must not raise
         result = await async_unload_entry(hass, entry)
     assert result is True
+
+
+# ─── Final coverage adds ─────────────────────────────────────────────────────
+
+
+def test_read_manifest_version_falls_back_on_failure(monkeypatch):
+    """If the manifest JSON read fails, _read_manifest_version returns "dev"."""
+    import custom_components.culiplan as init_mod
+    from pathlib import Path as _Path
+
+    class _BoomPath(_Path):
+        def read_text(self, *_args, **_kwargs):  # type: ignore[override]
+            raise OSError("disk on fire")
+
+    def _patched(value):
+        if str(value) == init_mod.__file__:
+            return _BoomPath(value)
+        return _Path(value)
+
+    monkeypatch.setattr(init_mod, "Path", _patched)
+    assert init_mod._read_manifest_version() == "dev"
+
+
+@pytest.mark.asyncio
+async def test_lovelace_resources_legacy_async_load_failure_returns_empty():
+    """The legacy `.async_load()` fallback path swallows errors and continues."""
+    resources_collection = MagicMock()
+    resources_collection.async_items = AsyncMock(side_effect=AttributeError("old API"))
+    resources_collection.async_load = AsyncMock(
+        side_effect=RuntimeError("load failure")
+    )
+    resources_collection.async_create_item = AsyncMock()
+    lovelace = MagicMock()
+    lovelace.resources = resources_collection
+
+    hass = MagicMock()
+    hass.data = {"lovelace": lovelace}
+
+    # Must not raise — should still attempt registrations with empty existing list.
+    await _async_register_lovelace_resources(hass)
