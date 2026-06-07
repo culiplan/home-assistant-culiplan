@@ -110,3 +110,350 @@ async def test_get_api_instance_returns_tools() -> None:
     assert isinstance(instance, ha_llm.APIInstance)
     assert instance.tools, "APIInstance must carry the Culiplan tool list"
     assert instance.api_prompt, "APIInstance must include the prompt fragment"
+
+
+# ─── Tool execution coverage (added v0.13.0) ─────────────────────────────────
+
+
+from typing import Any
+from unittest.mock import AsyncMock
+
+from custom_components.culiplan.const import DOMAIN
+from custom_components.culiplan.llm_api import (
+    _filter_expiring,
+    _find_entry_id,
+    _get_client,
+    _slot_in_range,
+    _AddToShoppingListTool,
+    _FindRecipesByIngredientsTool,
+    _GetMealPlanTool,
+    _GetPantryItemsTool,
+    _GetRecipeTool,
+    _SuggestMealTool,
+)
+
+
+def _hass_with_client(client: Any) -> MagicMock:
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"entry1": {"client": client}}}
+    hass.services = MagicMock()
+    hass.services.has_service.return_value = True
+    hass.services.async_call = AsyncMock()
+    hass.bus = MagicMock()
+    return hass
+
+
+def _ti(args: dict) -> MagicMock:
+    ti = MagicMock()
+    ti.tool_args = args
+    return ti
+
+
+# _find_entry_id / _get_client
+
+
+def test_find_entry_id_first_key():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"e1": {}, "e2": {}}}
+    assert _find_entry_id(hass) == "e1"
+
+
+def test_find_entry_id_none_empty():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    assert _find_entry_id(hass) is None
+
+
+def test_find_entry_id_none_no_domain():
+    hass = MagicMock()
+    hass.data = {}
+    assert _find_entry_id(hass) is None
+
+
+def test_get_client_no_entry_returns_none():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    assert _get_client(hass) is None
+
+
+def test_get_client_no_client_returns_none():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {"e1": {}}}
+    assert _get_client(hass) is None
+
+
+# _slot_in_range / _filter_expiring
+
+
+@pytest.mark.parametrize(
+    "date_value,start,end,expected",
+    [
+        ("2026-06-07T18:00:00Z", None, None, True),
+        ("2026-06-07", "2026-06-01", "2026-06-08", True),
+        ("2026-06-07", "2026-06-08", None, False),
+        ("2026-06-07", None, "2026-06-06", False),
+        (None, "2026-06-01", "2026-06-08", True),
+    ],
+)
+def test_slot_in_range(date_value, start, end, expected):
+    assert _slot_in_range(date_value, start, end) is expected
+
+
+def test_filter_expiring_skips_non_dict():
+    assert _filter_expiring(["not-a-dict"], 3) == []  # type: ignore[arg-type]
+
+
+def test_filter_expiring_skips_no_expiry():
+    assert _filter_expiring([{"id": "1"}], 3) == []
+
+
+def test_filter_expiring_skips_bad_date():
+    assert _filter_expiring([{"id": "1", "expiresAt": "garbage"}], 3) == []
+
+
+def test_filter_expiring_includes_soon():
+    from datetime import datetime, timedelta, timezone
+
+    soon = (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat()
+    assert len(_filter_expiring([{"id": "1", "expiresAt": soon}], 3)) == 1
+
+
+# get_meal_plan tool
+
+
+@pytest.mark.asyncio
+async def test_meal_plan_tool_not_configured():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    result = await _GetMealPlanTool().async_call(hass, _ti({}), MagicMock())
+    assert result["error"] == "not_configured"
+
+
+@pytest.mark.asyncio
+async def test_meal_plan_tool_all_slots():
+    plans = [{"id": "p1", "slots": [{"date": "2026-06-07"}, {"date": "2026-06-08"}]}]
+    client = MagicMock()
+    client.async_get_meal_plans = AsyncMock(return_value=plans)
+    result = await _GetMealPlanTool().async_call(_hass_with_client(client), _ti({}), MagicMock())
+    assert result["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_meal_plan_tool_filtered():
+    plans = [{"id": "p1", "slots": [
+        {"date": "2026-06-07"}, {"date": "2026-06-30"},
+    ]}]
+    client = MagicMock()
+    client.async_get_meal_plans = AsyncMock(return_value=plans)
+    result = await _GetMealPlanTool().async_call(
+        _hass_with_client(client),
+        _ti({"start_date": "2026-06-01", "end_date": "2026-06-08"}),
+        MagicMock(),
+    )
+    assert result["count"] == 1
+
+
+# suggest_meal tool
+
+
+@pytest.mark.asyncio
+async def test_suggest_tool_no_service():
+    hass = MagicMock()
+    hass.services.has_service.return_value = False
+    result = await _SuggestMealTool().async_call(hass, _ti({}), MagicMock())
+    assert result["error"] == "not_configured"
+
+
+@pytest.mark.asyncio
+async def test_suggest_tool_captures_event():
+    hass = _hass_with_client(MagicMock())
+    callbacks: list = []
+    hass.bus.async_listen = MagicMock(side_effect=lambda name, cb: callbacks.append(cb) or MagicMock())
+
+    async def _fire(*a, **k):
+        ev = MagicMock()
+        ev.data = {"result": "Pasta", "mode": "cloud"}
+        callbacks[0](ev)
+
+    hass.services.async_call = AsyncMock(side_effect=_fire)
+    result = await _SuggestMealTool().async_call(hass, _ti({}), MagicMock())
+    assert result["suggestion"] == "Pasta"
+
+
+@pytest.mark.asyncio
+async def test_suggest_tool_no_result():
+    hass = _hass_with_client(MagicMock())
+    hass.bus.async_listen = MagicMock(return_value=MagicMock())
+    result = await _SuggestMealTool().async_call(hass, _ti({}), MagicMock())
+    assert result["error"] == "no_result"
+
+
+# add_to_shopping_list tool
+
+
+@pytest.mark.asyncio
+async def test_add_to_shopping_list():
+    client = MagicMock()
+    client.async_add_shopping_item = AsyncMock(return_value={"id": "i1"})
+    result = await _AddToShoppingListTool().async_call(
+        _hass_with_client(client), _ti({"name": "Milk", "quantity": "1L"}), MagicMock()
+    )
+    assert result["added"] is True
+
+
+@pytest.mark.asyncio
+async def test_add_to_shopping_list_no_client():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    result = await _AddToShoppingListTool().async_call(
+        hass, _ti({"name": "Milk"}), MagicMock()
+    )
+    assert result["error"] == "not_configured"
+
+
+# find_recipes_by_ingredients tool
+
+
+@pytest.mark.asyncio
+async def test_find_recipes_envelope():
+    client = MagicMock()
+    client.async_get = AsyncMock(return_value={"data": [{"id": "r1", "title": "Pasta"}]})
+    result = await _FindRecipesByIngredientsTool().async_call(
+        _hass_with_client(client), _ti({"ingredients": ["chicken"]}), MagicMock()
+    )
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_find_recipes_bare_list():
+    client = MagicMock()
+    client.async_get = AsyncMock(return_value=[{"id": "r1", "title": "Soup"}])
+    result = await _FindRecipesByIngredientsTool().async_call(
+        _hass_with_client(client), _ti({"ingredients": ["onion"]}), MagicMock()
+    )
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_find_recipes_unexpected_response():
+    client = MagicMock()
+    client.async_get = AsyncMock(return_value="garbage")
+    result = await _FindRecipesByIngredientsTool().async_call(
+        _hass_with_client(client), _ti({"ingredients": ["x"]}), MagicMock()
+    )
+    assert result["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_find_recipes_not_configured():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    result = await _FindRecipesByIngredientsTool().async_call(
+        hass, _ti({"ingredients": ["x"]}), MagicMock()
+    )
+    assert result["error"] == "not_configured"
+
+
+# get_recipe tool
+
+
+@pytest.mark.asyncio
+async def test_get_recipe_trims_keys():
+    recipe = {"id": "r1", "title": "Pasta", "images": ["bigfile.jpg"], "audit": {}}
+    client = MagicMock()
+    client.async_get = AsyncMock(return_value=recipe)
+    result = await _GetRecipeTool().async_call(
+        _hass_with_client(client), _ti({"recipe_id": "r1"}), MagicMock()
+    )
+    assert "images" not in result["recipe"]
+    assert result["recipe"]["title"] == "Pasta"
+
+
+@pytest.mark.asyncio
+async def test_get_recipe_not_found():
+    client = MagicMock()
+    client.async_get = AsyncMock(return_value=None)
+    result = await _GetRecipeTool().async_call(
+        _hass_with_client(client), _ti({"recipe_id": "r1"}), MagicMock()
+    )
+    assert result["error"] == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_get_recipe_not_configured():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    result = await _GetRecipeTool().async_call(
+        hass, _ti({"recipe_id": "r1"}), MagicMock()
+    )
+    assert result["error"] == "not_configured"
+
+
+# get_pantry_items tool
+
+
+@pytest.mark.asyncio
+async def test_pantry_tool_all_items():
+    client = MagicMock()
+    client.async_get_pantry_items = AsyncMock(return_value=[
+        {"id": "p1", "name": "Milk"}, {"id": "p2", "name": "Cheese"},
+    ])
+    result = await _GetPantryItemsTool().async_call(
+        _hass_with_client(client), _ti({}), MagicMock()
+    )
+    assert result["count"] == 2
+    assert result["truncated"] is False
+
+
+@pytest.mark.asyncio
+async def test_pantry_tool_filtered_by_expiry():
+    from datetime import datetime, timedelta, timezone
+
+    soon = (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat()
+    far = (datetime.now(tz=timezone.utc) + timedelta(days=30)).isoformat()
+    client = MagicMock()
+    client.async_get_pantry_items = AsyncMock(return_value=[
+        {"id": "p1", "expiresAt": soon},
+        {"id": "p2", "expiresAt": far},
+    ])
+    result = await _GetPantryItemsTool().async_call(
+        _hass_with_client(client), _ti({"expiring_within_days": 3}), MagicMock()
+    )
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_pantry_tool_caps_at_50():
+    client = MagicMock()
+    client.async_get_pantry_items = AsyncMock(return_value=[
+        {"id": str(i)} for i in range(60)
+    ])
+    result = await _GetPantryItemsTool().async_call(
+        _hass_with_client(client), _ti({}), MagicMock()
+    )
+    assert result["count"] == 50
+    assert result["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_pantry_tool_not_configured():
+    hass = MagicMock()
+    hass.data = {DOMAIN: {}}
+    result = await _GetPantryItemsTool().async_call(hass, _ti({}), MagicMock())
+    assert result["error"] == "not_configured"
+
+
+# Register failure non-fatal
+
+
+def test_register_failure_non_fatal():
+    from custom_components.culiplan import llm_api as mod
+
+    hass = MagicMock()
+    hass.data = {"llm": {}}
+    original = mod.llm.async_register_api
+    mod.llm.async_register_api = MagicMock(side_effect=RuntimeError("boom"))  # type: ignore[attr-defined]
+    try:
+        async_register_llm_api(hass)  # must not raise
+    finally:
+        mod.llm.async_register_api = original  # type: ignore[attr-defined]
