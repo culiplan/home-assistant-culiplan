@@ -53,15 +53,20 @@ colour and any token via [card-mod](https://github.com/thomasloven/lovelace-card
 
 ### Via HACS (recommended)
 
-1. In Home Assistant, go to **HACS → Integrations → ⋮ → Custom repositories**.
-2. Add `https://github.com/culiplan/home-assistant-culiplan` as an **Integration**.
-3. Search for **Culiplan** and install.
-4. Restart Home Assistant.
-5. Go to **Settings → Devices & Services → Add Integration → Culiplan**.
+1. Open **HACS** in Home Assistant.
+2. Search for **Culiplan** and click **Download**.
+3. Restart Home Assistant.
+4. Go to **Settings → Devices & Services → Add Integration → Culiplan**.
+
+> **Don't see Culiplan in HACS search yet?** The default-store listing
+> ([hacs/default#8290](https://github.com/hacs/default/pull/8290)) is awaiting merge.
+> In the meantime: HACS → ⋮ → **Custom repositories** → add
+> `https://github.com/culiplan/home-assistant-culiplan` as an **Integration**, then download.
 
 ### Manual
 
 Copy `custom_components/culiplan/` into your HA `custom_components/` directory and restart.
+After v0.6.0 the integration self-updates from GitHub Releases — no terminal or HACS required.
 
 ---
 
