@@ -579,3 +579,319 @@ async def test_advanced_ai_local_remote_warning_confirm_commits(hass):
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AI_MODE] == AI_MODE_LOCAL
+
+
+# ─── Reconfigure path (Gold rule `reconfiguration-flow`) ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_wrong_account_aborts(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    existing = MagicMock()
+    existing.unique_id = "account-A"
+    existing.data = {}
+    hass.config_entries.async_get_entry = MagicMock(return_value=existing)
+    flow.context = {"entry_id": "e1"}
+
+    result = await flow._async_finish_reconfigure(
+        data={"token": {"access_token": "tok"}},
+        culiplan_account_id="account-B",
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "wrong_account"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_matching_account_updates_entry(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    existing = MagicMock()
+    existing.unique_id = "account-A"
+    existing.data = {"ai_mode": "byok"}
+    hass.config_entries.async_get_entry = MagicMock(return_value=existing)
+    # async_update_reload_and_abort returns a dict — patch it via flow attr
+    flow.context = {"entry_id": "e1", "user_id": "ha-user-1"}
+    flow.async_update_reload_and_abort = MagicMock(
+        return_value={"type": FlowResultType.ABORT, "reason": "reauth_successful"}
+    )
+    flow.async_set_unique_id = AsyncMock()
+
+    result = await flow._async_finish_reconfigure(
+        data={"token": {"access_token": "tok2"}},
+        culiplan_account_id="account-A",
+    )
+    assert result["type"] == FlowResultType.ABORT
+    flow.async_update_reload_and_abort.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_falls_back_to_new_entry_when_existing_missing(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    hass.config_entries.async_get_entry = MagicMock(return_value=None)
+    flow.context = {"entry_id": "missing"}
+    flow.async_set_unique_id = AsyncMock()
+
+    # mealie_offer self-skips → create_entry
+    result = await flow._async_finish_reconfigure(
+        data={"token": {"access_token": "tok"}},
+        culiplan_account_id=None,
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+
+
+@pytest.mark.asyncio
+async def test_async_step_reconfigure_delegates_to_user(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    flow.async_step_user = AsyncMock(
+        return_value={"type": FlowResultType.FORM, "step_id": "pick_implementation"}
+    )
+    result = await flow.async_step_reconfigure()
+    assert result["step_id"] == "pick_implementation"
+
+
+# ─── _call_migrate_preview / _call_migrate_start ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_call_migrate_preview_returns_json(hass):
+    from custom_components.culiplan.config_flow import _call_migrate_preview
+
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value={"willImport": 5})
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.post = MagicMock(return_value=resp)
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=session,
+    ):
+        result = await _call_migrate_preview(
+            hass,
+            {"access_token": "tok"},
+            "http://mealie.local",
+            "tok-mealie",
+        )
+    assert result == {"willImport": 5}
+
+
+@pytest.mark.asyncio
+async def test_call_migrate_start_returns_json(hass):
+    from custom_components.culiplan.config_flow import _call_migrate_start
+
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value={"jobId": "j1", "errors": 0})
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.post = MagicMock(return_value=resp)
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=session,
+    ):
+        result = await _call_migrate_start(
+            hass,
+            {"access_token": "tok"},
+            "http://mealie.local",
+            "tok-mealie",
+        )
+    assert result["jobId"] == "j1"
+
+
+# ─── _fetch_culiplan_account_id ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_fetch_culiplan_account_id_happy_path(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+
+    resp = MagicMock()
+    resp.status = 200
+    resp.json = AsyncMock(return_value={"id": "user-42"})
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.get = MagicMock(return_value=resp)
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=session,
+    ):
+        result = await flow._fetch_culiplan_account_id(
+            {"token": {"access_token": "tok"}}
+        )
+    assert result == "user-42"
+
+
+@pytest.mark.asyncio
+async def test_fetch_culiplan_account_id_no_token_returns_none(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    result = await flow._fetch_culiplan_account_id({})
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_culiplan_account_id_non_200_returns_none(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+
+    resp = MagicMock()
+    resp.status = 503
+    resp.__aenter__ = AsyncMock(return_value=resp)
+    resp.__aexit__ = AsyncMock(return_value=False)
+    session = MagicMock()
+    session.get = MagicMock(return_value=resp)
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=session,
+    ):
+        result = await flow._fetch_culiplan_account_id(
+            {"token": {"access_token": "tok"}}
+        )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_culiplan_account_id_network_error_returns_none(hass):
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    session = MagicMock()
+    session.get = MagicMock(side_effect=RuntimeError("boom"))
+    with patch(
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=session,
+    ):
+        result = await flow._fetch_culiplan_account_id(
+            {"token": {"access_token": "tok"}}
+        )
+    assert result is None
+
+
+# ─── More Options/BYOK form rendering ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_missing_provider_shows_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    result = await flow.async_step_advanced_ai_byok(
+        user_input={CONF_BYOK_PROVIDER: "", CONF_BYOK_API_KEY: "sk-test"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_BYOK_PROVIDER in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_missing_key_shows_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    result = await flow.async_step_advanced_ai_byok(
+        user_input={CONF_BYOK_PROVIDER: "openai", CONF_BYOK_API_KEY: ""}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_BYOK_API_KEY in result.get("errors", {})
+
+
+@pytest.mark.asyncio
+async def test_advanced_ai_byok_unexpected_error_base_error(hass):
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = _make_options_flow(hass)
+    flow._advanced_ai_data = {}
+    with patch(
+        "custom_components.culiplan.config_flow.validate_byok_key",
+        new=AsyncMock(side_effect=RuntimeError("unexpected")),
+    ):
+        result = await flow.async_step_advanced_ai_byok(
+            user_input={
+                CONF_BYOK_PROVIDER: "openai",
+                CONF_BYOK_API_KEY: "sk-test",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert "base" in result.get("errors", {})
+
+
+# ─── ai_byok step (initial config flow) extra coverage ───────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ai_byok_invalid_key_shows_form_error(hass):
+    from custom_components.culiplan.ai.types import ProviderAuthError
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+    from custom_components.culiplan.const import CONF_BYOK_API_KEY, CONF_BYOK_PROVIDER
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    flow._oauth_data = {"token": {"access_token": "tok"}}
+    flow._entry_data = {**flow._oauth_data, "ai_mode": "byok"}
+
+    with patch(
+        "custom_components.culiplan.config_flow.validate_byok_key",
+        new=AsyncMock(side_effect=ProviderAuthError("nope")),
+    ):
+        result = await flow.async_step_ai_byok(
+            user_input={
+                CONF_BYOK_PROVIDER: "openai",
+                CONF_BYOK_API_KEY: "sk-bad",
+            }
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert CONF_BYOK_API_KEY in result.get("errors", {})
+
+
+# ─── async_step_pick_implementation (ensures credential is imported) ─────────
+
+
+@pytest.mark.asyncio
+async def test_async_step_user_imports_credential(hass):
+    """async_step_user re-ensures the credential is registered before OAuth."""
+    from custom_components.culiplan.config_flow import OAuth2FlowHandler
+
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+
+    with (
+        patch(
+            "homeassistant.components.application_credentials.async_import_client_credential",
+            new=AsyncMock(),
+        ) as imp,
+        # super().async_step_user is the OAuth2 base — stub it out so we
+        # don't try to launch a real redirect.
+        patch.object(
+            type(flow).__mro__[1],
+            "async_step_user",
+            new=AsyncMock(
+                return_value={"type": FlowResultType.FORM, "step_id": "pick_implementation"}
+            ),
+        ),
+    ):
+        result = await flow.async_step_user()
+    imp.assert_awaited_once()
+    assert result["step_id"] == "pick_implementation"

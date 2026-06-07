@@ -462,3 +462,146 @@ async def test_handle_event_unknown_type_is_noop(coordinator):
     """Unknown event types must NOT raise."""
     coordinator.data = {}
     await coordinator._handle_event({"type": "weird.event.you.never.heard.of"})
+
+
+# ─── Socket.IO event handler functions (registered inside _connect) ──────────
+
+
+@pytest.mark.asyncio
+async def test_socketio_handlers_invoke_expected_behaviour(coordinator):
+    """Pull the four event handlers out of the AsyncClient mock and exercise them."""
+    coordinator._stopped = False
+    coordinator._miss_count = 0
+    captured_handlers = {}
+
+    def _event(namespace=None):  # decorator factory used as @sio.event(namespace=…)
+        def _dec(fn):
+            captured_handlers[fn.__name__] = fn
+            return fn
+
+        return _dec
+
+    def _on(event_name, namespace=None):
+        def _dec(fn):
+            captured_handlers[event_name] = fn
+            return fn
+
+        return _dec
+
+    fake_sio = MagicMock()
+    fake_sio.event = _event
+    fake_sio.on = _on
+    fake_sio.connect = AsyncMock()
+
+    with (
+        patch.object(coordinator, "_get_valid_token", new=AsyncMock(return_value="tok")),
+        patch(
+            "custom_components.culiplan.coordinator.socketio.AsyncClient",
+            return_value=fake_sio,
+        ),
+    ):
+        await coordinator._connect()
+
+    # connect handler — runs on a fresh connection
+    with patch.object(coordinator, "async_refresh", new=AsyncMock()) as refresh:
+        await captured_handlers["connect"]()
+    assert coordinator._connected is True
+    refresh.assert_awaited_once()
+
+    # disconnect handler — bumps miss count, triggers reconnect once threshold reached
+    with patch.object(coordinator, "_schedule_reconnect") as schedule:
+        # Below threshold: no listener update
+        await captured_handlers["disconnect"]("manual")
+        # At threshold: listeners updated
+        await captured_handlers["disconnect"]("server")
+    schedule.assert_called()
+
+    # ha:event handler — forwards to _handle_event
+    with patch.object(coordinator, "_handle_event", new=AsyncMock()) as handle:
+        await captured_handlers["ha:event"]({"type": "meal_plan.updated"})
+    handle.assert_awaited_once()
+
+    # ha:error handler — logs and returns (just verify it doesn't raise)
+    await captured_handlers["ha:error"]({"message": "warn"})
+
+
+# ─── _schedule_reconnect inner loop ──────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_schedule_reconnect_loops_until_connected(coordinator):
+    """The reconnect loop keeps retrying with backoff until connected."""
+    import asyncio as _asyncio
+
+    # Save the real sleep BEFORE patching so we can use it inside _fake_sleep
+    # without the patch sending us back into the fake.
+    _real_sleep = _asyncio.sleep
+
+    coordinator._stopped = False
+    coordinator._connected = False
+    coordinator._reconnect_task = None
+
+    call_count = {"n": 0}
+
+    async def _fake_connect():
+        call_count["n"] += 1
+        if call_count["n"] >= 2:
+            coordinator._connected = True
+
+    async def _fake_sleep(_delay):
+        await _real_sleep(0)
+
+    captured = {}
+
+    def _create_bg_task(coro, name=None):
+        task = _asyncio.create_task(coro, name=name)
+        captured["task"] = task
+        return task
+
+    coordinator.hass.async_create_background_task = _create_bg_task
+
+    with (
+        patch.object(coordinator, "_connect", new=_fake_connect),
+        patch("custom_components.culiplan.coordinator.asyncio.sleep", new=_fake_sleep),
+    ):
+        coordinator._schedule_reconnect(delay=0.001)
+        await _asyncio.wait_for(captured["task"], timeout=2.0)
+
+    assert coordinator._connected is True
+    assert call_count["n"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_reconnect_loop_breaks_on_stop(coordinator):
+    """If async_stop fires mid-loop, the reconnect coroutine exits cleanly."""
+    import asyncio as _asyncio
+
+    _real_sleep = _asyncio.sleep
+
+    coordinator._stopped = False
+    coordinator._connected = False
+    coordinator._reconnect_task = None
+
+    async def _fake_connect():
+        coordinator._stopped = True
+
+    async def _fake_sleep(_delay):
+        await _real_sleep(0)
+
+    captured = {}
+
+    def _create_bg_task(coro, name=None):
+        task = _asyncio.create_task(coro, name=name)
+        captured["task"] = task
+        return task
+
+    coordinator.hass.async_create_background_task = _create_bg_task
+
+    with (
+        patch.object(coordinator, "_connect", new=_fake_connect),
+        patch("custom_components.culiplan.coordinator.asyncio.sleep", new=_fake_sleep),
+    ):
+        coordinator._schedule_reconnect(delay=0.001)
+        await _asyncio.wait_for(captured["task"], timeout=2.0)
+
+    assert coordinator._connected is False

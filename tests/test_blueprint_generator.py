@@ -514,3 +514,160 @@ def test_extract_description_from_yaml_fallback():
     )
 
     assert _extract_description_from_yaml("blueprint:") == ""
+
+
+# ─── _byok_local_generate_blueprint LOCAL mode (v0.13.0) ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_local_generate_blueprint_uses_local_endpoint():
+    """Local AI mode resolves the dispatch backend_mode from the model name."""
+    from custom_components.culiplan.blueprint_generator import (
+        _byok_local_generate_blueprint,
+    )
+    from custom_components.culiplan.const import AI_MODE_LOCAL
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(
+        return_value={
+            "envelope": {
+                "messages": [],
+                "tools": [],
+                "model": "lmstudio-llama",
+                "intent_id": "x",
+                "mode": "local-lmstudio",
+            }
+        }
+    )
+    hass = MagicMock()
+    entry_data = {"options": {}}
+    entry_config = {
+        AI_MODE_LOCAL: AI_MODE_LOCAL,
+        CONF_AI_MODE: AI_MODE_LOCAL,
+        "local_endpoint": "http://localhost:1234",
+        "local_model": "lmstudio-llama",
+    }
+    dispatcher = MagicMock()
+    dispatcher.dispatch = AsyncMock(return_value=MagicMock(text=VALID_BLUEPRINT_YAML))
+    with patch(
+        "custom_components.culiplan.blueprint_generator.create_dispatcher",
+        return_value=dispatcher,
+    ):
+        result = await _byok_local_generate_blueprint(
+            hass, entry_data, entry_config, client, "prompt", None
+        )
+    # Backend was told mode=local-lmstudio
+    payload = client.async_post.call_args[0][1]
+    assert payload["aiProviderMode"] == "local-lmstudio"
+    assert result["yaml"] == VALID_BLUEPRINT_YAML
+
+
+@pytest.mark.asyncio
+async def test_local_generate_blueprint_envelope_missing():
+    """A backend response without an `envelope` key raises HomeAssistantError."""
+    from custom_components.culiplan.blueprint_generator import (
+        _byok_local_generate_blueprint,
+    )
+    from custom_components.culiplan.const import AI_MODE_LOCAL
+    from homeassistant.exceptions import HomeAssistantError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(return_value={})
+    hass = MagicMock()
+    # Stub create_dispatcher so we reach the envelope check.
+    with (
+        patch(
+            "custom_components.culiplan.blueprint_generator.create_dispatcher",
+            return_value=MagicMock(),
+        ),
+        pytest.raises(HomeAssistantError) as excinfo,
+    ):
+        await _byok_local_generate_blueprint(
+            hass,
+            {"options": {}},
+            {CONF_AI_MODE: AI_MODE_LOCAL, "local_endpoint": "http://localhost:11434"},
+            client,
+            "prompt",
+            None,
+        )
+    assert (
+        getattr(excinfo.value, "translation_key", "")
+        == "blueprint_envelope_missing"
+    )
+
+
+@pytest.mark.asyncio
+async def test_local_generate_blueprint_dispatch_failure_wraps():
+    """A dispatcher error during local execution is wrapped as HomeAssistantError."""
+    from custom_components.culiplan.blueprint_generator import (
+        _byok_local_generate_blueprint,
+    )
+    from custom_components.culiplan.const import AI_MODE_LOCAL
+    from homeassistant.exceptions import HomeAssistantError
+
+    client = AsyncMock()
+    client.async_post = AsyncMock(
+        return_value={
+            "envelope": {
+                "messages": [],
+                "tools": [],
+                "model": "x",
+                "intent_id": "x",
+                "mode": "local-ollama",
+            }
+        }
+    )
+    hass = MagicMock()
+    dispatcher = MagicMock()
+    dispatcher.dispatch = AsyncMock(side_effect=RuntimeError("dispatch boom"))
+    with patch(
+        "custom_components.culiplan.blueprint_generator.create_dispatcher",
+        return_value=dispatcher,
+    ):
+        with pytest.raises(HomeAssistantError) as excinfo:
+            await _byok_local_generate_blueprint(
+                hass,
+                {"options": {}},
+                {CONF_AI_MODE: AI_MODE_LOCAL, "local_endpoint": "http://localhost:11434"},
+                client,
+                "prompt",
+                None,
+            )
+    assert (
+        getattr(excinfo.value, "translation_key", "")
+        == "blueprint_local_ai_failed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_install_blueprint_writes_file(tmp_path):
+    """_install_blueprint writes YAML to config/blueprints/automation/culiplan/."""
+    from custom_components.culiplan.blueprint_generator import _install_blueprint
+
+    hass = MagicMock()
+    hass.config.config_dir = str(tmp_path)
+
+    async def _aej(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    hass.async_add_executor_job = _aej
+    rel_path = await _install_blueprint(hass, "Daily meals", "yaml: here")
+    target = tmp_path / "blueprints" / "automation" / "culiplan" / "daily_meals.yaml"
+    assert target.exists()
+    assert target.read_text() == "yaml: here"
+
+
+@pytest.mark.asyncio
+async def test_install_blueprint_write_failure_raises(tmp_path):
+    from custom_components.culiplan.blueprint_generator import _install_blueprint
+    from homeassistant.exceptions import HomeAssistantError
+
+    hass = MagicMock()
+    hass.config.config_dir = str(tmp_path)
+
+    async def _aej(fn, *args, **kwargs):
+        raise OSError("disk full")
+
+    hass.async_add_executor_job = _aej
+    with pytest.raises(HomeAssistantError):
+        await _install_blueprint(hass, "x", "yaml: here")
