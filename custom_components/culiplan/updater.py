@@ -152,9 +152,7 @@ async def async_perform_update(hass: HomeAssistant, zipball_url: str) -> None:
         zip_path = tmp_root_path / "release.zip"
 
         session = async_get_clientsession(hass)
-        _LOGGER.info(
-            "[culiplan][updater] Downloading release zip from %s", zipball_url
-        )
+        _LOGGER.info("[culiplan][updater] Downloading release zip from %s", zipball_url)
         try:
             async with session.get(
                 zipball_url,
@@ -190,9 +188,7 @@ async def async_perform_update(hass: HomeAssistant, zipball_url: str) -> None:
 
             # The top-level entry is something like
             # "culiplan-home-assistant-culiplan-<sha>/"
-            top_level_dirs = [
-                p for p in extract_dir.iterdir() if p.is_dir()
-            ]
+            top_level_dirs = [p for p in extract_dir.iterdir() if p.is_dir()]
             if not top_level_dirs:
                 raise ValueError("Zip archive appears to be empty")
             repo_root = top_level_dirs[0]

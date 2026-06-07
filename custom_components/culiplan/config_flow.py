@@ -914,9 +914,7 @@ class MealieOptionsFlow(config_entries.OptionsFlow):
                     user_input.get("expiry_hours", current_expiry_hours)
                 ),
                 "debug_ai": bool(user_input.get("debug_ai", current_debug_ai)),
-                "auto_update": bool(
-                    user_input.get("auto_update", current_auto_update)
-                ),
+                "auto_update": bool(user_input.get("auto_update", current_auto_update)),
             }
             # Preserve any existing AI mode keys the user already configured.
             for key in (
