@@ -31,6 +31,18 @@ from custom_components.culiplan.const import (
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
+def _set_config_entry_compat(flow, entry) -> None:
+    """Cross-HA-version setter for OptionsFlow.config_entry.
+
+    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
+    ``_config_entry``; HA 2024.10 (the CI floor) keeps it as a plain attribute.
+    """
+    try:
+        flow.config_entry = entry
+    except AttributeError:
+        flow._config_entry = entry  # type: ignore[attr-defined]
+
+
 def _mock_oauth_data() -> dict:
     return {
         "token": {
@@ -155,7 +167,7 @@ async def test_options_flow_init_shows_advanced_ai_toggle(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
 
     result = await flow.async_step_init()
@@ -179,7 +191,7 @@ async def test_options_flow_advanced_ai_toggle_opens_ai_step(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
 
     with patch(
@@ -204,7 +216,7 @@ async def test_options_flow_advanced_ai_switch_to_cloud(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_BYOK, CONF_BYOK_PROVIDER: "openai"}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
 
     result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
@@ -225,7 +237,7 @@ async def test_options_flow_advanced_ai_byok_stores_key(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_BYOK}
 
@@ -270,7 +282,7 @@ async def test_options_flow_advanced_ai_byok_invalid_key_shows_error(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_BYOK}
 
@@ -302,7 +314,7 @@ async def test_options_flow_advanced_ai_local_stores_endpoint(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_LOCAL}
     flow._detected_endpoints = []
@@ -336,7 +348,7 @@ async def test_options_flow_no_advanced_ai_toggle_returns_no_change(hass):
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
 
     result = await flow.async_step_init(user_input={CONF_ADVANCED_AI: False})

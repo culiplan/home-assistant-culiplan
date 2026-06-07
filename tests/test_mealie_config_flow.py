@@ -30,6 +30,18 @@ from custom_components.culiplan.const import (
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 
+def _set_config_entry_compat(flow, entry) -> None:
+    """Cross-HA-version setter for OptionsFlow.config_entry.
+
+    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
+    ``_config_entry``; HA 2024.10 (the CI floor) keeps it as a plain attribute.
+    """
+    try:
+        flow.config_entry = entry
+    except AttributeError:
+        flow._config_entry = entry  # type: ignore[attr-defined]
+
+
 def _mock_oauth_data() -> dict:
     return {
         "token": {
@@ -276,7 +288,7 @@ def _make_options_flow(entry_data: dict, hass) -> "MealieOptionsFlow":  # type: 
     entry.data = entry_data
     entry.options = {}
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry_compat(flow, entry)
     flow.hass = hass
     return flow
 

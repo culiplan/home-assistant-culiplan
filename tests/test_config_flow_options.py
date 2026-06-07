@@ -17,6 +17,20 @@ from homeassistant.data_entry_flow import FlowResultType
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
+def _set_config_entry(flow, entry) -> None:
+    """Cross-HA-version setter for OptionsFlow.config_entry.
+
+    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
+    ``_config_entry``. HA 2024.10 (the integration's CI floor) keeps it
+    as a plain attribute. Setting both keeps the tests passing across
+    the whole matrix.
+    """
+    try:
+        flow.config_entry = entry
+    except AttributeError:
+        flow._config_entry = entry  # type: ignore[attr-defined]
+
+
 def _make_options_flow(
     hass, entry_data: dict | None = None, options: dict | None = None
 ):
@@ -26,7 +40,7 @@ def _make_options_flow(
     entry.data = entry_data or {}
     entry.options = options or {}
     flow = MealieOptionsFlow()
-    flow.config_entry = entry
+    _set_config_entry(flow, entry)
     flow.hass = hass
     return flow
 
