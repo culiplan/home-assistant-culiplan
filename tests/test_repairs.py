@@ -226,19 +226,22 @@ class TestServicesRepairIntegration:
     """
 
     def _setup_hass_with_cloud_mode(self) -> tuple[MagicMock, MagicMock]:
-        """Set up a mock hass with Cloud AI mode and a client that returns 403."""
-        client = AsyncMock()
-        # Simulate 403 premium_required from backend
-        import json
+        """Set up a mock hass with Cloud AI mode and a client that returns 403.
 
-        body = json.dumps(
-            {
-                "error": "premium_required",
-                "feature": "ai.suggestion",
-                "upgradeUrl": "https://culiplan.com/settings/billing?ref=ha_gate&client=ha-core",
-            }
+        api.py now parses the 403 envelope and raises a typed
+        ``PremiumRequiredError`` directly (task-1416 — no more string
+        parsing in services.py). The mock raises the typed error so the
+        end-to-end behaviour matches what the real client does.
+        """
+        client = AsyncMock()
+        client.async_call_voice_tool = AsyncMock(
+            side_effect=PremiumRequiredError(
+                feature="ai.suggestion",
+                upgrade_url=(
+                    "https://culiplan.com/settings/billing?ref=ha_gate&client=ha-core"
+                ),
+            )
         )
-        client.async_call_voice_tool = AsyncMock(side_effect=Exception(f"403 {body}"))
 
         entry = MagicMock()
         entry.entry_id = "entry_test"

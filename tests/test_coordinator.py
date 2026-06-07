@@ -146,16 +146,17 @@ async def test_stale_token_refreshed_before_connect(coordinator, mock_entry):
     mock_oauth_session.async_ensure_token_valid = AsyncMock()
     mock_oauth_session.token = {"access_token": "tok_refreshed"}
 
+    # config_entry_oauth2_flow is imported lazily inside _get_valid_token,
+    # so patch the symbols at their source module.
     with (
         patch(
-            "custom_components.culiplan.coordinator.config_entry_oauth2_flow"
+            "homeassistant.helpers.config_entry_oauth2_flow"
             ".async_get_config_entry_implementation",
             new_callable=AsyncMock,
             return_value=mock_impl,
         ),
         patch(
-            "custom_components.culiplan.coordinator.config_entry_oauth2_flow"
-            ".OAuth2Session",
+            "homeassistant.helpers.config_entry_oauth2_flow.OAuth2Session",
             return_value=mock_oauth_session,
         ),
     ):

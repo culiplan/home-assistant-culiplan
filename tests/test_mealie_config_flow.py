@@ -53,7 +53,9 @@ def _make_preview_response(
             "willImport": will_import,
             "willFlag": will_flag,
             "willSkip": will_skip,
-            "unparsedIngredientSamples": ["For the sauce:", "Garnish:"],
+            # The preview screen renders `sampleTitles` from the backend
+            # payload (was `unparsedIngredientSamples` in earlier shape).
+            "sampleTitles": ["For the sauce:", "Garnish:"],
         },
     }
 
@@ -75,6 +77,18 @@ def _make_flow(hass) -> "OAuth2FlowHandler":  # type: ignore[name-defined]
     flow = OAuth2FlowHandler()
     flow.hass = hass
     flow._oauth_data = _mock_oauth_data()
+    # The mealie_offer step now skips the form entirely if HA has no
+    # Mealie integration configured (commit 1e5c0… — no point asking the
+    # user to import from nowhere). Pretend a Mealie entry exists so the
+    # flow goes through the import wizard.
+    original_async_entries = hass.config_entries.async_entries
+
+    def _async_entries_with_mealie(domain: str | None = None):  # type: ignore[no-untyped-def]
+        if domain == "mealie":
+            return [MagicMock()]
+        return original_async_entries(domain) if domain else original_async_entries()
+
+    hass.config_entries.async_entries = _async_entries_with_mealie
     return flow
 
 
@@ -125,14 +139,17 @@ async def test_mealie_offer_accept_shows_credentials(hass):
 
 @pytest.mark.asyncio
 async def test_mealie_credentials_success_shows_preview(hass):
-    """Valid credentials trigger a dry-run and show the preview step."""
+    """Valid credentials trigger a dry-run and show the preview step.
+
+    ``_call_migrate_preview`` was moved off the flow class to module scope
+    (no per-flow state to encapsulate); patch it there.
+    """
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    with patch.object(
-        flow,
-        "_call_migrate_preview",
-        return_value=(_make_preview_response()["preview"], None),
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_preview",
+        new=AsyncMock(return_value=_make_preview_response()["preview"]),
     ):
         result = await flow.async_step_mealie_credentials(
             user_input={
@@ -200,23 +217,23 @@ async def test_mealie_progress_creates_entry_on_success(hass):
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
 
-    with (
-        patch.object(
-            flow,
-            "_call_migrate_start",
-            return_value=("job-abc-789", None),
-        ),
-        patch.object(
-            flow,
-            "_poll_import_progress",
-            return_value=(True, []),
-        ),
+    # ``_call_migrate_start`` is now a module-level coroutine returning the
+    # raw backend payload dict (no separate progress poller — the backend
+    # finishes inline for the synchronous mealie import). The progress step
+    # forwards to mealie_done with the job_id, which creates the entry
+    # immediately (no intermediate form).
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_start",
+        new=AsyncMock(return_value={"jobId": "job-abc-789", "errors": 0}),
     ):
         result = await flow.async_step_mealie_progress()
 
-    # Should arrive at the mealie_done form
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "mealie_done"
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_MEALIE_JOB_ID] == "job-abc-789"
+    assert CONF_MEALIE_IMPORT_AT in result["data"]
+    # Credentials stripped before persisting (§6.6)
+    assert CONF_MEALIE_TOKEN not in result["data"]
+    assert CONF_MEALIE_URL not in result["data"]
 
 
 @pytest.mark.asyncio
@@ -225,7 +242,11 @@ async def test_mealie_done_creates_entry_with_job_id(hass):
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    flow._mealie_job_id = "job-xyz-321"
+    # Done step reads from `_entry_data` (job_id + import_at are written by
+    # the progress step before forwarding here); the legacy
+    # `flow._mealie_job_id` attribute is gone.
+    flow._entry_data[CONF_MEALIE_JOB_ID] = "job-xyz-321"
+    flow._entry_data[CONF_MEALIE_IMPORT_AT] = int(time.time())
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
 
@@ -242,19 +263,34 @@ async def test_mealie_done_creates_entry_with_job_id(hass):
 # ─── AC#4: rollback visible within 24 h ──────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_options_flow_rollback_visible_within_24h(hass):
-    """Rollback option should be shown when import is within 24 h."""
+def _make_options_flow(entry_data: dict, hass) -> "MealieOptionsFlow":  # type: ignore[name-defined]
+    """Construct MealieOptionsFlow the HA-2025.12+ way.
+
+    The legacy ``MealieOptionsFlow(entry)`` constructor was removed when HA
+    moved to a framework-assigned ``self.config_entry``. The framework does
+    that for real flows; for unit tests we assign it manually.
+    """
     from custom_components.culiplan.config_flow import MealieOptionsFlow
 
     entry = MagicMock()
-    entry.data = {
-        CONF_MEALIE_JOB_ID: "job-123",
-        CONF_MEALIE_IMPORT_AT: int(time.time()) - 3600,  # 1 hour ago
-    }
-
-    flow = MealieOptionsFlow(entry)
+    entry.data = entry_data
+    entry.options = {}
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
+    return flow
+
+
+@pytest.mark.asyncio
+async def test_options_flow_rollback_visible_within_24h(hass):
+    """Rollback option should be shown when import is within 24 h."""
+    flow = _make_options_flow(
+        {
+            CONF_MEALIE_JOB_ID: "job-123",
+            CONF_MEALIE_IMPORT_AT: int(time.time()) - 3600,  # 1 hour ago
+        },
+        hass,
+    )
 
     result = await flow.async_step_init()
 
@@ -267,16 +303,15 @@ async def test_options_flow_rollback_visible_within_24h(hass):
 @pytest.mark.asyncio
 async def test_options_flow_rollback_hidden_after_24h(hass):
     """Rollback option should NOT be available after 24 h."""
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {
-        CONF_MEALIE_JOB_ID: "job-123",
-        CONF_MEALIE_IMPORT_AT: int(time.time()) - MEALIE_ROLLBACK_WINDOW_SECONDS - 100,
-    }
-
-    flow = MealieOptionsFlow(entry)
-    flow.hass = hass
+    flow = _make_options_flow(
+        {
+            CONF_MEALIE_JOB_ID: "job-123",
+            CONF_MEALIE_IMPORT_AT: int(time.time())
+            - MEALIE_ROLLBACK_WINDOW_SECONDS
+            - 100,
+        },
+        hass,
+    )
 
     result = await flow.async_step_init()
 
@@ -288,13 +323,7 @@ async def test_options_flow_rollback_hidden_after_24h(hass):
 @pytest.mark.asyncio
 async def test_options_flow_no_import_at_shows_no_rollback(hass):
     """No import timestamp means no rollback option."""
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {}  # No mealie import metadata
-
-    flow = MealieOptionsFlow(entry)
-    flow.hass = hass
+    flow = _make_options_flow({}, hass)
 
     result = await flow.async_step_init()
 
@@ -306,40 +335,35 @@ async def test_options_flow_no_import_at_shows_no_rollback(hass):
 @pytest.mark.asyncio
 async def test_rollback_calls_delete_endpoint(hass):
     """Rollback step calls DELETE /api/migrate/mealie/rollback."""
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {
-        CONF_MEALIE_JOB_ID: "job-123",
-        CONF_MEALIE_IMPORT_AT: int(time.time()) - 60,
-        "token": {"access_token": "tok_access"},
-    }
-
-    flow = MealieOptionsFlow(entry)
-    flow.hass = hass
+    flow = _make_options_flow(
+        {
+            CONF_MEALIE_JOB_ID: "job-123",
+            CONF_MEALIE_IMPORT_AT: int(time.time()) - 60,
+            "access_token": "tok_access",
+        },
+        hass,
+    )
 
     mock_response = AsyncMock()
     mock_response.status = 200
-    mock_response.json = AsyncMock(
-        return_value={
-            "deleted": {"recipes": 5, "shoppingItems": 3, "mealPlans": 2},
-            "message": "Rollback complete.",
-        }
-    )
+    mock_response.raise_for_status = MagicMock()
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock(return_value=False)
 
     mock_session = MagicMock()
     mock_session.delete = MagicMock(return_value=mock_response)
 
+    # The rollback step uses HA's shared aiohttp session via
+    # aiohttp_client.async_get_clientsession.
     with patch(
-        "custom_components.culiplan.config_flow.async_get_clientsession",
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
         return_value=mock_session,
     ):
         result = await flow.async_step_mealie_rollback()
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "rollback_complete"
+    mock_session.delete.assert_called_once()
 
 
 # ─── AC#5: v1 and v2 schema inputs ────────────────────────────────────────────
@@ -359,10 +383,9 @@ async def test_preview_accepts_v1_mealie_data(hass):
         "unparsedIngredientSamples": [],
     }
 
-    with patch.object(
-        flow,
-        "_call_migrate_preview",
-        return_value=(v1_preview, None),
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_preview",
+        new=AsyncMock(return_value=v1_preview),
     ):
         result = await flow.async_step_mealie_credentials(
             user_input={
@@ -390,10 +413,9 @@ async def test_preview_accepts_v2_mealie_data(hass):
         "unparsedIngredientSamples": ["For the sauce:"],
     }
 
-    with patch.object(
-        flow,
-        "_call_migrate_preview",
-        return_value=(v2_preview, None),
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_preview",
+        new=AsyncMock(return_value=v2_preview),
     ):
         result = await flow.async_step_mealie_credentials(
             user_input={
@@ -412,14 +434,20 @@ async def test_preview_accepts_v2_mealie_data(hass):
 
 @pytest.mark.asyncio
 async def test_credentials_error_shows_form_again(hass):
-    """Connection error during dry-run shows the credentials form with error."""
+    """Connection error during dry-run shows the credentials form with error.
+
+    ``aiohttp.ClientConnectionError`` is mapped to a field-level error on
+    the mealie_url field (so the user fixes the URL); a bare exception
+    falls back to ``base`` with the generic ``unknown`` key.
+    """
+    import aiohttp as _aiohttp
+
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    with patch.object(
-        flow,
-        "_call_migrate_preview",
-        return_value=(None, "mealie_unreachable"),
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_preview",
+        new=AsyncMock(side_effect=_aiohttp.ClientConnectionError("unreachable")),
     ):
         result = await flow.async_step_mealie_credentials(
             user_input={
@@ -430,29 +458,35 @@ async def test_credentials_error_shows_form_again(hass):
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_credentials"
-    assert "base" in result.get("errors", {})
-    assert result["errors"]["base"] == "mealie_unreachable"
+    errors = result.get("errors", {})
+    assert errors.get(CONF_MEALIE_URL) == "mealie_unreachable"
 
 
 @pytest.mark.asyncio
 async def test_start_error_falls_through_to_done(hass):
-    """If the migration start fails, flow continues to done with error logged."""
+    """If the migration start fails, flow creates the entry without Mealie data.
+
+    On start failure the flow no longer renders an intermediate done form
+    — it strips the in-flight Mealie credentials and creates the entry
+    so the user isn't stuck mid-wizard. This matches the §6.6 §"never
+    persist credentials" rule even on failure.
+    """
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
 
-    with patch.object(
-        flow,
-        "_call_migrate_start",
-        return_value=(None, "unknown"),
+    with patch(
+        "custom_components.culiplan.config_flow._call_migrate_start",
+        new=AsyncMock(side_effect=Exception("simulated start failure")),
     ):
         result = await flow.async_step_mealie_progress()
 
-    # Should still reach the done step gracefully
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "mealie_done"
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    # Credentials must NOT be persisted (§6.6)
+    assert CONF_MEALIE_TOKEN not in result["data"]
+    assert CONF_MEALIE_URL not in result["data"]
 
 
 # ─── B2 regression: rollback must not raise TypeError ────────────────────────
@@ -462,40 +496,35 @@ async def test_start_error_falls_through_to_done(hass):
 async def test_rollback_no_type_error_on_network_failure(hass):
     """async_step_mealie_rollback must not raise TypeError (B2 from E2E review).
 
-    Previously, CuliplanApiClient(self.hass, self._config_entry) was called with
-    the wrong signature — it raised TypeError before any network call was made,
-    causing the rollback to silently abort with 'rollback_failed' even though
-    nothing was attempted.  The line was removed; this test confirms the path
-    degrades gracefully when the network call itself fails.
+    Previously, CuliplanApiClient(self.hass, self._config_entry) was called
+    with the wrong signature — it raised TypeError before any network call
+    was made, causing the rollback to silently abort with 'rollback_failed'
+    even though nothing was attempted. The line was removed; this test
+    confirms the path degrades gracefully when the DELETE itself fails.
     """
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    flow = _make_options_flow(
+        {
+            CONF_MEALIE_JOB_ID: "job-rollback-test",
+            CONF_MEALIE_IMPORT_AT: int(time.time()) - 60,
+            "access_token": "tok_access",
+        },
+        hass,
+    )
 
-    entry = MagicMock()
-    entry.data = {
-        CONF_MEALIE_JOB_ID: "job-rollback-test",
-        CONF_MEALIE_IMPORT_AT: int(time.time()) - 60,
-        "access_token": "tok_access",
-    }
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock(
+        side_effect=Exception("simulated network error")
+    )
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
 
-    flow = MealieOptionsFlow(entry)
-    flow.hass = hass
-    flow._config_entry = entry
+    mock_session = MagicMock()
+    mock_session.delete = MagicMock(return_value=mock_resp)
 
-    # Simulate a network error during the DELETE call — we just need to confirm
-    # no TypeError is raised before reaching the aiohttp call.
     with patch(
-        "custom_components.culiplan.config_flow.aiohttp.ClientSession",
-    ) as mock_session_cls:
-        mock_session = AsyncMock()
-        mock_resp = AsyncMock()
-        mock_resp.raise_for_status.side_effect = Exception("simulated network error")
-        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_resp.__aexit__ = AsyncMock(return_value=False)
-        mock_session.delete = MagicMock(return_value=mock_resp)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=False)
-        mock_session_cls.return_value = mock_session
-
+        "custom_components.culiplan.config_flow.aiohttp_client.async_get_clientsession",
+        return_value=mock_session,
+    ):
         # Must not raise TypeError; should abort with "rollback_failed"
         result = await flow.async_step_mealie_rollback()
 

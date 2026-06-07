@@ -108,10 +108,18 @@ class TestRunCloudIntent:
 
     @pytest.mark.asyncio
     async def test_403_premium_required_raises_premium_error(self):
-        """AC#4 (1388) + AC#5 (1389): Free user → PremiumRequiredError."""
+        """AC#4 (1388) + AC#5 (1389): Free user → PremiumRequiredError.
+
+        api.py now parses the 403 envelope and raises a typed
+        ``PremiumRequiredError`` directly (task-1416). ``_run_cloud_intent``
+        only needs to re-raise it; legacy string-parse path is gone.
+        """
         client = AsyncMock()
         client.async_call_voice_tool = AsyncMock(
-            side_effect=Exception("403 Forbidden: premium_required")
+            side_effect=PremiumRequiredError(
+                feature="suggest_meal",
+                upgrade_url="https://culiplan.com/premium?source=ha",
+            )
         )
         with pytest.raises(PremiumRequiredError) as exc_info:
             await _run_cloud_intent(client, "suggest_meal", {})
@@ -121,31 +129,32 @@ class TestRunCloudIntent:
 
     @pytest.mark.asyncio
     async def test_403_extracts_upgrade_url_from_json_body(self):
-        """AC#4: If error message contains JSON with upgradeUrl, use it."""
-        import json
-
-        body = json.dumps(
-            {
-                "error": "premium_required",
-                "upgradeUrl": "https://culiplan.com/premium?source=ha",
-            }
-        )
+        """AC#4: PremiumRequiredError carries the upgrade URL from api.py."""
         client = AsyncMock()
-        client.async_call_voice_tool = AsyncMock(side_effect=Exception(f"403 {body}"))
+        client.async_call_voice_tool = AsyncMock(
+            side_effect=PremiumRequiredError(
+                feature="suggest_meal",
+                upgrade_url="https://culiplan.com/premium?source=ha",
+            )
+        )
         with pytest.raises(PremiumRequiredError) as exc_info:
             await _run_cloud_intent(client, "suggest_meal", {})
-        assert "https://culiplan.com/premium?source=ha" == exc_info.value.upgrade_url
+        assert exc_info.value.upgrade_url == "https://culiplan.com/premium?source=ha"
 
     @pytest.mark.asyncio
     async def test_non_403_error_raises_homeassistant_error(self):
-        """Non-premium errors wrap in HomeAssistantError."""
+        """Non-premium errors wrap in HomeAssistantError via translation_key."""
         client = AsyncMock()
         client.async_call_voice_tool = AsyncMock(
             side_effect=Exception("Connection refused")
         )
         with pytest.raises(HomeAssistantError) as exc_info:
             await _run_cloud_intent(client, "suggest_meal", {})
-        assert "Connection refused" in str(exc_info.value)
+        # Translation_placeholders carry the underlying error text.
+        assert (
+            "Connection refused"
+            in exc_info.value.translation_placeholders.get("error", "")
+        )
 
     @pytest.mark.asyncio
     async def test_passes_params_to_tool(self):
@@ -207,7 +216,10 @@ class TestRunBYOKOrLocalIntent:
         assert result == "Here's dinner: pasta!"
         MockService.assert_called_once()
         call_kwargs = MockService.call_args
-        assert call_kwargs.kwargs["mode"] == AI_MODE_BYOK
+        # Mode is the compound dispatcher key (e.g. "byok-openai", "byok-anthropic")
+        # — the flat AI_MODE_BYOK never reaches AIDispatchService since the
+        # _build_dispatch_mode helper resolves the provider suffix.
+        assert call_kwargs.kwargs["mode"] == "byok-openai"
         assert call_kwargs.kwargs["api_key"] == "sk-test-key"
 
     @pytest.mark.asyncio
@@ -227,10 +239,11 @@ class TestRunBYOKOrLocalIntent:
             store_instance.get_key = MagicMock(return_value=None)
             MockKeyStore.return_value = store_instance
 
-            with pytest.raises(HomeAssistantError, match="No BYOK key found"):
+            with pytest.raises(HomeAssistantError) as excinfo:
                 await _run_byok_or_local_intent(
                     hass, entry_data, entry_config, client, "suggest_meal", {}
                 )
+            assert getattr(excinfo.value, "translation_key", "") == "byok_key_missing"
 
     @pytest.mark.asyncio
     async def test_local_mode_uses_endpoint(self):
@@ -259,7 +272,9 @@ class TestRunBYOKOrLocalIntent:
 
         assert result == "Shopping list is filled."
         call_kwargs = MockService.call_args
-        assert call_kwargs.kwargs["mode"] == AI_MODE_LOCAL
+        # Compound dispatcher key — "local-ollama" or "local-lmstudio" based
+        # on CONF_LOCAL_MODEL; "gemma3" routes to ollama.
+        assert call_kwargs.kwargs["mode"] == "local-ollama"
         assert call_kwargs.kwargs["api_key"] == "local"
         assert "/v1" in call_kwargs.kwargs["base_url"]
 
@@ -412,7 +427,7 @@ class TestHandleSuggestMeal:
         service_call = MagicMock()
         service_call.data = {}
 
-        with pytest.raises(HomeAssistantError, match="not configured"):
+        with pytest.raises(HomeAssistantError, match="not_configured"):
             await suggest_handler(service_call)
 
     @pytest.mark.asyncio
@@ -527,7 +542,7 @@ class TestHandleFillShoppingList:
         service_call = MagicMock()
         service_call.data = {}
 
-        with pytest.raises(HomeAssistantError, match="not configured"):
+        with pytest.raises(HomeAssistantError, match="not_configured"):
             await fill_handler(service_call)
 
 

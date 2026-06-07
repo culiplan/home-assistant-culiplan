@@ -31,14 +31,10 @@ This file sets up the test environment for the Culiplan HA integration:
    the cached `DATA_CUSTOM_COMPONENTS` dict on the test hass so the
    integration under test is reloaded for each test case.
 
-4. **Known-broken test skips.** Some tests fail for reasons
-   unrelated to the fixture drift (mock-patch path drift, API
-   contract drift, lingering-timer leaks in test helpers). They are
-   centrally skipped via `pytest_collection_modifyitems` below so
-   the diff is reviewable in one place rather than scattered as
-    `@pytest.mark.skip` decorators across 17 files. Each entry has
-   a TODO note. Re-enable individually as the underlying tests are
-   repaired.
+4. **No skip list any more.** The earlier ``_BROKEN_TEST_IDS`` set
+   was removed in v0.13.0 once every test had been brought back to
+   green. The hard floor in ``pyproject.toml`` (``fail_under = 95``)
+   now stands without exceptions.
 """
 
 from __future__ import annotations
@@ -62,111 +58,6 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     that resolution work across all matrix lanes.
     """
     yield
-
-
-# ─── Centralised skip list for known-broken tests (TODO: re-enable) ──────────
-#
-# Each entry below is a pre-existing test bug that surfaced once the fixture
-# drift was repaired and the suite could actually run. They are NOT regressions
-# from this conftest rewrite. Group reasons:
-#
-#   - test_ai_dispatchers.py: tests patch `custom_components.culiplan.ai.
-#     dispatchers.AsyncOpenAI` but the symbol is imported lazily inside
-#     `OpenAICompatibleDispatcher.__init__`, so the patch target doesn't
-#     exist at collection time. Needs the patch path updated to
-#     `openai.AsyncOpenAI` or a refactor that hoists the import.
-#
-#   - test_local_ai.py: aiohttp `HomeAssistantTCPConnector` leaves a
-#     lingering `_cleanup_closed` TimerHandle which HA's `verify_cleanup`
-#     fixture flags. Needs the probe helpers to close their connector
-#     explicitly in tests.
-#
-#   - test_services.py / test_repairs.py / test_phase2_services.py /
-#     test_mealie_config_flow.py / test_config_flow*.py /
-#     test_byok_key_store.py / test_intents.py / test_cooking_mode_services.py
-#     / test_blueprint_generator.py / test_coordinator.py /
-#     test_debug_logger_ttl.py / test_energy_sensor.py / test_entities.py /
-#     test_launch_view.py: assorted API-contract drift between test
-#     expectations and the v0.3.x implementation. These tests were green
-#     when last written but the underlying integration code moved on without
-#     the tests being updated (the Tests workflow has been disabled since
-#     the fixture broke, so nothing caught the drift).
-#
-# Track in the Gold/Platinum roadmap doc; each entry should be removed as the
-# underlying test is repaired in a follow-up PR.
-
-_BROKEN_TEST_IDS: frozenset[str] = frozenset(
-    {
-        # test_config_flow.py / test_config_flow_task1626.py — flow drift
-        "tests/test_config_flow.py::test_config_flow_cloud_ai_happy_path",
-        "tests/test_config_flow.py::test_ai_provider_step_cloud_leads_to_mealie_offer",
-        "tests/test_config_flow_task1626.py::test_oauth_create_entry_skips_ai_step",
-        # Lingering `_run_safe_shutdown_loop` daemon thread after test (HA test
-        # helper bug — only triggers under socket-based oauth fetch path).
-        "tests/test_config_flow_task1626.py::test_first_run_defaults_to_cloud_ai_in_entry_data",
-        "tests/test_config_flow_task1626.py::test_first_run_skipping_mealie_creates_cloud_entry",
-        "tests/test_config_flow_task1626.py::test_options_flow_init_shows_advanced_ai_toggle",
-        "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_toggle_opens_ai_step",
-        "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_switch_to_cloud",
-        "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_byok_stores_key",
-        "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_byok_invalid_key_shows_error",
-        "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_local_stores_endpoint",
-        "tests/test_config_flow_task1626.py::test_options_flow_no_advanced_ai_toggle_returns_no_change",
-        # test_coordinator.py / test_debug_logger_ttl.py / test_energy_sensor.py
-        "tests/test_coordinator.py::test_stale_token_refreshed_before_connect",
-        # test_mealie_config_flow.py — entry-creation short-circuit
-        "tests/test_mealie_config_flow.py::test_ai_provider_leads_to_mealie_offer",
-        "tests/test_mealie_config_flow.py::test_mealie_offer_accept_shows_credentials",
-        "tests/test_mealie_config_flow.py::test_mealie_credentials_success_shows_preview",
-        "tests/test_mealie_config_flow.py::test_preview_description_placeholders_present",
-        "tests/test_mealie_config_flow.py::test_mealie_progress_creates_entry_on_success",
-        "tests/test_mealie_config_flow.py::test_mealie_done_creates_entry_with_job_id",
-        "tests/test_mealie_config_flow.py::test_options_flow_rollback_visible_within_24h",
-        "tests/test_mealie_config_flow.py::test_options_flow_rollback_hidden_after_24h",
-        "tests/test_mealie_config_flow.py::test_options_flow_no_import_at_shows_no_rollback",
-        "tests/test_mealie_config_flow.py::test_rollback_calls_delete_endpoint",
-        "tests/test_mealie_config_flow.py::test_preview_accepts_v1_mealie_data",
-        "tests/test_mealie_config_flow.py::test_preview_accepts_v2_mealie_data",
-        "tests/test_mealie_config_flow.py::test_credentials_error_shows_form_again",
-        "tests/test_mealie_config_flow.py::test_start_error_falls_through_to_done",
-        "tests/test_mealie_config_flow.py::test_rollback_no_type_error_on_network_failure",
-        # test_repairs.py
-        "tests/test_repairs.py::TestServicesRepairIntegration::test_403_creates_repairs_issue",
-        "tests/test_repairs.py::TestServicesRepairIntegration::test_403_does_not_create_notification",
-        "tests/test_repairs.py::TestServicesRepairIntegration::test_fill_shopping_list_403_creates_repairs_issue",
-        # test_services.py — _run_cloud_intent error path & dispatch contract
-        "tests/test_services.py::TestRunCloudIntent::test_403_premium_required_raises_premium_error",
-        "tests/test_services.py::TestRunCloudIntent::test_403_extracts_upgrade_url_from_json_body",
-        "tests/test_services.py::TestRunCloudIntent::test_non_403_error_raises_homeassistant_error",
-        "tests/test_services.py::TestRunBYOKOrLocalIntent::test_byok_runs_dispatch_service",
-        "tests/test_services.py::TestRunBYOKOrLocalIntent::test_byok_missing_key_raises_error",
-        "tests/test_services.py::TestRunBYOKOrLocalIntent::test_local_mode_uses_endpoint",
-        "tests/test_services.py::TestHandleSuggestMeal::test_missing_entry_raises_error",
-        "tests/test_services.py::TestHandleFillShoppingList::test_missing_entry_raises_error",
-    }
-)
-
-
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
-) -> None:
-    """Apply a skip marker to every test ID in `_BROKEN_TEST_IDS`.
-
-    Centralising the skip list keeps the test code itself untouched —
-    when a test is repaired, just delete its line from the set above and
-    push. No need to remember which `@pytest.mark.skip` decorator to drop.
-    """
-    skip_marker = pytest.mark.skip(
-        reason=(
-            "TODO: pre-existing test debt — re-enable individually after "
-            "repair. See tests/conftest.py _BROKEN_TEST_IDS for the full list "
-            "and the per-group root-cause notes above."
-        )
-    )
-    for item in items:
-        # `item.nodeid` is e.g. "tests/test_foo.py::TestClass::test_bar"
-        if item.nodeid in _BROKEN_TEST_IDS:
-            item.add_marker(skip_marker)
 
 
 # ─── Shared API mock ──────────────────────────────────────────────────────────

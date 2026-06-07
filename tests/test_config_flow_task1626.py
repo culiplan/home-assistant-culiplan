@@ -58,14 +58,34 @@ def _make_flow(hass) -> "OAuth2FlowHandler":  # type: ignore[name-defined]
 async def test_oauth_create_entry_skips_ai_step(hass):
     """OAuth completion should skip the AI step and go directly to mealie_offer.
 
-    task-1626 AC#1: new installs land on Mealie offer immediately after OAuth.
+    task-1626 AC#1: new installs land on Mealie offer immediately after OAuth
+    when Mealie is configured; without it the offer step short-circuits to
+    entry creation (mealie_offer self-skips when no mealie config_entry).
     """
     from custom_components.culiplan.config_flow import OAuth2FlowHandler
 
     flow = OAuth2FlowHandler()
     flow.hass = hass
 
-    result = await flow.async_oauth_create_entry(_mock_oauth_data())
+    # Pretend the user has a Mealie integration so mealie_offer renders.
+    original = hass.config_entries.async_entries
+
+    def _entries(domain: str | None = None):  # type: ignore[no-untyped-def]
+        if domain == "mealie":
+            return [MagicMock()]
+        return original(domain) if domain else original()
+
+    hass.config_entries.async_entries = _entries
+
+    # Short-circuit the network probe — pytest-socket would otherwise
+    # spawn a `_run_safe_shutdown_loop` daemon thread that leaks across
+    # the test boundary and trips HA's verify_cleanup fixture.
+    from unittest.mock import patch, AsyncMock as _AsyncMock
+
+    with patch.object(
+        flow, "_fetch_culiplan_account_id", new=_AsyncMock(return_value=None)
+    ):
+        result = await flow.async_oauth_create_entry(_mock_oauth_data())
 
     # Must land on mealie_offer, NOT ai_provider
     assert result["type"] == FlowResultType.FORM
@@ -83,7 +103,12 @@ async def test_first_run_defaults_to_cloud_ai_in_entry_data(hass):
     flow = OAuth2FlowHandler()
     flow.hass = hass
 
-    await flow.async_oauth_create_entry(_mock_oauth_data())
+    from unittest.mock import patch, AsyncMock as _AsyncMock
+
+    with patch.object(
+        flow, "_fetch_culiplan_account_id", new=_AsyncMock(return_value=None)
+    ):
+        await flow.async_oauth_create_entry(_mock_oauth_data())
 
     # _entry_data must have CONF_AI_MODE = AI_MODE_CLOUD already set
     assert flow._entry_data.get(CONF_AI_MODE) == AI_MODE_CLOUD
@@ -100,8 +125,13 @@ async def test_first_run_skipping_mealie_creates_cloud_entry(hass):
     flow = OAuth2FlowHandler()
     flow.hass = hass
 
-    # Simulate OAuth completion
-    await flow.async_oauth_create_entry(_mock_oauth_data())
+    from unittest.mock import patch, AsyncMock as _AsyncMock
+
+    # Simulate OAuth completion (mock the network probe).
+    with patch.object(
+        flow, "_fetch_culiplan_account_id", new=_AsyncMock(return_value=None)
+    ):
+        await flow.async_oauth_create_entry(_mock_oauth_data())
 
     # User skips Mealie migration
     result = await flow.async_step_mealie_offer(user_input={"migrate_mealie": False})
@@ -124,7 +154,8 @@ async def test_options_flow_init_shows_advanced_ai_toggle(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
 
     result = await flow.async_step_init()
@@ -147,7 +178,8 @@ async def test_options_flow_advanced_ai_toggle_opens_ai_step(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
 
     with patch(
@@ -171,7 +203,8 @@ async def test_options_flow_advanced_ai_switch_to_cloud(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_BYOK, CONF_BYOK_PROVIDER: "openai"}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
 
     result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
@@ -191,7 +224,8 @@ async def test_options_flow_advanced_ai_byok_stores_key(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_BYOK}
 
@@ -235,7 +269,8 @@ async def test_options_flow_advanced_ai_byok_invalid_key_shows_error(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_BYOK}
 
@@ -266,7 +301,8 @@ async def test_options_flow_advanced_ai_local_stores_endpoint(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
     flow._advanced_ai_data = {CONF_AI_MODE: AI_MODE_LOCAL}
     flow._detected_endpoints = []
@@ -299,11 +335,16 @@ async def test_options_flow_no_advanced_ai_toggle_returns_no_change(hass):
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
 
-    flow = MealieOptionsFlow(entry)
+    flow = MealieOptionsFlow()
+    flow.config_entry = entry
     flow.hass = hass
 
     result = await flow.async_step_init(user_input={CONF_ADVANCED_AI: False})
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    # No AI mode change — data is empty (OptionsFlow returns delta only)
-    assert result["data"] == {}
+    # Options now always persist the pantry windows + debug + auto_update
+    # toggles (previously they were saved only when changed); CONF_AI_MODE
+    # is preserved unchanged because the Advanced AI sub-flow was not entered.
+    assert CONF_AI_MODE not in result["data"]
+    assert "auto_update" in result["data"]
+    assert "expiry_days" in result["data"]

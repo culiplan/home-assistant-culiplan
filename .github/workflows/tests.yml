@@ -7,11 +7,8 @@ name: Tests
 # fixtures like `enable_custom_integrations`. All three matrix lanes now pass
 # fixture collection.
 #
-# Coverage gate temporarily lowered from 95 to 50 because ~98 pre-existing
-# tests are centrally skipped via tests/conftest.py `_BROKEN_TEST_IDS` (real
-# test debt from API drift while the workflow was disabled). Restore the
-# 95% gate once that skip list is empty. Tracked as the Silver
-# `test-coverage` rule in quality_scale.yaml.
+# Coverage gate is the Platinum 95% floor (restored in v0.13.0 after the
+# central _BROKEN_TEST_IDS skip list was driven to zero).
 on:
   push:
     branches: [main]
@@ -71,16 +68,13 @@ jobs:
             "google-genai>=1.12.0"
 
       - name: Run tests with coverage
-        # `--cov-fail-under=50` is the temporary floor while the broken-tests
-        # skip list in tests/conftest.py is non-empty. Bump back to 95 as
-        # skips are removed. asyncio_mode and the skip list both live in
-        # pyproject.toml + tests/conftest.py so they apply uniformly to
-        # local `pytest` runs as well as CI.
+        # 95% Platinum gate. asyncio_mode lives in pyproject.toml so it
+        # applies uniformly to local `pytest` runs and CI.
         run: |
           pytest tests/ -v --tb=short \
             --cov=custom_components/culiplan \
             --cov-report=term-missing \
-            --cov-fail-under=50
+            --cov-fail-under=95
 
       - name: Upload coverage report
         if: matrix.ha-version == '2026.6.0'
