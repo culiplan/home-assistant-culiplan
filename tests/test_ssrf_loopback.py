@@ -11,7 +11,6 @@ Covers the cases identified in the security review:
 
 from __future__ import annotations
 
-import pytest
 
 from custom_components.culiplan.config_flow import _is_loopback_host
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
@@ -12,10 +11,6 @@ from custom_components.culiplan.const import (
     AI_MODE_CLOUD,
     AI_MODE_LOCAL,
     CONF_AI_MODE,
-    CONF_BYOK_API_KEY,
-    CONF_BYOK_PROVIDER,
-    CONF_LOCAL_ENDPOINT,
-    CONF_LOCAL_MODEL,
     DOMAIN,
 )
 
@@ -64,9 +59,7 @@ async def test_ai_provider_step_cloud_leads_to_mealie_offer(hass):
     flow.hass = hass
     flow._oauth_data = _mock_oauth_data()
 
-    result = await flow.async_step_ai_provider(
-        user_input={CONF_AI_MODE: AI_MODE_CLOUD}
-    )
+    result = await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_offer"
@@ -82,9 +75,7 @@ async def test_ai_provider_step_byok_routes_to_byok_form(hass):
     flow.hass = hass
     flow._oauth_data = _mock_oauth_data()
 
-    result = await flow.async_step_ai_provider(
-        user_input={CONF_AI_MODE: AI_MODE_BYOK}
-    )
+    result = await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_BYOK})
 
     # Should show the ai_byok sub-form, not create the entry
     assert result["type"] == FlowResultType.FORM
@@ -100,9 +91,7 @@ async def test_ai_provider_step_local_routes_to_local_form(hass):
     flow.hass = hass
     flow._oauth_data = _mock_oauth_data()
 
-    result = await flow.async_step_ai_provider(
-        user_input={CONF_AI_MODE: AI_MODE_LOCAL}
-    )
+    result = await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_LOCAL})
 
     # Should show the ai_local sub-form, not create the entry
     assert result["type"] == FlowResultType.FORM

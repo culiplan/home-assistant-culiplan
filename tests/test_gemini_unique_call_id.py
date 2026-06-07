@@ -28,6 +28,7 @@ def _make_function_call_mock(name: str, args: dict | None = None) -> MagicMock:
 
 # ─── AC#1: call_id is unique and contains tool name ───────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_google_dispatcher_unique_call_id_format():
     """
@@ -38,8 +39,6 @@ async def test_google_dispatcher_unique_call_id_format():
         PromptEnvelope,
         Message,
         ToolSpec,
-        ToolCall,
-        ToolResult,
     )
 
     envelope = PromptEnvelope(
@@ -74,8 +73,10 @@ async def test_google_dispatcher_unique_call_id_format():
         dispatcher._debug = False
         dispatcher._client = MagicMock()
 
-        with patch("google.genai", create=True), \
-             patch("google.genai.types", create=True):
+        with (
+            patch("google.genai", create=True),
+            patch("google.genai.types", create=True),
+        ):
             result = await dispatcher.dispatch(envelope, None)
 
     assert len(result.tool_calls) == 1
@@ -90,6 +91,7 @@ async def test_google_dispatcher_unique_call_id_format():
 
 
 # ─── AC#2: two calls to same tool get different call_ids ─────────────────────
+
 
 @pytest.mark.asyncio
 async def test_google_dispatcher_two_same_tool_calls_unique_ids():
@@ -109,7 +111,10 @@ async def test_google_dispatcher_two_same_tool_calls_unique_ids():
             ToolSpec(
                 name="append_shopping_list",
                 description="append",
-                parameters={"type": "object", "properties": {"item": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"item": {"type": "string"}},
+                },
             )
         ],
         model="gemini-1.5-flash",
@@ -144,8 +149,10 @@ async def test_google_dispatcher_two_same_tool_calls_unique_ids():
         dispatcher._debug = False
         dispatcher._client = MagicMock()
 
-        with patch("google.genai", create=True), \
-             patch("google.genai.types", create=True):
+        with (
+            patch("google.genai", create=True),
+            patch("google.genai.types", create=True),
+        ):
             result = await dispatcher.dispatch(envelope, None)
 
     assert len(result.tool_calls) == 2
@@ -165,6 +172,7 @@ async def test_google_dispatcher_two_same_tool_calls_unique_ids():
 
 # ─── AC#3: ToolResult routing uses the correct call_id ───────────────────────
 
+
 @pytest.mark.asyncio
 async def test_google_dispatcher_tool_result_uses_correct_call_id():
     """
@@ -175,7 +183,6 @@ async def test_google_dispatcher_tool_result_uses_correct_call_id():
         PromptEnvelope,
         Message,
         ToolSpec,
-        ToolCall,
         ToolResult,
     )
 
@@ -225,8 +232,10 @@ async def test_google_dispatcher_tool_result_uses_correct_call_id():
         dispatcher._debug = False
         dispatcher._client = MagicMock()
 
-        with patch("google.genai", create=True), \
-             patch("google.genai.types", create=True):
+        with (
+            patch("google.genai", create=True),
+            patch("google.genai.types", create=True),
+        ):
             result = await dispatcher.dispatch(envelope, tool_results)
 
     assert result.text == "I suggest pasta."

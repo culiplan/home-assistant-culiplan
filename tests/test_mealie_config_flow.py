@@ -23,7 +23,6 @@ from custom_components.culiplan.const import (
     CONF_MEALIE_JOB_ID,
     CONF_MEALIE_TOKEN,
     CONF_MEALIE_URL,
-    DOMAIN,
     MEALIE_ROLLBACK_WINDOW_SECONDS,
 )
 
@@ -87,9 +86,7 @@ async def test_ai_provider_leads_to_mealie_offer(hass):
     """After choosing Cloud AI, the flow should show mealie_offer."""
     flow = _make_flow(hass)
 
-    result = await flow.async_step_ai_provider(
-        user_input={CONF_AI_MODE: AI_MODE_CLOUD}
-    )
+    result = await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_offer"
@@ -103,9 +100,7 @@ async def test_mealie_offer_skip_creates_entry(hass):
     # Prime the entry data via ai_provider step
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    result = await flow.async_step_mealie_offer(
-        user_input={"migrate_mealie": False}
-    )
+    result = await flow.async_step_mealie_offer(user_input={"migrate_mealie": False})
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AI_MODE] == AI_MODE_CLOUD
@@ -119,9 +114,7 @@ async def test_mealie_offer_accept_shows_credentials(hass):
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    result = await flow.async_step_mealie_offer(
-        user_input={"migrate_mealie": True}
-    )
+    result = await flow.async_step_mealie_offer(user_input={"migrate_mealie": True})
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_credentials"
@@ -158,7 +151,9 @@ async def test_preview_description_placeholders_present(hass):
     flow = _make_flow(hass)
     await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
-    preview = _make_preview_response(will_import=15, will_flag=3, will_skip=0)["preview"]
+    preview = _make_preview_response(will_import=15, will_flag=3, will_skip=0)[
+        "preview"
+    ]
     flow._mealie_preview = preview
     # Store temp credentials
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
@@ -185,9 +180,7 @@ async def test_preview_cancel_creates_entry_without_mealie_data(hass):
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
 
-    result = await flow.async_step_mealie_preview(
-        user_input={"confirm_import": False}
-    )
+    result = await flow.async_step_mealie_preview(user_input={"confirm_import": False})
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
     # Token must NOT be persisted
@@ -314,7 +307,6 @@ async def test_options_flow_no_import_at_shows_no_rollback(hass):
 async def test_rollback_calls_delete_endpoint(hass):
     """Rollback step calls DELETE /api/migrate/mealie/rollback."""
     from custom_components.culiplan.config_flow import MealieOptionsFlow
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
     entry = MagicMock()
     entry.data = {

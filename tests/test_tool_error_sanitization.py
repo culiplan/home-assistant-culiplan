@@ -8,13 +8,13 @@ AC#3 — No internal details leak to AI provider via tool-result content
 
 from __future__ import annotations
 
-import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 
 # ─── Helper: _is_non_retryable ────────────────────────────────────────────────
+
 
 def test_is_non_retryable_with_status_attr():
     from custom_components.culiplan.ai.service import _is_non_retryable
@@ -39,6 +39,7 @@ def test_is_non_retryable_from_string():
 
 # ─── AC#2 + AC#3: sanitized payload sent to model ────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_tool_error_sanitized_payload_retryable():
     """
@@ -53,7 +54,6 @@ async def test_tool_error_sanitized_payload_retryable():
         Message,
         ToolSpec,
         ToolCall,
-        ToolResult,
     )
 
     # Build a minimal envelope
@@ -82,13 +82,15 @@ async def test_tool_error_sanitized_payload_retryable():
         "500 Internal Server Error: culiplanadmin@172.24.0.9/culiplan_db query failed"
     )
     mock_client.async_call_voice_tool = AsyncMock(side_effect=internal_error)
-    mock_client.async_post = AsyncMock(return_value={
-        "messages": [{"role": "user", "content": "test"}],
-        "tools": [],
-        "model": "test-model",
-        "intent_id": "suggest_meal",
-        "mode": "byok-anthropic",
-    })
+    mock_client.async_post = AsyncMock(
+        return_value={
+            "messages": [{"role": "user", "content": "test"}],
+            "tools": [],
+            "model": "test-model",
+            "intent_id": "suggest_meal",
+            "mode": "byok-anthropic",
+        }
+    )
 
     service = AIDispatchService.__new__(AIDispatchService)
     service._mode = "byok-anthropic"
@@ -133,7 +135,6 @@ async def test_tool_error_non_retryable_for_4xx():
         Message,
         ToolSpec,
         ToolCall,
-        ToolResult,
     )
 
     envelope = PromptEnvelope(
@@ -146,7 +147,9 @@ async def test_tool_error_non_retryable_for_4xx():
 
     first_result = DispatchResult(
         text=None,
-        tool_calls=[ToolCall(name="add_to_list", params={"item": "milk"}, call_id="c2")],
+        tool_calls=[
+            ToolCall(name="add_to_list", params={"item": "milk"}, call_id="c2")
+        ],
     )
     second_result = DispatchResult(text="Done.", tool_calls=[])
 
@@ -174,6 +177,7 @@ async def test_tool_error_non_retryable_for_4xx():
 
 
 # ─── AC#1: exception logged at WARN level ────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_tool_error_logged_at_warn():
@@ -216,9 +220,7 @@ async def test_tool_error_logged_at_warn():
     service._dispatcher = mock_dispatcher
     service.fetch_envelope = AsyncMock(return_value=envelope)
 
-    with patch(
-        "custom_components.culiplan.ai.service._LOGGER"
-    ) as mock_logger:
+    with patch("custom_components.culiplan.ai.service._LOGGER") as mock_logger:
         await service.run_intent("suggest_meal", {})
 
         # AC#1: warning must have been called with exc_info=True

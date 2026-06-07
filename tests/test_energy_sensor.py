@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -97,124 +96,157 @@ def coordinator_zero_kwh(hass, mock_api_client, mock_config_entry):
 
 
 class TestPlannedKwhTodaySensor:
-
-    def test_native_value_returns_estimated_kwh(self, coordinator_with_energy, device):
+    def test_native_value_returns_estimated_kwh(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """sensor.native_value returns the estimated_kwh float from energy_today."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.native_value == 1.25
 
     def test_native_value_returns_zero_when_no_energy_data(
-        self, coordinator_no_energy, device
+        self, coordinator_no_energy, device, mock_config_entry
     ):
         """sensor.native_value returns 0.0 when energy_today key is absent."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_no_energy, device)
+        sensor = PlannedKwhTodaySensor(coordinator_no_energy, device, mock_config_entry)
         assert sensor.native_value == 0.0
 
     def test_native_value_returns_zero_on_no_cook_day(
-        self, coordinator_zero_kwh, device
+        self, coordinator_zero_kwh, device, mock_config_entry
     ):
         """sensor.native_value returns 0.0 when all meals are no-cook."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_zero_kwh, device)
+        sensor = PlannedKwhTodaySensor(coordinator_zero_kwh, device, mock_config_entry)
         assert sensor.native_value == 0.0
 
-    def test_native_value_handles_null_data(self, hass, mock_api_client, mock_config_entry, device):
+    def test_native_value_handles_null_data(
+        self, hass, mock_api_client, mock_config_entry, device
+    ):
         """sensor.native_value returns 0.0 when coordinator.data is None."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
         coord = CuliplanCoordinator(hass, mock_api_client, mock_config_entry)
         coord.data = None
-        sensor = PlannedKwhTodaySensor(coord, device)
+        sensor = PlannedKwhTodaySensor(coord, device, mock_config_entry)
         assert sensor.native_value == 0.0
 
     def test_extra_state_attributes_contains_recipe_ids(
-        self, coordinator_with_energy, device
+        self, coordinator_with_energy, device, mock_config_entry
     ):
         """extra_state_attributes includes recipe_ids list (ID-only, §14.3)."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         attrs = sensor.extra_state_attributes
 
         assert "recipe_ids" in attrs
         assert attrs["recipe_ids"] == ["rec1", "rec2"]
 
     def test_extra_state_attributes_excludes_recipe_titles(
-        self, coordinator_with_energy, device
+        self, coordinator_with_energy, device, mock_config_entry
     ):
         """extra_state_attributes must NOT expose recipe titles (§14.3 PII rule)."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         attrs = sensor.extra_state_attributes
 
         # Titles are PII-adjacent data; they must not appear in HA attributes.
         assert "recipeTitle" not in attrs
         assert "recipe_titles" not in attrs
 
-    def test_extra_state_attributes_slot_count(self, coordinator_with_energy, device):
+    def test_extra_state_attributes_slot_count(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """extra_state_attributes includes slot_count."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.extra_state_attributes["slot_count"] == 2
 
-    def test_extra_state_attributes_date(self, coordinator_with_energy, device):
+    def test_extra_state_attributes_date(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """extra_state_attributes includes the date string."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.extra_state_attributes["date"] == "2026-04-25"
 
     def test_extra_state_attributes_empty_when_no_data(
-        self, coordinator_no_energy, device
+        self, coordinator_no_energy, device, mock_config_entry
     ):
         """extra_state_attributes returns empty dict when energy_today is absent."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_no_energy, device)
+        sensor = PlannedKwhTodaySensor(coordinator_no_energy, device, mock_config_entry)
         assert sensor.extra_state_attributes == {}
 
-    def test_unique_id(self, coordinator_with_energy, device):
-        """Sensor unique_id must be stable and domain-prefixed."""
+    def test_unique_id(self, coordinator_with_energy, device, mock_config_entry):
+        """Sensor unique_id must be stable and per-entry (v0.13.0)."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
-        assert sensor.unique_id == f"{DOMAIN}_planned_kwh_today"
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
+        assert sensor.unique_id == f"{mock_config_entry.entry_id}_planned_kwh_today"
 
-    def test_state_class_is_total(self, coordinator_with_energy, device):
+    def test_state_class_is_total(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """state_class must be TOTAL for HA Energy dashboard compatibility."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
         from homeassistant.components.sensor import SensorStateClass
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.state_class == SensorStateClass.TOTAL
 
-    def test_device_class_is_energy(self, coordinator_with_energy, device):
+    def test_device_class_is_energy(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """device_class must be ENERGY for kWh unit handling in HA."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
         from homeassistant.components.sensor import SensorDeviceClass
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.device_class == SensorDeviceClass.ENERGY
 
-    def test_unit_of_measurement_is_kwh(self, coordinator_with_energy, device):
+    def test_unit_of_measurement_is_kwh(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
         """unit_of_measurement must be 'kWh'."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.native_unit_of_measurement == "kWh"
 
-    def test_icon(self, coordinator_with_energy, device):
+    def test_icon(self, coordinator_with_energy, device, mock_config_entry):
         """Sensor icon must be mdi:flash."""
         from custom_components.culiplan.sensor import PlannedKwhTodaySensor
 
-        sensor = PlannedKwhTodaySensor(coordinator_with_energy, device)
+        sensor = PlannedKwhTodaySensor(
+            coordinator_with_energy, device, mock_config_entry
+        )
         assert sensor.icon == "mdi:flash"
 
     def test_slots_without_recipe_excluded_from_recipe_ids(
@@ -230,12 +262,22 @@ class TestPlannedKwhTodaySensor:
                 "estimated_kwh": 0.5,
                 "slot_count": 2,
                 "slots": [
-                    {"mealPlanId": "mp1", "recipeId": "rec1", "recipeTitle": "Pasta", "estimated_kwh": 0.5},
-                    {"mealPlanId": "mp2", "recipeId": None, "recipeTitle": None, "estimated_kwh": 0.0},
+                    {
+                        "mealPlanId": "mp1",
+                        "recipeId": "rec1",
+                        "recipeTitle": "Pasta",
+                        "estimated_kwh": 0.5,
+                    },
+                    {
+                        "mealPlanId": "mp2",
+                        "recipeId": None,
+                        "recipeTitle": None,
+                        "estimated_kwh": 0.0,
+                    },
                 ],
             }
         }
-        sensor = PlannedKwhTodaySensor(coord, device)
+        sensor = PlannedKwhTodaySensor(coord, device, mock_config_entry)
         assert sensor.extra_state_attributes["recipe_ids"] == ["rec1"]
 
 
@@ -271,7 +313,9 @@ class TestCoordinatorEnergyRefresh:
     """Verify _refresh_energy updates coordinator data correctly."""
 
     @pytest.mark.asyncio
-    async def test_refresh_energy_updates_data(self, hass, mock_api_client, mock_config_entry):
+    async def test_refresh_energy_updates_data(
+        self, hass, mock_api_client, mock_config_entry
+    ):
         """_refresh_energy fetches energy_today and merges it into coordinator.data."""
         from custom_components.culiplan.coordinator import CuliplanCoordinator
 

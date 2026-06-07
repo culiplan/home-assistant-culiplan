@@ -51,9 +51,9 @@ def test_build_tools_non_empty_and_well_formed() -> None:
     for tool in tools:
         assert tool.name, f"Tool missing name: {tool}"
         assert tool.description, f"Tool {tool.name} missing description"
-        assert isinstance(
-            tool.parameters, vol.Schema
-        ), f"Tool {tool.name} parameters must be vol.Schema"
+        assert isinstance(tool.parameters, vol.Schema), (
+            f"Tool {tool.name} parameters must be vol.Schema"
+        )
 
 
 def test_register_llm_api_is_idempotent() -> None:

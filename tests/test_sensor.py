@@ -77,7 +77,9 @@ def test_meals_planned_this_week_counts_correctly(
     from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor
 
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans())
-    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    sensor = MealsPlanedThisWeekSensor(
+        coord, _device(mock_config_entry), mock_config_entry
+    )
     assert sensor.native_value == 1
 
 
@@ -88,7 +90,9 @@ def test_meals_planned_this_week_zero_when_no_plans(
     from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor
 
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, [])
-    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    sensor = MealsPlanedThisWeekSensor(
+        coord, _device(mock_config_entry), mock_config_entry
+    )
     assert sensor.native_value == 0
 
 
@@ -107,7 +111,9 @@ def test_meals_planned_this_week_excludes_outside_week(
         }
     ]
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, plans)
-    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    sensor = MealsPlanedThisWeekSensor(
+        coord, _device(mock_config_entry), mock_config_entry
+    )
     assert sensor.native_value == 0
 
 
@@ -147,7 +153,9 @@ async def test_sensor_counts_after_api_normalisation(
         meal_plans = await client.async_get_meal_plans()
 
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans)
-    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    sensor = MealsPlanedThisWeekSensor(
+        coord, _device(mock_config_entry), mock_config_entry
+    )
     assert sensor.native_value == 1
 
 
@@ -193,5 +201,7 @@ async def test_sensor_counts_multi_date_after_single_plan_collapse(
     assert len(meal_plans[0]["slots"]) == 3
 
     coord = _make_coordinator(hass, mock_api_client, mock_config_entry, meal_plans)
-    sensor = MealsPlanedThisWeekSensor(coord, _device(mock_config_entry))
+    sensor = MealsPlanedThisWeekSensor(
+        coord, _device(mock_config_entry), mock_config_entry
+    )
     assert sensor.native_value == 3

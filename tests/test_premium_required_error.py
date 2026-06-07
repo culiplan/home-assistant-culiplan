@@ -10,35 +10,35 @@ AC#5 — 403 with non-premium body → HomeAssistantError (not PremiumRequiredEr
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 
 # ─── AC#1: PremiumRequiredError lives in ai.types ─────────────────────────────
 
+
 def test_premium_required_error_importable_from_ai_types():
     """PremiumRequiredError must be importable from the shared types module."""
     from custom_components.culiplan.ai.types import PremiumRequiredError
+
     assert PremiumRequiredError is not None
 
 
 def test_premium_required_error_not_defined_in_services():
     """services.py should re-export (import) PremiumRequiredError, not define it."""
-    import inspect
-    import custom_components.culiplan.services as svc_mod
-    import custom_components.culiplan.ai.types as types_mod
 
     # Both should refer to the *same* class object
     from custom_components.culiplan.services import PremiumRequiredError as SvcErr
     from custom_components.culiplan.ai.types import PremiumRequiredError as TypesErr
+
     assert SvcErr is TypesErr, (
         "services.PremiumRequiredError and ai.types.PremiumRequiredError must be the same class"
     )
 
 
 # ─── AC#4: 403 premium_required body → PremiumRequiredError ──────────────────
+
 
 @pytest.mark.asyncio
 async def test_post_raises_premium_required_error_on_premium_403():
@@ -68,7 +68,9 @@ async def test_post_raises_premium_required_error_on_premium_403():
     client = CuliplanApiClient(session=mock_session, access_token="tok")
 
     with pytest.raises(PremiumRequiredError) as exc_info:
-        await client._post("/api/voice/ha-assist", {"tool": "suggest_meal", "params": {}})
+        await client._post(
+            "/api/voice/ha-assist", {"tool": "suggest_meal", "params": {}}
+        )
 
     err = exc_info.value
     assert err.feature == "ai.suggestion"
@@ -76,6 +78,7 @@ async def test_post_raises_premium_required_error_on_premium_403():
 
 
 # ─── AC#5: 403 non-premium body → HomeAssistantError ─────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_post_raises_ha_error_on_non_premium_403():
@@ -110,6 +113,7 @@ async def test_post_raises_ha_error_on_non_premium_403():
 
 
 # ─── AC#3: services.py catches typed error — no string parsing ───────────────
+
 
 @pytest.mark.asyncio
 async def test_run_cloud_intent_re_raises_premium_required_error():

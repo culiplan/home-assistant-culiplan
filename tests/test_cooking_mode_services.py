@@ -12,20 +12,13 @@ AC coverage:
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.culiplan.cooking_services import (
-    SERVICE_START_COOKING_MODE,
-    SERVICE_ADVANCE_COOKING_STEP,
-    SERVICE_SET_RECIPE_TIMER,
-    SERVICE_CANCEL_RECIPE_TIMER,
-    SERVICE_PAUSE_COOKING_MODE,
-    SERVICE_RESUME_COOKING_MODE,
-    SERVICE_COMPLETE_COOKING_MODE,
     COOKING_SERVICES,
     async_register_cooking_services,
     async_unregister_cooking_services,
@@ -80,13 +73,16 @@ def _make_client(
     client = AsyncMock()
     # GET /api/cooking-sessions?status=active&limit=1
     default_session = session or _make_session()
-    client.async_get.return_value = session_list if session_list is not None else [default_session]
+    client.async_get.return_value = (
+        session_list if session_list is not None else [default_session]
+    )
     client.async_post.return_value = post_return or default_session
     client._patch = AsyncMock(return_value=patch_return or default_session)
     return client
 
 
 # ─── Unit helpers ─────────────────────────────────────────────────────────────
+
 
 class TestTimerEntityId:
     def test_basic_label(self) -> None:
@@ -109,6 +105,7 @@ class TestTimerEntityId:
 
 
 # ─── Service registration ─────────────────────────────────────────────────────
+
 
 class TestServiceRegistration:
     def test_all_seven_registered(self) -> None:
@@ -135,6 +132,7 @@ class TestServiceRegistration:
 
 
 # ─── start_cooking_mode ───────────────────────────────────────────────────────
+
 
 class TestStartCookingMode:
     @pytest.mark.asyncio
@@ -203,6 +201,7 @@ class TestStartCookingMode:
 
 
 # ─── advance_cooking_step ─────────────────────────────────────────────────────
+
 
 class TestAdvanceCookingStep:
     def _get_handler(self, hass: MagicMock) -> Any:
@@ -278,6 +277,7 @@ class TestAdvanceCookingStep:
 
 # ─── set_recipe_timer ─────────────────────────────────────────────────────────
 
+
 class TestSetRecipeTimer:
     def _get_handler(self, hass: MagicMock) -> Any:
         return hass.services.async_register.call_args_list[2][0][2]
@@ -351,6 +351,7 @@ class TestSetRecipeTimer:
 
 # ─── cancel_recipe_timer ──────────────────────────────────────────────────────
 
+
 class TestCancelRecipeTimer:
     def _get_handler(self, hass: MagicMock) -> Any:
         return hass.services.async_register.call_args_list[3][0][2]
@@ -418,6 +419,7 @@ class TestCancelRecipeTimer:
 
 
 # ─── pause / resume / complete ───────────────────────────────────────────────
+
 
 class TestPauseResumComplete:
     @pytest.mark.asyncio
@@ -492,6 +494,7 @@ class TestPauseResumComplete:
 
 # ─── Timer mirroring via sync_ha_timers ──────────────────────────────────────
 
+
 class TestSyncHaTimers:
     @pytest.mark.asyncio
     async def test_starts_ha_timer_for_each_active_timer(self) -> None:
@@ -544,21 +547,22 @@ class TestSyncHaTimers:
 
 # ─── Voice intent → service dispatch (AC#4) ──────────────────────────────────
 
+
 class TestCookingIntentDispatch:
     """Verify that the cooking intent handler wires to the correct service."""
 
     @pytest.mark.asyncio
     async def test_next_step_intent_calls_advance_service(self) -> None:
-        from custom_components.culiplan.__init__ import (
-            _make_cooking_intent_handler,
-            _COOKING_INTENT_TO_SERVICE,
-        )
+
         # Patch __init__ import name
         with patch(
             "custom_components.culiplan.__init__._COOKING_INTENT_TO_SERVICE",
             {"CuliplanNextCookingStep": "advance_cooking_step"},
         ):
-            from custom_components.culiplan.__init__ import _make_cooking_intent_handler as mkh  # noqa: PLC0415
+            from custom_components.culiplan.__init__ import (
+                _make_cooking_intent_handler as mkh,
+            )  # noqa: PLC0415
+
             entry = MagicMock()
             entry.entry_id = "test_entry_id"
             handler = mkh("CuliplanNextCookingStep", entry)

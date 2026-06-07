@@ -13,8 +13,7 @@ Covers:
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.culiplan.blueprint_generator import (
@@ -28,7 +27,6 @@ from custom_components.culiplan.services import PremiumRequiredError
 from custom_components.culiplan.const import (
     AI_MODE_CLOUD,
     AI_MODE_BYOK,
-    AI_MODE_LOCAL,
     CONF_AI_MODE,
     CONF_BYOK_PROVIDER,
     DOMAIN,
@@ -124,6 +122,7 @@ def make_service_call(
 
 # ─── Unit tests: helpers ──────────────────────────────────────────────────────
 
+
 class TestMakeSlug:
     def test_basic_name(self):
         assert _make_slug("Daily meal notification") == "daily_meal_notification"
@@ -168,6 +167,7 @@ class TestExtractHelpers:
 
 # ─── Integration tests: Cloud AI mode ────────────────────────────────────────
 
+
 class TestCloudAIMode:
     @pytest.mark.asyncio
     async def test_cloud_success_fires_event(self):
@@ -175,8 +175,14 @@ class TestCloudAIMode:
         client = entry_data["client"]
         client.async_post.return_value = CLOUD_RESPONSE
 
-        with patch("custom_components.culiplan.blueprint_generator.async_create_premium_repair") as mock_repair, \
-             patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair") as mock_resolve:
+        with (
+            patch(
+                "custom_components.culiplan.blueprint_generator.async_create_premium_repair"
+            ) as mock_repair,
+            patch(
+                "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+            ) as mock_resolve,
+        ):
             await handle_generate_blueprint(hass, make_service_call(), "test_entry_id")
 
         # API was called with correct endpoint and payload
@@ -207,9 +213,13 @@ class TestCloudAIMode:
             f'403 {{"error": "premium_required", "upgradeUrl": "{upgrade_url}"}}'
         )
 
-        with patch("custom_components.culiplan.blueprint_generator.async_create_premium_repair") as mock_repair:
+        with patch(
+            "custom_components.culiplan.blueprint_generator.async_create_premium_repair"
+        ) as mock_repair:
             with pytest.raises(PremiumRequiredError) as exc_info:
-                await handle_generate_blueprint(hass, make_service_call(), "test_entry_id")
+                await handle_generate_blueprint(
+                    hass, make_service_call(), "test_entry_id"
+                )
 
         assert exc_info.value.feature == "ai.blueprint"
         assert "premium" in exc_info.value.upgrade_url.lower()
@@ -222,7 +232,9 @@ class TestCloudAIMode:
         client.async_post.return_value = CLOUD_RESPONSE
         entities = ["calendar.culiplan_meal_plan", "light.kitchen"]
 
-        with patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"):
+        with patch(
+            "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+        ):
             await handle_generate_blueprint(
                 hass,
                 make_service_call(available_entities=entities),
@@ -239,7 +251,9 @@ class TestCloudAIMode:
         client.async_post.return_value = CLOUD_RESPONSE
         entities = [f"sensor.entity_{i}" for i in range(150)]
 
-        with patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"):
+        with patch(
+            "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+        ):
             await handle_generate_blueprint(
                 hass,
                 make_service_call(available_entities=entities),
@@ -251,6 +265,7 @@ class TestCloudAIMode:
 
 
 # ─── Integration tests: BYOK mode ────────────────────────────────────────────
+
 
 class TestBYOKMode:
     @pytest.mark.asyncio
@@ -266,11 +281,21 @@ class TestBYOKMode:
         mock_dispatcher = AsyncMock()
         mock_dispatcher.dispatch = AsyncMock(return_value=mock_result)
 
-        with patch("custom_components.culiplan.blueprint_generator.BYOKKeyStore") as MockKeyStore, \
-             patch("custom_components.culiplan.blueprint_generator.create_dispatcher", return_value=mock_dispatcher), \
-             patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"), \
-             patch("custom_components.culiplan.blueprint_generator.async_create_premium_repair"):
-
+        with (
+            patch(
+                "custom_components.culiplan.blueprint_generator.BYOKKeyStore"
+            ) as MockKeyStore,
+            patch(
+                "custom_components.culiplan.blueprint_generator.create_dispatcher",
+                return_value=mock_dispatcher,
+            ),
+            patch(
+                "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+            ),
+            patch(
+                "custom_components.culiplan.blueprint_generator.async_create_premium_repair"
+            ),
+        ):
             # BYOKKeyStore.get_key must return a non-empty key
             mock_ks_instance = AsyncMock()
             mock_ks_instance.get_key.return_value = "sk-test-key"
@@ -301,16 +326,21 @@ class TestBYOKMode:
         hass, entry_data, entry = make_hass(AI_MODE_BYOK)
         client = entry_data["client"]
 
-        with patch("custom_components.culiplan.blueprint_generator.BYOKKeyStore") as MockKeyStore:
+        with patch(
+            "custom_components.culiplan.blueprint_generator.BYOKKeyStore"
+        ) as MockKeyStore:
             mock_ks_instance = AsyncMock()
             mock_ks_instance.get_key.return_value = ""
             MockKeyStore.return_value = mock_ks_instance
 
             with pytest.raises(HomeAssistantError, match="No BYOK key"):
-                await handle_generate_blueprint(hass, make_service_call(), "test_entry_id")
+                await handle_generate_blueprint(
+                    hass, make_service_call(), "test_entry_id"
+                )
 
 
 # ─── Integration tests: blueprint install ────────────────────────────────────
+
 
 class TestBlueprintInstall:
     @pytest.mark.asyncio
@@ -324,9 +354,12 @@ class TestBlueprintInstall:
         # async_add_executor_job should execute the callable directly in tests
         async def fake_executor_job(fn, *args):
             fn(*args)
+
         hass.async_add_executor_job = fake_executor_job
 
-        with patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"):
+        with patch(
+            "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+        ):
             await handle_generate_blueprint(
                 hass,
                 make_service_call(install=True),
@@ -353,7 +386,9 @@ class TestBlueprintInstall:
         client = entry_data["client"]
         client.async_post.return_value = CLOUD_RESPONSE
 
-        with patch("custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"):
+        with patch(
+            "custom_components.culiplan.blueprint_generator.async_resolve_premium_repair"
+        ):
             await handle_generate_blueprint(
                 hass,
                 make_service_call(install=False),

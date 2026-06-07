@@ -17,7 +17,6 @@ import pytest
 
 from custom_components.culiplan.ai.local_ai import (
     LocalAIEndpoint,
-    _PROBE_TIMEOUT_SEC,
     model_supports_function_calling,
     probe_custom_endpoint,
     probe_local_ai_endpoints,
@@ -25,6 +24,7 @@ from custom_components.culiplan.ai.local_ai import (
 
 
 # ─── LocalAIEndpoint helpers ──────────────────────────────────────────────────
+
 
 def test_base_url_ollama():
     ep = LocalAIEndpoint(host="localhost", port=11434, provider="ollama")
@@ -48,6 +48,7 @@ def test_display_name_lmstudio():
 
 
 # ─── model_supports_function_calling ─────────────────────────────────────────
+
 
 def test_known_function_calling_models():
     """AC#3: well-known function-calling models return True."""
@@ -76,6 +77,7 @@ def test_model_case_insensitive():
 
 # ─── probe_local_ai_endpoints ─────────────────────────────────────────────────
 
+
 class TestProbeLocalAIEndpoints:
     """AC#1: probe respects 2s timeout; AC#2: returns model list."""
 
@@ -84,12 +86,14 @@ class TestProbeLocalAIEndpoints:
         """Ollama endpoint reachable → detected with model list."""
         ollama_resp = MagicMock()
         ollama_resp.status = 200
-        ollama_resp.json = AsyncMock(return_value={
-            "models": [
-                {"name": "llama3.2"},
-                {"name": "gemma3:4b"},
-            ]
-        })
+        ollama_resp.json = AsyncMock(
+            return_value={
+                "models": [
+                    {"name": "llama3.2"},
+                    {"name": "gemma3:4b"},
+                ]
+            }
+        )
         ollama_resp.__aenter__ = AsyncMock(return_value=ollama_resp)
         ollama_resp.__aexit__ = AsyncMock(return_value=None)
 
@@ -126,9 +130,9 @@ class TestProbeLocalAIEndpoints:
 
         lmstudio_resp = MagicMock()
         lmstudio_resp.status = 200
-        lmstudio_resp.json = AsyncMock(return_value={
-            "data": [{"id": "local-model"}, {"id": "phi3"}]
-        })
+        lmstudio_resp.json = AsyncMock(
+            return_value={"data": [{"id": "local-model"}, {"id": "phi3"}]}
+        )
         lmstudio_resp.__aenter__ = AsyncMock(return_value=lmstudio_resp)
         lmstudio_resp.__aexit__ = AsyncMock(return_value=None)
 
@@ -172,14 +176,11 @@ class TestProbeLocalAIEndpoints:
     @pytest.mark.asyncio
     async def test_connection_timeout_handled_gracefully(self):
         """AC#1: timeout (2s) is handled gracefully — no exception propagation."""
-        import aiohttp
 
         mock_session = MagicMock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
-        mock_session.get = MagicMock(
-            side_effect=asyncio.TimeoutError()
-        )
+        mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
         with patch(
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
@@ -224,6 +225,7 @@ class TestProbeLocalAIEndpoints:
 
 # ─── probe_custom_endpoint (AC#4: manual entry) ───────────────────────────────
 
+
 class TestProbeCustomEndpoint:
     """AC#4: manual entry path for users on different host/port."""
 
@@ -245,7 +247,9 @@ class TestProbeCustomEndpoint:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            ep = await probe_custom_endpoint(MagicMock(), "192.168.1.50", 11434, "ollama")
+            ep = await probe_custom_endpoint(
+                MagicMock(), "192.168.1.50", 11434, "ollama"
+            )
 
         assert ep is not None
         assert ep.host == "192.168.1.50"
@@ -264,12 +268,15 @@ class TestProbeCustomEndpoint:
             "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
             return_value=mock_session,
         ):
-            ep = await probe_custom_endpoint(MagicMock(), "192.168.99.99", 11434, "ollama")
+            ep = await probe_custom_endpoint(
+                MagicMock(), "192.168.99.99", 11434, "ollama"
+            )
 
         assert ep is None
 
 
 # ─── AC#5: no telemetry leaks ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_probe_makes_no_external_calls():
@@ -287,18 +294,23 @@ async def test_probe_makes_no_external_calls():
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=None)
-    mock_session.get = MagicMock(side_effect=lambda url, **kw: (_ for _ in ()).throw(asyncio.TimeoutError()))
+    mock_session.get = MagicMock(
+        side_effect=lambda url, **kw: (_ for _ in ()).throw(asyncio.TimeoutError())
+    )
 
     # Patch get to capture URLs
     captured: list[str] = []
     original_probe = probe_local_ai_endpoints
 
     async def capturing_probe(**kwargs: Any) -> list[LocalAIEndpoint]:
-        import aiohttp as _aiohttp
 
         class _Session:
-            async def __aenter__(self) -> "_Session": return self
-            async def __aexit__(self, *a: Any) -> None: pass
+            async def __aenter__(self) -> "_Session":
+                return self
+
+            async def __aexit__(self, *a: Any) -> None:
+                pass
+
             def get(self, url: str, **kw: Any) -> "_Ctx":
                 captured.append(url)
                 return _Ctx()
@@ -308,9 +320,13 @@ async def test_probe_makes_no_external_calls():
                 m = MagicMock()
                 m.status = 404
                 return m
-            async def __aexit__(self, *a: Any) -> None: pass
 
-        with patch("custom_components.culiplan.ai.local_ai.aiohttp.ClientSession", _Session):
+            async def __aexit__(self, *a: Any) -> None:
+                pass
+
+        with patch(
+            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession", _Session
+        ):
             return await probe_local_ai_endpoints(MagicMock())
 
     await capturing_probe()

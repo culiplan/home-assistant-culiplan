@@ -68,7 +68,9 @@ async def test_register_intents_uses_executor_for_yaml_load(hass, mock_config_en
     hass.async_add_executor_job.assert_awaited_once()
     # Confirm the callable passed is the blocking YAML loader, not a coroutine.
     load_callable = hass.async_add_executor_job.call_args[0][0]
-    assert callable(load_callable), "First arg to async_add_executor_job must be a callable"
+    assert callable(load_callable), (
+        "First arg to async_add_executor_job must be a callable"
+    )
 
 
 @pytest.mark.asyncio

@@ -12,14 +12,12 @@ Tests use pytest-asyncio with unittest.mock; no live AI provider calls are made.
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from custom_components.culiplan.ai.types import (
     DispatchResult,
-    DispatcherError,
     Message,
     PromptEnvelope,
     ProviderAuthError,
@@ -41,7 +39,9 @@ from custom_components.culiplan.ai.service import AIDispatchService
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 
-def make_envelope(intent: str = "suggest_meal", model: str = "test-model") -> PromptEnvelope:
+def make_envelope(
+    intent: str = "suggest_meal", model: str = "test-model"
+) -> PromptEnvelope:
     return PromptEnvelope(
         messages=[
             Message(role="system", content="You are the Culiplan AI assistant."),
@@ -124,32 +124,47 @@ def test_dispatch_result_not_final_no_text():
 # ─── create_dispatcher factory ────────────────────────────────────────────────
 
 
-@patch("custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__", return_value=None)
+@patch(
+    "custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__",
+    return_value=None,
+)
 def test_factory_byok_openai(mock_init):
     """create_dispatcher('byok-openai') returns an OpenAICompatibleDispatcher."""
     d = create_dispatcher("byok-openai", api_key="sk-test", base_url=None)
     assert isinstance(d, OpenAICompatibleDispatcher)
 
 
-@patch("custom_components.culiplan.ai.dispatchers.AnthropicDispatcher.__init__", return_value=None)
+@patch(
+    "custom_components.culiplan.ai.dispatchers.AnthropicDispatcher.__init__",
+    return_value=None,
+)
 def test_factory_byok_anthropic(mock_init):
     d = create_dispatcher("byok-anthropic", api_key="sk-ant-test")
     assert isinstance(d, AnthropicDispatcher)
 
 
-@patch("custom_components.culiplan.ai.dispatchers.GoogleDispatcher.__init__", return_value=None)
+@patch(
+    "custom_components.culiplan.ai.dispatchers.GoogleDispatcher.__init__",
+    return_value=None,
+)
 def test_factory_byok_gemini(mock_init):
     d = create_dispatcher("byok-gemini", api_key="AIzaTest")
     assert isinstance(d, GoogleDispatcher)
 
 
-@patch("custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__", return_value=None)
+@patch(
+    "custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__",
+    return_value=None,
+)
 def test_factory_local_ollama(mock_init):
     d = create_dispatcher("local-ollama", base_url="http://localhost:11434/v1")
     assert isinstance(d, OpenAICompatibleDispatcher)
 
 
-@patch("custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__", return_value=None)
+@patch(
+    "custom_components.culiplan.ai.dispatchers.OpenAICompatibleDispatcher.__init__",
+    return_value=None,
+)
 def test_factory_local_lmstudio(mock_init):
     d = create_dispatcher("local-lmstudio", base_url="http://localhost:1234/v1")
     assert isinstance(d, OpenAICompatibleDispatcher)
@@ -172,7 +187,9 @@ def test_factory_cloud_mode_raises():
 @pytest.fixture
 def mock_openai_client():
     """Mock the AsyncOpenAI client."""
-    with patch("custom_components.culiplan.ai.dispatchers.AsyncOpenAI", autospec=True) as MockClass:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.AsyncOpenAI", autospec=True
+    ) as MockClass:
         instance = MockClass.return_value
         yield instance
 
@@ -247,7 +264,11 @@ class TestOpenAICompatibleDispatcher:
         dispatcher._debug = False
 
         tool_results = [
-            ToolResult(call_id="call-001", tool_name="get_meal_plan", content={"dinner": "pasta"})
+            ToolResult(
+                call_id="call-001",
+                tool_name="get_meal_plan",
+                content={"dinner": "pasta"},
+            )
         ]
 
         await dispatcher.dispatch(make_envelope(), tool_results=tool_results)
@@ -279,7 +300,9 @@ class TestOpenAICompatibleDispatcher:
             await dispatcher.dispatch(make_envelope())
 
     @pytest.mark.asyncio
-    async def test_rate_limit_raises_provider_rate_limit_error(self, mock_openai_client):
+    async def test_rate_limit_raises_provider_rate_limit_error(
+        self, mock_openai_client
+    ):
         """429 from provider raises ProviderRateLimitError."""
         from openai import APIStatusError
 
@@ -333,7 +356,9 @@ class TestOpenAICompatibleDispatcher:
         dispatcher._client = mock_openai_client
         dispatcher._debug = True
 
-        with caplog.at_level(logging.DEBUG, logger="custom_components.culiplan.ai.dispatchers"):
+        with caplog.at_level(
+            logging.DEBUG, logger="custom_components.culiplan.ai.dispatchers"
+        ):
             await dispatcher.dispatch(make_envelope())
 
         assert any("DEBUG MODE" in r.message for r in caplog.records)
@@ -344,7 +369,9 @@ class TestOpenAICompatibleDispatcher:
 
 @pytest.fixture
 def mock_anthropic_client():
-    with patch("custom_components.culiplan.ai.dispatchers.AsyncAnthropic", autospec=True) as MockClass:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.AsyncAnthropic", autospec=True
+    ) as MockClass:
         instance = MockClass.return_value
         yield instance
 
@@ -450,13 +477,19 @@ class TestAnthropicDispatcher:
         dispatcher._debug = False
 
         tool_results = [
-            ToolResult(call_id="toolu_01", tool_name="get_pantry", content={"items": ["eggs"]})
+            ToolResult(
+                call_id="toolu_01", tool_name="get_pantry", content={"items": ["eggs"]}
+            )
         ]
         await dispatcher.dispatch(make_envelope(), tool_results=tool_results)
 
         messages = mock_anthropic_client.messages.create.call_args.kwargs["messages"]
         tool_msg = next(
-            (m for m in messages if m.get("role") == "user" and isinstance(m.get("content"), list)),
+            (
+                m
+                for m in messages
+                if m.get("role") == "user" and isinstance(m.get("content"), list)
+            ),
             None,
         )
         assert tool_msg is not None
@@ -560,16 +593,18 @@ class TestAIDispatchServiceMultiTurn:
     async def test_single_turn_no_tools(self):
         """Single turn, model gives a text response immediately."""
         mock_client = AsyncMock()
-        mock_client.async_post = AsyncMock(return_value={
-            "messages": [
-                {"role": "system", "content": "You are a cooking assistant."},
-                {"role": "user", "content": "Execute intent: suggest_meal"},
-            ],
-            "tools": [],
-            "model": "test-model",
-            "intent_id": "suggest_meal",
-            "mode": "byok-anthropic",
-        })
+        mock_client.async_post = AsyncMock(
+            return_value={
+                "messages": [
+                    {"role": "system", "content": "You are a cooking assistant."},
+                    {"role": "user", "content": "Execute intent: suggest_meal"},
+                ],
+                "tools": [],
+                "model": "test-model",
+                "intent_id": "suggest_meal",
+                "mode": "byok-anthropic",
+            }
+        )
 
         mock_dispatcher = MagicMock()
         mock_dispatcher.dispatch = AsyncMock(
@@ -591,22 +626,24 @@ class TestAIDispatchServiceMultiTurn:
     async def test_two_turn_tool_call_then_final(self):
         """Model calls a tool first, then gives final answer after tool result."""
         mock_client = AsyncMock()
-        mock_client.async_post = AsyncMock(return_value={
-            "messages": [
-                {"role": "system", "content": "System prompt"},
-                {"role": "user", "content": "Execute intent: suggest_meal"},
-            ],
-            "tools": [
-                {
-                    "name": "get_pantry",
-                    "description": "Get pantry",
-                    "parameters": {"type": "object", "properties": {}},
-                }
-            ],
-            "model": "test-model",
-            "intent_id": "suggest_meal",
-            "mode": "byok-anthropic",
-        })
+        mock_client.async_post = AsyncMock(
+            return_value={
+                "messages": [
+                    {"role": "system", "content": "System prompt"},
+                    {"role": "user", "content": "Execute intent: suggest_meal"},
+                ],
+                "tools": [
+                    {
+                        "name": "get_pantry",
+                        "description": "Get pantry",
+                        "parameters": {"type": "object", "properties": {}},
+                    }
+                ],
+                "model": "test-model",
+                "intent_id": "suggest_meal",
+                "mode": "byok-anthropic",
+            }
+        )
         mock_client.async_call_voice_tool = AsyncMock(
             return_value={"items": ["eggs", "milk"]}
         )
@@ -614,13 +651,19 @@ class TestAIDispatchServiceMultiTurn:
         # Turn 1: model asks for tool
         # Turn 2: model gives final answer
         mock_dispatcher = MagicMock()
-        mock_dispatcher.dispatch = AsyncMock(side_effect=[
-            DispatchResult(
-                text=None,
-                tool_calls=[ToolCall(name="get_pantry", params={}, call_id="tc-001")],
-            ),
-            DispatchResult(text="Based on your pantry, I suggest omelette.", tool_calls=[]),
-        ])
+        mock_dispatcher.dispatch = AsyncMock(
+            side_effect=[
+                DispatchResult(
+                    text=None,
+                    tool_calls=[
+                        ToolCall(name="get_pantry", params={}, call_id="tc-001")
+                    ],
+                ),
+                DispatchResult(
+                    text="Based on your pantry, I suggest omelette.", tool_calls=[]
+                ),
+            ]
+        )
 
         service = AIDispatchService.__new__(AIDispatchService)
         service._mode = "byok-anthropic"
@@ -641,13 +684,15 @@ class TestAIDispatchServiceMultiTurn:
         from custom_components.culiplan.ai.service import _MAX_TOOL_TURNS
 
         mock_client = AsyncMock()
-        mock_client.async_post = AsyncMock(return_value={
-            "messages": [{"role": "user", "content": "test"}],
-            "tools": [],
-            "model": "test-model",
-            "intent_id": "suggest_meal",
-            "mode": "byok-anthropic",
-        })
+        mock_client.async_post = AsyncMock(
+            return_value={
+                "messages": [{"role": "user", "content": "test"}],
+                "tools": [],
+                "model": "test-model",
+                "intent_id": "suggest_meal",
+                "mode": "byok-anthropic",
+            }
+        )
         mock_client.async_call_voice_tool = AsyncMock(return_value={})
 
         # Always return a tool call (never final)
@@ -684,6 +729,7 @@ def test_dispatch_multi_turn_raises_not_implemented():
 
     with pytest.raises(NotImplementedError, match="service layer"):
         import asyncio
+
         asyncio.get_event_loop().run_until_complete(
             dispatcher.dispatch_multi_turn(make_envelope())
         )

@@ -60,8 +60,8 @@ async def async_setup_entry(
 
     async_add_entities(
         [
-            PantryHasExpiringBinarySensor(coordinator, device, expiry_hours),
-            DinnerPartyActiveBinarySensor(coordinator, client, device),
+            PantryHasExpiringBinarySensor(coordinator, device, entry, expiry_hours),
+            DinnerPartyActiveBinarySensor(coordinator, client, device, entry),
         ]
     )
 
@@ -94,11 +94,15 @@ class PantryHasExpiringBinarySensor(
         self,
         coordinator: CuliplanCoordinator,
         device: DeviceInfo,
+        entry: ConfigEntry,
         expiry_hours: int,
     ) -> None:
         super().__init__(coordinator)
         self._expiry_hours = expiry_hours
-        self._attr_unique_id = f"{DOMAIN}_pantry_has_expiring"
+        # Per-entry unique_id (v0.13.0). Pre-v0.13.0 entries used the legacy
+        # f"{DOMAIN}_..." form; __init__.async_migrate_entry rewrites those
+        # in the entity registry on first load after upgrade.
+        self._attr_unique_id = f"{entry.entry_id}_pantry_has_expiring"
         self._attr_device_info = device
 
     @property
@@ -167,10 +171,11 @@ class DinnerPartyActiveBinarySensor(
         coordinator: CuliplanCoordinator,
         client: CuliplanApiClient,
         device: DeviceInfo,
+        entry: ConfigEntry,
     ) -> None:
         super().__init__(coordinator)
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_dinner_party_active"
+        self._attr_unique_id = f"{entry.entry_id}_dinner_party_active"
         self._attr_device_info = device
         # Cache the last fetched active-party data from REST endpoint
         self._active_party: dict[str, Any] | None = None

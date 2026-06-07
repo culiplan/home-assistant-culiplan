@@ -45,7 +45,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
 from .helpers import _build_device_info
 from .updater import LatestRelease, async_check_latest, async_perform_update, is_newer
 
@@ -86,9 +85,14 @@ class CuliplanUpdateEntity(UpdateEntity):
     )
 
     def __init__(self, entry: ConfigEntry) -> None:
-        """Initialise from the config entry (device grouping + version)."""
+        """Initialise from the config entry (device grouping + version).
+
+        Per-entry unique_id (v0.13.0) — pre-v0.13.0 entries used the legacy
+        ``f"{DOMAIN}_update"`` form; ``__init__.async_migrate_entry`` rewrites
+        those in the entity registry on first load after upgrade.
+        """
         self._entry = entry
-        self._attr_unique_id = f"{DOMAIN}_update"
+        self._attr_unique_id = f"{entry.entry_id}_update"
         self._attr_device_info = _build_device_info(entry)
         installed = _installed_version()
         self._attr_installed_version = installed

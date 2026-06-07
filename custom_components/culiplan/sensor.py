@@ -38,10 +38,10 @@ async def async_setup_entry(
     device = _build_device_info(entry)
     async_add_entities(
         [
-            MealsPlanedThisWeekSensor(coordinator, device),
-            ShoppingItemsCountSensor(coordinator, device),
-            ExpiringPantrySensor(coordinator, device, expiry_days),
-            PlannedKwhTodaySensor(coordinator, device),
+            MealsPlanedThisWeekSensor(coordinator, device, entry),
+            ShoppingItemsCountSensor(coordinator, device, entry),
+            ExpiringPantrySensor(coordinator, device, entry, expiry_days),
+            PlannedKwhTodaySensor(coordinator, device, entry),
         ]
     )
 
@@ -51,9 +51,15 @@ class _CuliplanSensor(CoordinatorEntity[CuliplanCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
+    def __init__(
+        self,
+        coordinator: CuliplanCoordinator,
+        device: DeviceInfo,
+        entry: ConfigEntry,
+    ) -> None:
         super().__init__(coordinator)
         self._attr_device_info = device
+        self._entry_id = entry.entry_id
 
 
 class MealsPlanedThisWeekSensor(_CuliplanSensor):
@@ -63,9 +69,18 @@ class MealsPlanedThisWeekSensor(_CuliplanSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "meals"
 
-    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
-        super().__init__(coordinator, device)
-        self._attr_unique_id = f"{DOMAIN}_meals_planned_this_week"
+    def __init__(
+        self,
+        coordinator: CuliplanCoordinator,
+        device: DeviceInfo,
+        entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator, device, entry)
+        # Per-entry unique_id so adding a second Culiplan account does not
+        # collide with the first. Pre-v0.13.0 entries used the legacy
+        # f"{DOMAIN}_..." form; __init__.async_migrate_entry rewrites those
+        # in the entity registry on first load after upgrade.
+        self._attr_unique_id = f"{entry.entry_id}_meals_planned_this_week"
 
     @property
     def native_value(self) -> int:
@@ -100,9 +115,14 @@ class ShoppingItemsCountSensor(_CuliplanSensor):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "items"
 
-    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
-        super().__init__(coordinator, device)
-        self._attr_unique_id = f"{DOMAIN}_shopping_items"
+    def __init__(
+        self,
+        coordinator: CuliplanCoordinator,
+        device: DeviceInfo,
+        entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator, device, entry)
+        self._attr_unique_id = f"{entry.entry_id}_shopping_items"
 
     @property
     def native_value(self) -> int:
@@ -129,11 +149,12 @@ class ExpiringPantrySensor(_CuliplanSensor):
         self,
         coordinator: CuliplanCoordinator,
         device: DeviceInfo,
+        entry: ConfigEntry,
         expiry_days: int,
     ) -> None:
-        super().__init__(coordinator, device)
+        super().__init__(coordinator, device, entry)
         self._expiry_days = expiry_days
-        self._attr_unique_id = f"{DOMAIN}_expiring_pantry"
+        self._attr_unique_id = f"{entry.entry_id}_expiring_pantry"
 
     @property
     def native_value(self) -> int:
@@ -188,9 +209,14 @@ class PlannedKwhTodaySensor(_CuliplanSensor):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
 
-    def __init__(self, coordinator: CuliplanCoordinator, device: DeviceInfo) -> None:
-        super().__init__(coordinator, device)
-        self._attr_unique_id = f"{DOMAIN}_planned_kwh_today"
+    def __init__(
+        self,
+        coordinator: CuliplanCoordinator,
+        device: DeviceInfo,
+        entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator, device, entry)
+        self._attr_unique_id = f"{entry.entry_id}_planned_kwh_today"
 
     @property
     def native_value(self) -> float:

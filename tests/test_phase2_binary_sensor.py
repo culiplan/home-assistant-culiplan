@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import pytest
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_coordinator(pantry_items=None, dinner_parties=None):
     coordinator = MagicMock()
@@ -30,52 +31,73 @@ def _make_device():
     return device
 
 
+def _make_entry(entry_id: str = "test_entry_id"):
+    entry = MagicMock()
+    entry.entry_id = entry_id
+    return entry
+
+
 # ─── PantryHasExpiringBinarySensor ────────────────────────────────────────────
+
 
 class TestPantryHasExpiringBinarySensor:
     """task-1378 AC#1 — binary_sensor.culiplan_pantry_has_expiring"""
 
     def _make_sensor(self, pantry_items=None, expiry_hours=48):
-        from custom_components.culiplan.binary_sensor import PantryHasExpiringBinarySensor
+        from custom_components.culiplan.binary_sensor import (
+            PantryHasExpiringBinarySensor,
+        )
+
         coordinator = _make_coordinator(pantry_items=pantry_items)
         device = _make_device()
-        sensor = PantryHasExpiringBinarySensor(coordinator, device, expiry_hours)
+        entry = _make_entry()
+        sensor = PantryHasExpiringBinarySensor(coordinator, device, entry, expiry_hours)
         return sensor
 
     def test_unique_id(self):
         sensor = self._make_sensor()
-        assert sensor.unique_id == "culiplan_pantry_has_expiring"
+        # v0.13.0: per-entry unique_id to avoid multi-account collision.
+        assert sensor.unique_id == "test_entry_id_pantry_has_expiring"
 
     def test_is_off_when_no_items(self):
         sensor = self._make_sensor(pantry_items=[])
         assert sensor.is_on is False
 
     def test_is_off_when_no_expiry_field(self):
-        sensor = self._make_sensor(pantry_items=[
-            {"id": "item1", "name": "Milk"},  # no expiresAt
-        ])
+        sensor = self._make_sensor(
+            pantry_items=[
+                {"id": "item1", "name": "Milk"},  # no expiresAt
+            ]
+        )
         assert sensor.is_on is False
 
     def test_is_on_when_item_expires_within_window(self):
         soon = (datetime.now(tz=UTC) + timedelta(hours=24)).isoformat()
-        sensor = self._make_sensor(pantry_items=[
-            {"id": "item1", "name": "Milk", "expiresAt": soon},
-        ])
+        sensor = self._make_sensor(
+            pantry_items=[
+                {"id": "item1", "name": "Milk", "expiresAt": soon},
+            ]
+        )
         assert sensor.is_on is True
 
     def test_is_off_when_item_expires_outside_window(self):
         later = (datetime.now(tz=UTC) + timedelta(days=10)).isoformat()
-        sensor = self._make_sensor(pantry_items=[
-            {"id": "item1", "name": "Milk", "expiresAt": later},
-        ], expiry_hours=48)
+        sensor = self._make_sensor(
+            pantry_items=[
+                {"id": "item1", "name": "Milk", "expiresAt": later},
+            ],
+            expiry_hours=48,
+        )
         assert sensor.is_on is False
 
     def test_extra_state_attributes_ids_only(self):
         """Attributes must contain item IDs, not names (§14.3)."""
         soon = (datetime.now(tz=UTC) + timedelta(hours=12)).isoformat()
-        sensor = self._make_sensor(pantry_items=[
-            {"id": "item-abc", "name": "Sensitive Item Name", "expiresAt": soon},
-        ])
+        sensor = self._make_sensor(
+            pantry_items=[
+                {"id": "item-abc", "name": "Sensitive Item Name", "expiresAt": soon},
+            ]
+        )
         attrs = sensor.extra_state_attributes
         assert "item-abc" in attrs["expiring_item_ids"]
         # Names must NOT appear in attributes (§14.3 PII check)
@@ -89,21 +111,27 @@ class TestPantryHasExpiringBinarySensor:
 
 # ─── DinnerPartyActiveBinarySensor ────────────────────────────────────────────
 
+
 class TestDinnerPartyActiveBinarySensor:
     """task-1380 AC#1+2+3 — binary_sensor.culiplan_dinner_party_active"""
 
     def _make_sensor(self, coordinator=None):
-        from custom_components.culiplan.binary_sensor import DinnerPartyActiveBinarySensor
+        from custom_components.culiplan.binary_sensor import (
+            DinnerPartyActiveBinarySensor,
+        )
+
         if coordinator is None:
             coordinator = _make_coordinator()
         client = AsyncMock()
         device = _make_device()
-        sensor = DinnerPartyActiveBinarySensor(coordinator, client, device)
+        entry = _make_entry()
+        sensor = DinnerPartyActiveBinarySensor(coordinator, client, device, entry)
         return sensor
 
     def test_unique_id(self):
         sensor = self._make_sensor()
-        assert sensor.unique_id == "culiplan_dinner_party_active"
+        # v0.13.0: per-entry unique_id to avoid multi-account collision.
+        assert sensor.unique_id == "test_entry_id_dinner_party_active"
 
     def test_is_off_by_default_no_active_party(self):
         """No REST data yet, no coordinator data → should be off."""
@@ -127,7 +155,11 @@ class TestDinnerPartyActiveBinarySensor:
 
     def test_is_off_when_rest_data_inactive(self):
         sensor = self._make_sensor()
-        sensor._active_party = {"is_active": False, "party_id": None, "attributes": None}
+        sensor._active_party = {
+            "is_active": False,
+            "party_id": None,
+            "attributes": None,
+        }
         assert sensor.is_on is False
 
     def test_extra_state_attributes_with_active_party(self):
@@ -153,7 +185,11 @@ class TestDinnerPartyActiveBinarySensor:
 
     def test_extra_state_attributes_empty_when_inactive(self):
         sensor = self._make_sensor()
-        sensor._active_party = {"is_active": False, "party_id": None, "attributes": None}
+        sensor._active_party = {
+            "is_active": False,
+            "party_id": None,
+            "attributes": None,
+        }
         attrs = sensor.extra_state_attributes
         assert attrs["party_id"] is None
         assert attrs["guest_count"] == 0
@@ -181,16 +217,18 @@ class TestDinnerPartyActiveBinarySensor:
     async def test_async_update_fetches_rest_endpoint(self):
         """task-1380 AC#3 — async_update calls the REST endpoint."""
         sensor = self._make_sensor()
-        sensor._client.async_get = AsyncMock(return_value={
-            "is_active": True,
-            "party_id": "party999",
-            "attributes": {
-                "guest_count": 4,
-                "course_count": 2,
-                "start_at": "2026-04-25T20:00:00",
-                "recipe_ids": [],
-            },
-        })
+        sensor._client.async_get = AsyncMock(
+            return_value={
+                "is_active": True,
+                "party_id": "party999",
+                "attributes": {
+                    "guest_count": 4,
+                    "course_count": 2,
+                    "start_at": "2026-04-25T20:00:00",
+                    "recipe_ids": [],
+                },
+            }
+        )
         await sensor.async_update()
         sensor._client.async_get.assert_called_once_with("/api/ha/dinner-party/active")
         assert sensor._active_party["party_id"] == "party999"
@@ -209,14 +247,16 @@ class TestDinnerPartyActiveBinarySensor:
     def test_fallback_to_coordinator_data(self):
         """When _active_party is None, fall back to coordinator dinner_parties data."""
         today = datetime.now(tz=UTC).date().isoformat()
-        coordinator = _make_coordinator(dinner_parties=[
-            {
-                "id": "dp1",
-                "date": today,
-                "status": "PLANNED",
-                "archived": False,
-            }
-        ])
+        coordinator = _make_coordinator(
+            dinner_parties=[
+                {
+                    "id": "dp1",
+                    "date": today,
+                    "status": "PLANNED",
+                    "archived": False,
+                }
+            ]
+        )
         sensor = self._make_sensor(coordinator=coordinator)
         # No REST data yet
         assert sensor._active_party is None

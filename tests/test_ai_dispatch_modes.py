@@ -6,7 +6,6 @@ every AI mode so that create_dispatcher() never raises ValueError.
 
 from __future__ import annotations
 
-import pytest
 
 from custom_components.culiplan.const import (
     AI_MODE_BYOK,
@@ -43,11 +42,17 @@ class TestBuildDispatchMode:
         assert _build_dispatch_mode(AI_MODE_BYOK, config) == "byok-gemini"
 
     def test_local_ollama_default_port(self) -> None:
-        config = {CONF_AI_MODE: AI_MODE_LOCAL, CONF_LOCAL_ENDPOINT: "http://localhost:11434"}
+        config = {
+            CONF_AI_MODE: AI_MODE_LOCAL,
+            CONF_LOCAL_ENDPOINT: "http://localhost:11434",
+        }
         assert _build_dispatch_mode(AI_MODE_LOCAL, config) == "local-ollama"
 
     def test_local_lmstudio_port(self) -> None:
-        config = {CONF_AI_MODE: AI_MODE_LOCAL, CONF_LOCAL_ENDPOINT: "http://localhost:1234"}
+        config = {
+            CONF_AI_MODE: AI_MODE_LOCAL,
+            CONF_LOCAL_ENDPOINT: "http://localhost:1234",
+        }
         assert _build_dispatch_mode(AI_MODE_LOCAL, config) == "local-lmstudio"
 
     def test_local_no_endpoint_defaults_to_ollama(self) -> None:
@@ -74,24 +79,28 @@ class TestCreateDispatcherNoValueError:
 
     def test_byok_openai_no_error(self) -> None:
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
+
         mode = _build_dispatch_mode(AI_MODE_BYOK, self._make_config("openai"))
         dispatcher = create_dispatcher(mode=mode, api_key="sk-test")
         assert dispatcher is not None
 
     def test_byok_anthropic_no_error(self) -> None:
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
+
         mode = _build_dispatch_mode(AI_MODE_BYOK, self._make_config("anthropic"))
         dispatcher = create_dispatcher(mode=mode, api_key="sk-ant-test")
         assert dispatcher is not None
 
     def test_byok_gemini_no_error(self) -> None:
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
+
         mode = _build_dispatch_mode(AI_MODE_BYOK, self._make_config("google"))
         dispatcher = create_dispatcher(mode=mode, api_key="AIza-test")
         assert dispatcher is not None
 
     def test_local_ollama_no_error(self) -> None:
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
+
         mode = _build_dispatch_mode(
             AI_MODE_LOCAL, self._make_local_config("http://localhost:11434")
         )
@@ -100,6 +109,7 @@ class TestCreateDispatcherNoValueError:
 
     def test_local_lmstudio_no_error(self) -> None:
         from custom_components.culiplan.ai.dispatchers import create_dispatcher
+
         mode = _build_dispatch_mode(
             AI_MODE_LOCAL, self._make_local_config("http://localhost:1234")
         )

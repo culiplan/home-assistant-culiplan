@@ -213,6 +213,90 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+_LEGACY_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
+    # sensor.py
+    "meals_planned_this_week",
+    "shopping_items",
+    "expiring_pantry",
+    "planned_kwh_today",
+    # binary_sensor.py
+    "pantry_has_expiring",
+    "dinner_party_active",
+    # update.py
+    "update",
+)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entries to the current schema.
+
+    v1 → v2 (v0.13.0)
+        Rewrite per-entity ``unique_id`` from the legacy
+        ``f"{DOMAIN}_<suffix>"`` form to the per-entry
+        ``f"{entry.entry_id}_<suffix>"`` form. The previous form caused a
+        collision the moment a user added a second Culiplan account: HA
+        rejects a duplicate ``(platform, unique_id)`` tuple, so half of the
+        sensors / binary_sensors / the update entity for the second account
+        never appeared.
+
+        Only the entries in :data:`_LEGACY_UNIQUE_ID_SUFFIXES` are affected
+        — calendar (keyed on plan_id) and todo (keyed on shopping_list_id)
+        already had per-resource unique IDs and are intentionally left
+        alone. Idempotent: if the entity registry already holds the new
+        form (e.g. fresh install or re-run after a partial migration),
+        ``async_update_entity`` is not called.
+    """
+    if entry.version == 1:
+        from homeassistant.helpers import entity_registry as er
+
+        registry = er.async_get(hass)
+        migrated = 0
+        # Snapshot the entries up-front; async_update_entity mutates the
+        # registry's internal index, which would invalidate a live iterator.
+        for reg_entry in list(registry.entities.values()):
+            if reg_entry.config_entry_id != entry.entry_id:
+                continue
+            for suffix in _LEGACY_UNIQUE_ID_SUFFIXES:
+                legacy_uid = f"{DOMAIN}_{suffix}"
+                if reg_entry.unique_id != legacy_uid:
+                    continue
+                new_uid = f"{entry.entry_id}_{suffix}"
+                # Skip if the new uid already exists for this platform
+                # (idempotency guard against a half-finished prior run).
+                existing = registry.async_get_entity_id(
+                    reg_entry.domain, DOMAIN, new_uid
+                )
+                if existing is not None and existing != reg_entry.entity_id:
+                    _LOGGER.warning(
+                        "[culiplan][migrate] Both %s and %s already exist; "
+                        "leaving legacy entity %s untouched. Remove the "
+                        "duplicate manually if desired.",
+                        legacy_uid,
+                        new_uid,
+                        reg_entry.entity_id,
+                    )
+                    break
+                registry.async_update_entity(reg_entry.entity_id, new_unique_id=new_uid)
+                _LOGGER.info(
+                    "[culiplan][migrate] %s: %s → %s",
+                    reg_entry.entity_id,
+                    legacy_uid,
+                    new_uid,
+                )
+                migrated += 1
+                break
+
+        hass.config_entries.async_update_entry(entry, version=2)
+        _LOGGER.info(
+            "[culiplan][migrate] Entry %s upgraded v1 → v2 "
+            "(%d entity unique_ids rewritten)",
+            entry.entry_id,
+            migrated,
+        )
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Culiplan from a config entry."""
     implementation = (

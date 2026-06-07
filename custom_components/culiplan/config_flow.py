@@ -167,6 +167,11 @@ class OAuth2FlowHandler(  # type: ignore[call-arg]
     """
 
     DOMAIN = DOMAIN
+    # Bumped to 2 in v0.13.0 for the per-entry unique_id rewrite
+    # (see ``__init__.async_migrate_entry``). Existing v1 entries are
+    # migrated in-place — no data shape change, just the entity-registry
+    # unique_id format. Idempotent.
+    VERSION = 2
 
     def __init__(self) -> None:
         super().__init__()

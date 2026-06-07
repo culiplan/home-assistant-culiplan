@@ -25,7 +25,6 @@ from custom_components.culiplan.const import (
     CONF_BYOK_PROVIDER,
     CONF_LOCAL_ENDPOINT,
     CONF_LOCAL_MODEL,
-    DOMAIN,
 )
 
 
@@ -175,9 +174,7 @@ async def test_options_flow_advanced_ai_switch_to_cloud(hass):
     flow = MealieOptionsFlow(entry)
     flow.hass = hass
 
-    result = await flow.async_step_advanced_ai(
-        user_input={CONF_AI_MODE: AI_MODE_CLOUD}
-    )
+    result = await flow.async_step_advanced_ai(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
 
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_AI_MODE] == AI_MODE_CLOUD
@@ -190,7 +187,6 @@ async def test_options_flow_advanced_ai_byok_stores_key(hass):
     task-1626 AC#3: BYOK provider config accessible via OptionsFlow.
     """
     from custom_components.culiplan.config_flow import MealieOptionsFlow
-    from custom_components.culiplan.ai.types import ProviderAuthError
 
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
@@ -266,7 +262,6 @@ async def test_options_flow_advanced_ai_local_stores_endpoint(hass):
     task-1626 AC#3: Local AI config accessible via OptionsFlow.
     """
     from custom_components.culiplan.config_flow import MealieOptionsFlow
-    from custom_components.culiplan.ai.local_ai import LocalAIEndpoint
 
     entry = MagicMock()
     entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}

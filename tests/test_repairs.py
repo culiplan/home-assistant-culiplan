@@ -11,12 +11,10 @@ AC coverage:
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.culiplan.repairs import (
     async_create_premium_repair,
@@ -29,7 +27,6 @@ from custom_components.culiplan.repairs import (
 from custom_components.culiplan.services import (
     PremiumRequiredError,
     async_register_services,
-    SUGGEST_MEAL_SCHEMA,
 )
 from custom_components.culiplan.const import (
     AI_MODE_CLOUD,
@@ -39,6 +36,7 @@ from custom_components.culiplan.const import (
 
 
 # ─── _repair_issue_id ─────────────────────────────────────────────────────────
+
 
 class TestRepairIssueId:
     """Issue IDs are stable and safe for HA issue registry."""
@@ -57,6 +55,7 @@ class TestRepairIssueId:
 
 
 # ─── _append_ha_install_id ────────────────────────────────────────────────────
+
 
 class TestAppendHaInstallId:
     """AC#3: ha_install_id is appended to upgradeUrl."""
@@ -101,6 +100,7 @@ class TestAppendHaInstallId:
 
 
 # ─── async_create_premium_repair ─────────────────────────────────────────────
+
 
 class TestAsyncCreatePremiumRepair:
     """AC#1, AC#2, AC#3: issue is created with correct copy and upgrade URL."""
@@ -194,6 +194,7 @@ class TestAsyncCreatePremiumRepair:
 
 # ─── async_resolve_premium_repair ────────────────────────────────────────────
 
+
 class TestAsyncResolvePremiumRepair:
     """AC#4: Repair auto-resolves on next successful call."""
 
@@ -210,14 +211,13 @@ class TestAsyncResolvePremiumRepair:
     def test_safe_when_no_issue_exists(self):
         """AC#4: Resolving a non-existent issue should not raise."""
         hass = MagicMock()
-        with patch(
-            "custom_components.culiplan.repairs.ir.async_delete_issue"
-        ):
+        with patch("custom_components.culiplan.repairs.ir.async_delete_issue"):
             # Should not raise
             async_resolve_premium_repair(hass, "ai.suggestion")
 
 
 # ─── Integration with services.py ────────────────────────────────────────────
+
 
 class TestServicesRepairIntegration:
     """
@@ -230,14 +230,15 @@ class TestServicesRepairIntegration:
         client = AsyncMock()
         # Simulate 403 premium_required from backend
         import json
-        body = json.dumps({
-            "error": "premium_required",
-            "feature": "ai.suggestion",
-            "upgradeUrl": "https://culiplan.com/settings/billing?ref=ha_gate&client=ha-core",
-        })
-        client.async_call_voice_tool = AsyncMock(
-            side_effect=Exception(f"403 {body}")
+
+        body = json.dumps(
+            {
+                "error": "premium_required",
+                "feature": "ai.suggestion",
+                "upgradeUrl": "https://culiplan.com/settings/billing?ref=ha_gate&client=ha-core",
+            }
         )
+        client.async_call_voice_tool = AsyncMock(side_effect=Exception(f"403 {body}"))
 
         entry = MagicMock()
         entry.entry_id = "entry_test"

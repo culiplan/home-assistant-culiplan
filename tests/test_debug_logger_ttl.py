@@ -22,7 +22,6 @@ import pathlib
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -40,12 +39,14 @@ STRINGS_JSON = (
 # AC#1 — get_debug_logger attaches TimedRotatingFileHandler
 # ---------------------------------------------------------------------------
 
+
 def test_get_debug_logger_returns_logger_with_file_handler(tmp_path):
     """get_debug_logger() must return a Logger with a TimedRotatingFileHandler."""
     from custom_components.culiplan.ai.debug_logger import (
         _debug_handler_cache,
         get_debug_logger,
     )
+
     # Clear the module-level cache so we get a fresh handler
     _debug_handler_cache.clear()
 
@@ -55,7 +56,8 @@ def test_get_debug_logger_returns_logger_with_file_handler(tmp_path):
     assert logger.propagate is False
 
     file_handlers = [
-        h for h in logger.handlers
+        h
+        for h in logger.handlers
         if isinstance(h, logging.handlers.TimedRotatingFileHandler)
     ]
     assert len(file_handlers) >= 1, "Expected at least one TimedRotatingFileHandler"
@@ -70,25 +72,33 @@ def test_get_debug_logger_returns_logger_with_file_handler(tmp_path):
 # AC#5 — get_debug_logger is idempotent
 # ---------------------------------------------------------------------------
 
+
 def test_get_debug_logger_idempotent(tmp_path):
     """Calling get_debug_logger twice with the same dir must not add a second handler."""
     from custom_components.culiplan.ai.debug_logger import (
         _debug_handler_cache,
         get_debug_logger,
     )
+
     _debug_handler_cache.clear()
 
     logger1 = get_debug_logger(str(tmp_path))
-    handler_count_after_first = len([
-        h for h in logger1.handlers
-        if isinstance(h, logging.handlers.TimedRotatingFileHandler)
-    ])
+    handler_count_after_first = len(
+        [
+            h
+            for h in logger1.handlers
+            if isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        ]
+    )
 
     logger2 = get_debug_logger(str(tmp_path))
-    handler_count_after_second = len([
-        h for h in logger2.handlers
-        if isinstance(h, logging.handlers.TimedRotatingFileHandler)
-    ])
+    handler_count_after_second = len(
+        [
+            h
+            for h in logger2.handlers
+            if isinstance(h, logging.handlers.TimedRotatingFileHandler)
+        ]
+    )
 
     assert logger1 is logger2
     assert handler_count_after_second == handler_count_after_first
@@ -97,6 +107,7 @@ def test_get_debug_logger_idempotent(tmp_path):
 # ---------------------------------------------------------------------------
 # AC#2 — purge_old_debug_logs deletes stale files, keeps recent ones
 # ---------------------------------------------------------------------------
+
 
 def test_purge_old_debug_logs_deletes_stale_files(tmp_path):
     """purge_old_debug_logs() must delete files older than 24h."""
@@ -133,7 +144,10 @@ def test_purge_old_debug_logs_returns_correct_count(tmp_path):
     from custom_components.culiplan.ai.debug_logger import purge_old_debug_logs
 
     # Two stale files
-    for name in ("culiplan_ai_debug.log.2026-01-01", "culiplan_ai_debug.log.2026-01-02"):
+    for name in (
+        "culiplan_ai_debug.log.2026-01-01",
+        "culiplan_ai_debug.log.2026-01-02",
+    ):
         f = tmp_path / name
         f.write_text("stale")
         old_mtime = time.time() - (30 * 3600)
@@ -151,6 +165,7 @@ def test_purge_old_debug_logs_returns_correct_count(tmp_path):
 # ---------------------------------------------------------------------------
 # AC#4 — setup_debug_log_purge is idempotent
 # ---------------------------------------------------------------------------
+
 
 def test_setup_debug_log_purge_idempotent():
     """setup_debug_log_purge() must not register a second callback if already done."""
@@ -185,6 +200,7 @@ def test_setup_debug_log_purge_idempotent():
 # ---------------------------------------------------------------------------
 # AC#3 — strings.json contains accurate 24h-TTL copy
 # ---------------------------------------------------------------------------
+
 
 def test_strings_json_has_24h_ttl_description():
     """strings.json ai_provider description must mention '24 hours' or '24h'."""

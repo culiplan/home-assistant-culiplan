@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.culiplan.const import DOMAIN
 from custom_components.culiplan.coordinator import CuliplanCoordinator
-from homeassistant.helpers.device_registry import DeviceInfo
 
 
 # ─── Shared coordinator fixture ──────────────────────────────────────────────
@@ -55,7 +53,6 @@ def full_coordinator(hass, mock_api_client, mock_config_entry):
 
 
 class TestCuliplanCalendar:
-
     def test_events_built_from_slot(self, full_coordinator, mock_config_entry):
         from custom_components.culiplan.calendar import CuliplanCalendar
 
@@ -89,7 +86,9 @@ class TestCuliplanCalendar:
         attrs = cal.extra_state_attributes
         assert "recipe_id" in attrs
 
-    def test_no_extra_state_attrs_when_no_event(self, full_coordinator, mock_config_entry):
+    def test_no_extra_state_attrs_when_no_event(
+        self, full_coordinator, mock_config_entry
+    ):
         from custom_components.culiplan.calendar import CuliplanCalendar
 
         full_coordinator.data["meal_plans"][0]["slots"] = []
@@ -112,13 +111,16 @@ class TestCuliplanCalendar:
         end = datetime(2026, 4, 29, 0, 0, tzinfo=timezone.utc)
         assert len(await cal.async_get_events(hass, start, end)) == 1
         # Outside range
-        assert len(
-            await cal.async_get_events(
-                hass,
-                datetime(2026, 5, 1, 0, 0, tzinfo=timezone.utc),
-                datetime(2026, 5, 7, 0, 0, tzinfo=timezone.utc),
+        assert (
+            len(
+                await cal.async_get_events(
+                    hass,
+                    datetime(2026, 5, 1, 0, 0, tzinfo=timezone.utc),
+                    datetime(2026, 5, 7, 0, 0, tzinfo=timezone.utc),
+                )
             )
-        ) == 0
+            == 0
+        )
 
     def test_device_info_present(self, full_coordinator, mock_config_entry):
         from custom_components.culiplan.calendar import CuliplanCalendar
@@ -138,13 +140,14 @@ class TestCuliplanCalendar:
 
 
 class TestCuliplanShoppingList:
-
     def test_todo_items_mapped_correctly(self, full_coordinator, mock_config_entry):
         from custom_components.culiplan.todo import CuliplanShoppingList
         from homeassistant.components.todo import TodoItemStatus
 
         entity = CuliplanShoppingList(
-            full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
+            full_coordinator,
+            full_coordinator.data["shopping_lists"][0],
+            mock_config_entry,
         )
         items = entity.todo_items
         assert len(items) == 2
@@ -161,7 +164,9 @@ class TestCuliplanShoppingList:
         from homeassistant.components.todo import TodoItem, TodoItemStatus
 
         entity = CuliplanShoppingList(
-            full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
+            full_coordinator,
+            full_coordinator.data["shopping_lists"][0],
+            mock_config_entry,
         )
         new_item = TodoItem(summary="Bread", status=TodoItemStatus.NEEDS_ACTION)
 
@@ -177,7 +182,9 @@ class TestCuliplanShoppingList:
         from custom_components.culiplan.todo import CuliplanShoppingList
 
         entity = CuliplanShoppingList(
-            full_coordinator, full_coordinator.data["shopping_lists"][0], mock_config_entry
+            full_coordinator,
+            full_coordinator.data["shopping_lists"][0],
+            mock_config_entry,
         )
         info = entity._attr_device_info
         assert (DOMAIN, mock_config_entry.entry_id) in info["identifiers"]
@@ -190,7 +197,6 @@ class TestCuliplanShoppingList:
 
 
 class TestSensorTrio:
-
     @pytest.fixture
     def coordinator_with_pantry(self, hass, mock_api_client, mock_config_entry):
         import datetime as dt
@@ -200,7 +206,11 @@ class TestSensorTrio:
         monday = today - dt.timedelta(days=today.weekday())
         slot_date = (
             datetime(
-                monday.year, monday.month, monday.day, 18, 0,
+                monday.year,
+                monday.month,
+                monday.day,
+                18,
+                0,
                 tzinfo=timezone.utc,
             )
             + dt.timedelta(days=2)
@@ -221,47 +231,73 @@ class TestSensorTrio:
                 }
             ],
             "pantry_items": [
-                {"id": "p1", "expiresAt": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat()},
-                {"id": "p2", "expiresAt": (datetime.now(tz=timezone.utc) + timedelta(days=10)).isoformat()},
+                {
+                    "id": "p1",
+                    "expiresAt": (
+                        datetime.now(tz=timezone.utc) + timedelta(days=1)
+                    ).isoformat(),
+                },
+                {
+                    "id": "p2",
+                    "expiresAt": (
+                        datetime.now(tz=timezone.utc) + timedelta(days=10)
+                    ).isoformat(),
+                },
             ],
         }
         return coord
 
     def _device(self, entry):
         from custom_components.culiplan.helpers import _build_device_info
+
         return _build_device_info(entry)
 
     def test_meals_this_week(self, coordinator_with_pantry, mock_config_entry):
         from custom_components.culiplan.sensor import MealsPlanedThisWeekSensor
 
         sensor = MealsPlanedThisWeekSensor(
-            coordinator_with_pantry, self._device(mock_config_entry)
+            coordinator_with_pantry, self._device(mock_config_entry), mock_config_entry
         )
         assert sensor.native_value == 1
 
-    def test_shopping_count_excludes_completed(self, coordinator_with_pantry, mock_config_entry):
+    def test_shopping_count_excludes_completed(
+        self, coordinator_with_pantry, mock_config_entry
+    ):
         from custom_components.culiplan.sensor import ShoppingItemsCountSensor
 
         sensor = ShoppingItemsCountSensor(
-            coordinator_with_pantry, self._device(mock_config_entry)
+            coordinator_with_pantry, self._device(mock_config_entry), mock_config_entry
         )
         assert sensor.native_value == 2
 
-    def test_expiring_pantry_within_window(self, coordinator_with_pantry, mock_config_entry):
+    def test_expiring_pantry_within_window(
+        self, coordinator_with_pantry, mock_config_entry
+    ):
         from custom_components.culiplan.sensor import ExpiringPantrySensor
 
         sensor = ExpiringPantrySensor(
-            coordinator_with_pantry, self._device(mock_config_entry), expiry_days=3
+            coordinator_with_pantry,
+            self._device(mock_config_entry),
+            mock_config_entry,
+            expiry_days=3,
         )
         assert sensor.native_value == 1
         assert "p1" in sensor.extra_state_attributes["expiring_item_ids"]
         assert "p2" not in sensor.extra_state_attributes["expiring_item_ids"]
 
-    def test_expiring_attributes_ids_only(self, coordinator_with_pantry, mock_config_entry):
+    def test_expiring_attributes_ids_only(
+        self, coordinator_with_pantry, mock_config_entry
+    ):
         """Sensor attributes must not contain PII (§14.3)."""
         from custom_components.culiplan.sensor import ExpiringPantrySensor
 
         sensor = ExpiringPantrySensor(
-            coordinator_with_pantry, self._device(mock_config_entry), expiry_days=3
+            coordinator_with_pantry,
+            self._device(mock_config_entry),
+            mock_config_entry,
+            expiry_days=3,
         )
-        assert set(sensor.extra_state_attributes) == {"expiring_item_ids", "expiry_window_days"}
+        assert set(sensor.extra_state_attributes) == {
+            "expiring_item_ids",
+            "expiry_window_days",
+        }

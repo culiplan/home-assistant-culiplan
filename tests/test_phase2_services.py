@@ -8,10 +8,11 @@ Syntax-verified + mocked unit tests (Python 3.9 compatible).
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_hass(entry_id: str = "entry1") -> MagicMock:
     hass = MagicMock()
@@ -31,6 +32,7 @@ def _make_hass(entry_id: str = "entry1") -> MagicMock:
 
 
 # ─── Test: _find_entry_id ─────────────────────────────────────────────────────
+
 
 def test_find_entry_id_returns_first_key():
     from custom_components.culiplan.services import _find_entry_id
@@ -60,6 +62,7 @@ def test_find_entry_id_returns_none_when_domain_missing():
 
 
 # ─── Test: async_register_phase2_services ────────────────────────────────────
+
 
 def test_register_phase2_services_registers_all_three():
     from custom_components.culiplan.services import (
@@ -91,22 +94,24 @@ def test_register_phase2_services_idempotent():
 
 # ─── Test: pantry_decrement service handler ────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_pantry_decrement_success():
     """Successful decrement calls the API and resolves any repair issue."""
     from custom_components.culiplan.services import (
         async_register_phase2_services,
-        SERVICE_PANTRY_DECREMENT,
     )
 
     hass = _make_hass()
     client = hass.data["culiplan"]["entry1"]["client"]
-    client.async_post = AsyncMock(return_value={
-        "success": True,
-        "pantryItemId": "item123",
-        "decremented": 1.0,
-        "remaining": 0,
-    })
+    client.async_post = AsyncMock(
+        return_value={
+            "success": True,
+            "pantryItemId": "item123",
+            "decremented": 1.0,
+            "remaining": 0,
+        }
+    )
 
     # Capture the handler function
     async_register_phase2_services(hass)
@@ -131,7 +136,6 @@ async def test_pantry_decrement_barcode_not_found_creates_repair():
     """404 response should create a Repairs issue."""
     from custom_components.culiplan.services import (
         async_register_phase2_services,
-        SERVICE_PANTRY_DECREMENT,
         PantryItemNotFoundError,
     )
 
@@ -158,6 +162,7 @@ async def test_pantry_decrement_barcode_not_found_creates_repair():
 
 # ─── Test: pantry_expiring_items service handler ─────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_pantry_expiring_fires_ha_event():
     """Service should fire a HA event with item IDs (§14.3)."""
@@ -165,14 +170,24 @@ async def test_pantry_expiring_fires_ha_event():
 
     hass = _make_hass()
     client = hass.data["culiplan"]["entry1"]["client"]
-    client.async_get = AsyncMock(return_value={
-        "windowHours": 48,
-        "count": 2,
-        "items": [
-            {"pantryItemId": "item-1", "stockIds": ["s1"], "earliestExpiryAt": "2026-04-27T00:00:00Z"},
-            {"pantryItemId": "item-2", "stockIds": ["s2"], "earliestExpiryAt": "2026-04-26T12:00:00Z"},
-        ],
-    })
+    client.async_get = AsyncMock(
+        return_value={
+            "windowHours": 48,
+            "count": 2,
+            "items": [
+                {
+                    "pantryItemId": "item-1",
+                    "stockIds": ["s1"],
+                    "earliestExpiryAt": "2026-04-27T00:00:00Z",
+                },
+                {
+                    "pantryItemId": "item-2",
+                    "stockIds": ["s2"],
+                    "earliestExpiryAt": "2026-04-26T12:00:00Z",
+                },
+            ],
+        }
+    )
 
     async_register_phase2_services(hass)
     # The expiring handler is the second registered service
@@ -196,6 +211,7 @@ async def test_pantry_expiring_fires_ha_event():
 
 # ─── Test: scale_tonight_servings service handler ─────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_scale_tonight_servings_success():
     """Premium users should be able to scale servings successfully."""
@@ -203,13 +219,15 @@ async def test_scale_tonight_servings_success():
 
     hass = _make_hass()
     client = hass.data["culiplan"]["entry1"]["client"]
-    client.async_post = AsyncMock(return_value={
-        "success": True,
-        "presentCount": 3,
-        "slotsUpdated": 2,
-        "date": "2026-04-25",
-        "mealPlanIds": ["mp1", "mp2"],
-    })
+    client.async_post = AsyncMock(
+        return_value={
+            "success": True,
+            "presentCount": 3,
+            "slotsUpdated": 2,
+            "date": "2026-04-25",
+            "mealPlanIds": ["mp1", "mp2"],
+        }
+    )
 
     async_register_phase2_services(hass)
     # scale_tonight_servings is the third registered service
@@ -259,8 +277,10 @@ async def test_scale_tonight_servings_premium_required_creates_repair():
 
 # ─── Test: error type constructors ────────────────────────────────────────────
 
+
 def test_pantry_item_not_found_error_message():
     from custom_components.culiplan.services import PantryItemNotFoundError
+
     err = PantryItemNotFoundError("0000001234567")
     assert "0000001234567" in str(err)
     assert err.barcode == "0000001234567"
@@ -268,12 +288,16 @@ def test_pantry_item_not_found_error_message():
 
 def test_insufficient_stock_error_message():
     from custom_components.culiplan.services import InsufficientStockError
+
     err = InsufficientStockError("item123", 0.5, 2.0)
     assert "item123" in str(err)
 
 
 def test_premium_required_error_message():
     from custom_components.culiplan.services import PremiumRequiredError
-    err = PremiumRequiredError("household.presence_scaling", "https://culiplan.com/premium")
+
+    err = PremiumRequiredError(
+        "household.presence_scaling", "https://culiplan.com/premium"
+    )
     assert "premium_scaling" in err.feature.replace(".", "_") or "presence" in str(err)
     assert err.upgrade_url == "https://culiplan.com/premium"

@@ -20,8 +20,7 @@ AC coverage:
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -52,18 +51,25 @@ from custom_components.culiplan.const import (
 
 # ─── PremiumRequiredError ─────────────────────────────────────────────────────
 
+
 class TestPremiumRequiredError:
     def test_inherits_homeassistant_error(self):
-        err = PremiumRequiredError(feature="suggest_meal", upgrade_url="https://culiplan.com/premium")
+        err = PremiumRequiredError(
+            feature="suggest_meal", upgrade_url="https://culiplan.com/premium"
+        )
         assert isinstance(err, HomeAssistantError)
 
     def test_attributes_stored(self):
-        err = PremiumRequiredError(feature="suggest_meal", upgrade_url="https://culiplan.com/premium")
+        err = PremiumRequiredError(
+            feature="suggest_meal", upgrade_url="https://culiplan.com/premium"
+        )
         assert err.feature == "suggest_meal"
         assert err.upgrade_url == "https://culiplan.com/premium"
 
     def test_message_contains_feature_and_url(self):
-        err = PremiumRequiredError(feature="fill_shopping_list", upgrade_url="https://culiplan.com/upgrade")
+        err = PremiumRequiredError(
+            feature="fill_shopping_list", upgrade_url="https://culiplan.com/upgrade"
+        )
         msg = str(err)
         assert "fill_shopping_list" in msg
         assert "https://culiplan.com/upgrade" in msg
@@ -71,20 +77,25 @@ class TestPremiumRequiredError:
 
 # ─── _run_cloud_intent ────────────────────────────────────────────────────────
 
+
 class TestRunCloudIntent:
     """AC#2 (1388) + AC#2 (1389): Cloud AI path."""
 
     @pytest.mark.asyncio
     async def test_returns_speakable_result(self):
         client = AsyncMock()
-        client.async_call_voice_tool = AsyncMock(return_value={"speakable": "Tonight, have pasta."})
+        client.async_call_voice_tool = AsyncMock(
+            return_value={"speakable": "Tonight, have pasta."}
+        )
         result = await _run_cloud_intent(client, "suggest_meal", {})
         assert result == "Tonight, have pasta."
 
     @pytest.mark.asyncio
     async def test_falls_back_to_message_field(self):
         client = AsyncMock()
-        client.async_call_voice_tool = AsyncMock(return_value={"message": "Shopping list filled."})
+        client.async_call_voice_tool = AsyncMock(
+            return_value={"message": "Shopping list filled."}
+        )
         result = await _run_cloud_intent(client, "fill_shopping_list", {})
         assert result == "Shopping list filled."
 
@@ -112,11 +123,15 @@ class TestRunCloudIntent:
     async def test_403_extracts_upgrade_url_from_json_body(self):
         """AC#4: If error message contains JSON with upgradeUrl, use it."""
         import json
-        body = json.dumps({"error": "premium_required", "upgradeUrl": "https://culiplan.com/premium?source=ha"})
-        client = AsyncMock()
-        client.async_call_voice_tool = AsyncMock(
-            side_effect=Exception(f"403 {body}")
+
+        body = json.dumps(
+            {
+                "error": "premium_required",
+                "upgradeUrl": "https://culiplan.com/premium?source=ha",
+            }
         )
+        client = AsyncMock()
+        client.async_call_voice_tool = AsyncMock(side_effect=Exception(f"403 {body}"))
         with pytest.raises(PremiumRequiredError) as exc_info:
             await _run_cloud_intent(client, "suggest_meal", {})
         assert "https://culiplan.com/premium?source=ha" == exc_info.value.upgrade_url
@@ -139,13 +154,16 @@ class TestRunCloudIntent:
         client.async_call_voice_tool = AsyncMock(
             return_value={"speakable": "Here's a quick lunch for you."}
         )
-        await _run_cloud_intent(client, "suggest_meal", {"mealSlot": "lunch", "maxTimeMinutes": 30})
+        await _run_cloud_intent(
+            client, "suggest_meal", {"mealSlot": "lunch", "maxTimeMinutes": 30}
+        )
         client.async_call_voice_tool.assert_called_once_with(
             "suggest_meal", {"mealSlot": "lunch", "maxTimeMinutes": 30}
         )
 
 
 # ─── _run_byok_or_local_intent ────────────────────────────────────────────────
+
 
 class TestRunBYOKOrLocalIntent:
     """AC#3 (1388) + AC#3 (1389): BYOK / Local AI paths."""
@@ -166,9 +184,7 @@ class TestRunBYOKOrLocalIntent:
         client = AsyncMock()
 
         with (
-            patch(
-                "custom_components.culiplan.services.BYOKKeyStore"
-            ) as MockKeyStore,
+            patch("custom_components.culiplan.services.BYOKKeyStore") as MockKeyStore,
             patch(
                 "custom_components.culiplan.services.AIDispatchService"
             ) as MockService,
@@ -228,7 +244,9 @@ class TestRunBYOKOrLocalIntent:
         }
         client = AsyncMock()
 
-        with patch("custom_components.culiplan.services.AIDispatchService") as MockService:
+        with patch(
+            "custom_components.culiplan.services.AIDispatchService"
+        ) as MockService:
             service_instance = AsyncMock()
             service_instance.run_intent = AsyncMock(
                 return_value=MagicMock(text="Shopping list is filled.")
@@ -256,11 +274,11 @@ class TestRunBYOKOrLocalIntent:
         }
         client = AsyncMock()
 
-        with patch("custom_components.culiplan.services.AIDispatchService") as MockService:
+        with patch(
+            "custom_components.culiplan.services.AIDispatchService"
+        ) as MockService:
             service_instance = AsyncMock()
-            service_instance.run_intent = AsyncMock(
-                return_value=MagicMock(text=None)
-            )
+            service_instance.run_intent = AsyncMock(return_value=MagicMock(text=None))
             MockService.return_value = service_instance
 
             result = await _run_byok_or_local_intent(
@@ -271,6 +289,7 @@ class TestRunBYOKOrLocalIntent:
 
 
 # ─── Service registration ─────────────────────────────────────────────────────
+
 
 class TestServiceRegistration:
     """AC#1 (1388 + 1389): Services registered under DOMAIN."""
@@ -307,6 +326,7 @@ class TestServiceRegistration:
 
 # ─── suggest_meal handler ─────────────────────────────────────────────────────
 
+
 class TestHandleSuggestMeal:
     """
     AC#2, AC#4, AC#5 (task-1388): handler fires event + persistent notification.
@@ -324,11 +344,7 @@ class TestHandleSuggestMeal:
         entry.data = {CONF_AI_MODE: ai_mode}
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "entry_123": {"client": client}
-            }
-        }
+        hass.data = {DOMAIN: {"entry_123": {"client": client}}}
         hass.config_entries.async_entries.return_value = [entry]
         hass.bus.async_fire = MagicMock()
         hass.services.async_call = AsyncMock()
@@ -420,6 +436,7 @@ class TestHandleSuggestMeal:
 
 # ─── fill_shopping_list handler ───────────────────────────────────────────────
 
+
 class TestHandleFillShoppingList:
     """
     AC#2, AC#4 (task-1389): handler fires event + persistent notification.
@@ -437,11 +454,7 @@ class TestHandleFillShoppingList:
         entry.data = {CONF_AI_MODE: ai_mode}
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "entry_456": {"client": client}
-            }
-        }
+        hass.data = {DOMAIN: {"entry_456": {"client": client}}}
         hass.config_entries.async_entries.return_value = [entry]
         hass.bus.async_fire = MagicMock()
         hass.services.async_call = AsyncMock()
@@ -520,6 +533,7 @@ class TestHandleFillShoppingList:
 
 # ─── Schema validation ────────────────────────────────────────────────────────
 
+
 class TestServiceSchemas:
     """Voluptuous schema correctness for both services."""
 
@@ -537,6 +551,7 @@ class TestServiceSchemas:
 
     def test_suggest_meal_invalid_slot_raises(self):
         import voluptuous as vol
+
         with pytest.raises(vol.Invalid):
             SUGGEST_MEAL_SCHEMA({"meal_slot": "elevenses"})
 

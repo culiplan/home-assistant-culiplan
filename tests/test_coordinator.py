@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from custom_components.culiplan.coordinator import (
     CuliplanCoordinator,
-    HA_EVENT,
-    HA_NAMESPACE,
     _MAX_HEARTBEAT_MISSES,
-    _RECONNECT_INITIAL_DELAY,
 )
 
 
@@ -60,9 +56,15 @@ async def test_ha_event_meal_plan_triggers_refresh(coordinator, mock_client):
     """meal_plan.updated event causes meal plan re-fetch."""
     coordinator.data = {"meal_plans": [], "shopping_lists": []}
 
-    with patch.object(coordinator, "_refresh_meal_plans", new_callable=AsyncMock) as mock_refresh:
+    with patch.object(
+        coordinator, "_refresh_meal_plans", new_callable=AsyncMock
+    ) as mock_refresh:
         await coordinator._handle_event(
-            {"type": "meal_plan.updated", "id": "mp1", "updatedAt": "2026-04-25T12:00:00Z"}
+            {
+                "type": "meal_plan.updated",
+                "id": "mp1",
+                "updatedAt": "2026-04-25T12:00:00Z",
+            }
         )
         mock_refresh.assert_awaited_once()
 
@@ -76,7 +78,11 @@ async def test_ha_event_shopping_item_triggers_refresh(coordinator, mock_client)
         coordinator, "_refresh_shopping_lists", new_callable=AsyncMock
     ) as mock_refresh:
         await coordinator._handle_event(
-            {"type": "shopping_list.item.added", "id": "item1", "updatedAt": "2026-04-25T12:00:00Z"}
+            {
+                "type": "shopping_list.item.added",
+                "id": "item1",
+                "updatedAt": "2026-04-25T12:00:00Z",
+            }
         )
         mock_refresh.assert_awaited_once()
 

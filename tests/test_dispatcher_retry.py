@@ -8,12 +8,13 @@ AC#3 — Retry logged at WARN for audit visibility
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 
 # ─── _retry_once_on_5xx helper ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_retry_once_on_5xx_succeeds_on_second_attempt():
@@ -30,7 +31,10 @@ async def test_retry_once_on_5xx_succeeds_on_second_attempt():
             raise ProviderUnavailableError("503 service unavailable")
         return "success"
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
         result = await _retry_once_on_5xx(factory, provider="test")
 
     assert result == "success"
@@ -48,7 +52,10 @@ async def test_retry_once_on_5xx_raises_on_second_5xx():
     async def factory():
         raise ProviderUnavailableError("503 still down")
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock):
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ):
         with pytest.raises(ProviderUnavailableError):
             await _retry_once_on_5xx(factory, provider="test")
 
@@ -66,7 +73,10 @@ async def test_retry_once_no_retry_on_auth_error():
         call_count += 1
         raise ProviderAuthError("401 invalid key")
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
         with pytest.raises(ProviderAuthError):
             await _retry_once_on_5xx(factory, provider="test")
 
@@ -88,7 +98,10 @@ async def test_retry_once_no_retry_on_rate_limit_error():
         call_count += 1
         raise ProviderRateLimitError("429 rate limited")
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
         with pytest.raises(ProviderRateLimitError):
             await _retry_once_on_5xx(factory, provider="test")
 
@@ -109,7 +122,10 @@ async def test_retry_once_no_retry_on_dispatcher_error():
         call_count += 1
         raise DispatcherError("400 bad request")
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
         with pytest.raises(DispatcherError):
             await _retry_once_on_5xx(factory, provider="test")
 
@@ -125,7 +141,10 @@ async def test_retry_once_succeeds_without_error():
     async def factory():
         return {"result": "ok"}
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
         result = await _retry_once_on_5xx(factory, provider="test")
 
     assert result == {"result": "ok"}
@@ -133,6 +152,7 @@ async def test_retry_once_succeeds_without_error():
 
 
 # ─── AC#3: retry logged at WARN ──────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_retry_logs_warning():
@@ -149,12 +169,15 @@ async def test_retry_logs_warning():
             raise ProviderUnavailableError("503 unavailable")
         return "ok"
 
-    with patch("custom_components.culiplan.ai.dispatchers.asyncio.sleep", new_callable=AsyncMock):
+    with patch(
+        "custom_components.culiplan.ai.dispatchers.asyncio.sleep",
+        new_callable=AsyncMock,
+    ):
         with patch("custom_components.culiplan.ai.dispatchers._LOGGER") as mock_logger:
             await _retry_once_on_5xx(factory, provider="mytest")
 
             # AC#3: warning should mention the provider name
-            warned = any(
-                "mytest" in str(c) for c in mock_logger.warning.call_args_list
+            warned = any("mytest" in str(c) for c in mock_logger.warning.call_args_list)
+            assert warned, (
+                f"Expected 'mytest' in warning logs, got: {mock_logger.warning.call_args_list}"
             )
-            assert warned, f"Expected 'mytest' in warning logs, got: {mock_logger.warning.call_args_list}"
