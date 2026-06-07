@@ -13,6 +13,24 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
+try:
+    import google.genai  # noqa: F401
+
+    _HAS_GENAI = True
+except ImportError:
+    _HAS_GENAI = False
+
+
+pytestmark = pytest.mark.skipif(
+    not _HAS_GENAI,
+    reason=(
+        "google-genai not installed on this lane (HA 2024.10/2025.1 lanes "
+        "skip it due to httpx<0.28 conflict); GoogleDispatcher.dispatch() "
+        "needs `google.genai.types` at runtime."
+    ),
+)
+
+
 def _make_function_call_mock(name: str, args: dict | None = None) -> MagicMock:
     """Create a mock Gemini function_call part."""
     fc = MagicMock()

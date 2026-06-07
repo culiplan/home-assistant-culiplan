@@ -170,6 +170,22 @@ class TestValidateAnthropicKey:
                 await validate_anthropic_key("sk-ant-bad")
 
 
+try:
+    import google.genai  # noqa: F401
+
+    _HAS_GENAI = True
+except ImportError:
+    _HAS_GENAI = False
+
+
+@pytest.mark.skipif(
+    not _HAS_GENAI,
+    reason=(
+        "google-genai is not installed on this lane (HA 2024.10/2025.1 lanes "
+        "skip it due to httpx<0.28 pin conflict); dispatch_test_*.py covers "
+        "the same paths against the mocked dispatcher."
+    ),
+)
 class TestValidateGoogleKey:
     @pytest.mark.asyncio
     async def test_valid_key_succeeds(self):

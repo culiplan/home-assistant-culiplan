@@ -64,8 +64,16 @@ jobs:
             "python-socketio>=5.12.0" \
             "PyYAML>=6.0.2" \
             "openai>=1.77.0" \
-            "anthropic>=0.49.0" \
-            "google-genai>=1.12.0,<1.13"
+            "anthropic>=0.49.0"
+          # google-genai installs are intentionally skipped: every recent
+          # 1.x release depends on httpx>=0.28.1, which conflicts with
+          # HA 2024.10/2025.1's httpx<0.28 pin. The dispatcher imports it
+          # lazily inside its __init__ and every test that touches it
+          # patches the SDK at the upstream module path. Install it only
+          # on the HA 2026.6 lane where the httpx pin allows it.
+          if [ "${{ matrix.ha-version }}" = "2026.6.0" ]; then
+            pip install "google-genai>=1.12.0"
+          fi
 
       - name: Run tests with coverage
         # 95% Platinum gate. asyncio_mode lives in pyproject.toml so it

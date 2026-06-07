@@ -509,6 +509,22 @@ def mock_google_client():
     return MagicMock()
 
 
+try:
+    import google.genai  # noqa: F401
+
+    _HAS_GENAI = True
+except ImportError:
+    _HAS_GENAI = False
+
+
+@pytest.mark.skipif(
+    not _HAS_GENAI,
+    reason=(
+        "google-genai not installed on this lane (HA 2024.10/2025.1 lanes "
+        "skip it due to httpx<0.28 conflict); GoogleDispatcher.dispatch() "
+        "needs `google.genai.types` at runtime."
+    ),
+)
 class TestGoogleDispatcher:
     """AC#1 + AC#2: Google dispatcher accepts envelope, returns result."""
 
