@@ -7,6 +7,8 @@ Syntax-verified + mocked unit tests (Python 3.9 compatible).
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,6 +31,20 @@ def _make_hass(entry_id: str = "entry1") -> MagicMock:
     hass.bus = MagicMock()
     hass.bus.async_fire = MagicMock()
     return hass
+
+
+def _registered_handler(hass: MagicMock, service_name: str) -> Any:  # type: ignore[name-defined]
+    """Return the handler registered for the given service name.
+
+    Service-registration order changed across feature waves; locate by name
+    instead of relying on a positional index in
+    ``hass.services.async_register.call_args_list``.
+    """
+    for call in hass.services.async_register.call_args_list:
+        # async_register(DOMAIN, name, handler, schema=...)
+        if call.args[1] == service_name:
+            return call.args[2]
+    raise AssertionError(f"Service {service_name!r} was never registered")
 
 
 # ─── Test: _find_entry_id ─────────────────────────────────────────────────────
@@ -115,7 +131,9 @@ async def test_pantry_decrement_success():
 
     # Capture the handler function
     async_register_phase2_services(hass)
-    handler = hass.services.async_register.call_args_list[0][0][2]
+    from custom_components.culiplan.services import SERVICE_PANTRY_DECREMENT
+
+    handler = _registered_handler(hass, SERVICE_PANTRY_DECREMENT)
 
     call_data = MagicMock()
     call_data.data = {"barcode": "1234567890123", "qty": 1.0}
@@ -146,7 +164,9 @@ async def test_pantry_decrement_barcode_not_found_creates_repair():
     )
 
     async_register_phase2_services(hass)
-    handler = hass.services.async_register.call_args_list[0][0][2]
+    from custom_components.culiplan.services import SERVICE_PANTRY_DECREMENT
+
+    handler = _registered_handler(hass, SERVICE_PANTRY_DECREMENT)
 
     call_data = MagicMock()
     call_data.data = {"barcode": "999", "qty": 1.0}
@@ -170,7 +190,8 @@ async def test_pantry_expiring_fires_ha_event():
 
     hass = _make_hass()
     client = hass.data["culiplan"]["entry1"]["client"]
-    client.async_get = AsyncMock(
+    # The service hits CuliplanApiClient._get directly (see services._call_pantry_expiring).
+    client._get = AsyncMock(
         return_value={
             "windowHours": 48,
             "count": 2,
@@ -190,8 +211,9 @@ async def test_pantry_expiring_fires_ha_event():
     )
 
     async_register_phase2_services(hass)
-    # The expiring handler is the second registered service
-    handler = hass.services.async_register.call_args_list[1][0][2]
+    from custom_components.culiplan.services import SERVICE_PANTRY_EXPIRING
+
+    handler = _registered_handler(hass, SERVICE_PANTRY_EXPIRING)
 
     call_data = MagicMock()
     call_data.data = {"window_hours": 48}
@@ -230,8 +252,9 @@ async def test_scale_tonight_servings_success():
     )
 
     async_register_phase2_services(hass)
-    # scale_tonight_servings is the third registered service
-    handler = hass.services.async_register.call_args_list[2][0][2]
+    from custom_components.culiplan.services import SERVICE_SCALE_TONIGHT_SERVINGS
+
+    handler = _registered_handler(hass, SERVICE_SCALE_TONIGHT_SERVINGS)
 
     call_data = MagicMock()
     call_data.data = {"present_count": 3}
@@ -253,25 +276,34 @@ async def test_scale_tonight_servings_premium_required_creates_repair():
 
     hass = _make_hass()
     client = hass.data["culiplan"]["entry1"]["client"]
+    # api.py now raises PremiumRequiredError directly on 403 premium_required
+    # responses (task-1416). The legacy "string-parse the exception message"
+    # path is gone; the API layer hands a typed error up the stack.
     client.async_post = AsyncMock(
-        side_effect=Exception(
-            '403 {"error":"premium_required","feature":"household.presence_scaling",'
-            '"upgradeUrl":"https://culiplan.com/premium?source=ha"}'
+        side_effect=PremiumRequiredError(
+            feature="household.presence_scaling",
+            upgrade_url="https://culiplan.com/premium?source=ha",
         )
     )
 
     async_register_phase2_services(hass)
-    handler = hass.services.async_register.call_args_list[2][0][2]
+    from custom_components.culiplan.services import SERVICE_SCALE_TONIGHT_SERVINGS
+
+    handler = _registered_handler(hass, SERVICE_SCALE_TONIGHT_SERVINGS)
 
     call_data = MagicMock()
     call_data.data = {"present_count": 2}
 
-    with patch("custom_components.culiplan.services.ir") as mock_ir:
+    # The premium repair issue is now created via repairs.py, which calls
+    # homeassistant.helpers.issue_registry directly. Patch at the source.
+    with patch(
+        "custom_components.culiplan.repairs.ir.async_create_issue"
+    ) as mock_create:
         with pytest.raises(PremiumRequiredError):
             await handler(call_data)
         # Repairs upsell issue must be created (task-1379 AC#1)
-        mock_ir.async_create_issue.assert_called_once()
-        issue_kwargs = mock_ir.async_create_issue.call_args[1]
+        mock_create.assert_called_once()
+        issue_kwargs = mock_create.call_args[1]
         assert "premium_required" in issue_kwargs["issue_id"]
 
 
@@ -282,15 +314,20 @@ def test_pantry_item_not_found_error_message():
     from custom_components.culiplan.services import PantryItemNotFoundError
 
     err = PantryItemNotFoundError("0000001234567")
-    assert "0000001234567" in str(err)
+    # str() returns the translation_key in test (no translation cache);
+    # check the structured fields the renderer uses instead.
     assert err.barcode == "0000001234567"
+    assert err.translation_key == "pantry_item_not_found"
+    assert err.translation_placeholders["barcode"] == "0000001234567"
 
 
 def test_insufficient_stock_error_message():
     from custom_components.culiplan.services import InsufficientStockError
 
     err = InsufficientStockError("item123", 0.5, 2.0)
-    assert "item123" in str(err)
+    assert err.pantry_item_id == "item123"
+    assert err.translation_key == "insufficient_stock"
+    assert err.translation_placeholders["item_id"] == "item123"
 
 
 def test_premium_required_error_message():

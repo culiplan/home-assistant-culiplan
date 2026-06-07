@@ -107,8 +107,12 @@ class TestProbeLocalAIEndpoints:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(side_effect=[ollama_resp, lmstudio_resp])
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             detected = await probe_local_ai_endpoints(MagicMock())
@@ -141,8 +145,12 @@ class TestProbeLocalAIEndpoints:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(side_effect=[ollama_resp, lmstudio_resp])
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             detected = await probe_local_ai_endpoints(MagicMock())
@@ -165,8 +173,12 @@ class TestProbeLocalAIEndpoints:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(return_value=resp)
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             detected = await probe_local_ai_endpoints(MagicMock())
@@ -182,8 +194,12 @@ class TestProbeLocalAIEndpoints:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             detected = await probe_local_ai_endpoints(MagicMock())
@@ -211,8 +227,12 @@ class TestProbeLocalAIEndpoints:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(side_effect=[ollama_resp, lmstudio_resp])
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             detected = await probe_local_ai_endpoints(MagicMock())
@@ -243,8 +263,12 @@ class TestProbeCustomEndpoint:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(return_value=resp)
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             ep = await probe_custom_endpoint(
@@ -264,8 +288,12 @@ class TestProbeCustomEndpoint:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
+        # The probe uses HA's shared aiohttp session via
+        # aiohttp_client.async_get_clientsession (per Platinum
+        # `inject-websession`), so patch that helper rather than
+        # aiohttp.ClientSession itself.
         with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession",
+            "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
             return_value=mock_session,
         ):
             ep = await probe_custom_endpoint(
@@ -280,59 +308,39 @@ class TestProbeCustomEndpoint:
 
 @pytest.mark.asyncio
 async def test_probe_makes_no_external_calls():
-    """
-    AC#5: probe only connects to the specified local addresses.
-    Verified by ensuring all requests go to localhost / the specified host,
-    never to external domains.
-    """
-    recorded_urls: list[str] = []
+    """AC#5: probe only connects to the specified local addresses.
 
-    async def fake_get(url: str, **kwargs: Any) -> Any:
-        recorded_urls.append(url)
-        raise asyncio.TimeoutError()
+    Verify that every URL the probe touches is localhost (or 127.0.0.1).
+    Internet calls would be a privacy regression — Culiplan must NEVER
+    learn whether the user has a local model running.
+    """
+    captured: list[str] = []
+
+    # The probe gets HA's shared session; we intercept .get() to record URLs.
+    class _GetCtx:
+        async def __aenter__(self) -> MagicMock:
+            m = MagicMock()
+            m.status = 404
+            return m
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    def _record_get(url: str, **_kwargs: object) -> _GetCtx:
+        captured.append(url)
+        return _GetCtx()
 
     mock_session = MagicMock()
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=None)
-    mock_session.get = MagicMock(
-        side_effect=lambda url, **kw: (_ for _ in ()).throw(asyncio.TimeoutError())
-    )
+    mock_session.get = MagicMock(side_effect=_record_get)
 
-    # Patch get to capture URLs
-    captured: list[str] = []
-    original_probe = probe_local_ai_endpoints
+    with patch(
+        "custom_components.culiplan.ai.local_ai.aiohttp_client.async_get_clientsession",
+        return_value=mock_session,
+    ):
+        await probe_local_ai_endpoints(MagicMock())
 
-    async def capturing_probe(**kwargs: Any) -> list[LocalAIEndpoint]:
-
-        class _Session:
-            async def __aenter__(self) -> "_Session":
-                return self
-
-            async def __aexit__(self, *a: Any) -> None:
-                pass
-
-            def get(self, url: str, **kw: Any) -> "_Ctx":
-                captured.append(url)
-                return _Ctx()
-
-        class _Ctx:
-            async def __aenter__(self) -> MagicMock:
-                m = MagicMock()
-                m.status = 404
-                return m
-
-            async def __aexit__(self, *a: Any) -> None:
-                pass
-
-        with patch(
-            "custom_components.culiplan.ai.local_ai.aiohttp.ClientSession", _Session
-        ):
-            return await probe_local_ai_endpoints(MagicMock())
-
-    await capturing_probe()
-
-    # All probed URLs must be localhost only
+    assert captured, "Expected at least one probe URL to be requested"
     for url in captured:
         assert "localhost" in url or "127.0.0.1" in url, (
-            f"Probe URL '{url}' should only target localhost"
+            f"Probe URL '{url}' must only target localhost"
         )

@@ -86,12 +86,15 @@ def _make_client(
 
 class TestTimerEntityId:
     def test_basic_label(self) -> None:
+        # Session ID is truncated to 8 chars and slugified; "session_id_abc"[:8]
+        # is "session_" which collapses to "session" after the trailing
+        # underscore is stripped.
         eid = _timer_entity_id("session_id_abc", "pasta")
-        assert eid == "timer.culiplan_session_session_i_pasta"
+        assert eid == "timer.culiplan_session_session_pasta"
 
     def test_label_normalisation(self) -> None:
         eid = _timer_entity_id("session_id_abc", "Sauce Reduce")
-        assert eid == "timer.culiplan_session_session_i_sauce_reduce"
+        assert eid == "timer.culiplan_session_session_sauce_reduce"
 
     def test_short_session_id(self) -> None:
         eid = _timer_entity_id("s1", "pasta")
@@ -257,8 +260,13 @@ class TestAdvanceCookingStep:
 
         call_obj = MagicMock()
         call_obj.data = {}
-        with pytest.raises(HomeAssistantError, match="last step"):
+        with pytest.raises(HomeAssistantError) as excinfo:
             await handler(call_obj)
+        # Error surfaces via translation_key (HA-canonical pattern); message
+        # text is locale-dependent and not available in unit tests.
+        assert getattr(excinfo.value, "translation_key", "") == (
+            "cooking_already_last_step"
+        )
 
     @pytest.mark.asyncio
     async def test_raises_when_no_active_session(self) -> None:
@@ -271,8 +279,12 @@ class TestAdvanceCookingStep:
 
         call_obj = MagicMock()
         call_obj.data = {}
-        with pytest.raises(HomeAssistantError, match="No active cooking session"):
+        with pytest.raises(HomeAssistantError) as excinfo:
             await handler(call_obj)
+        assert getattr(excinfo.value, "translation_key", "") in (
+            "cooking_no_active_session",
+            "no_active_cooking_session",
+        )
 
 
 # ─── set_recipe_timer ─────────────────────────────────────────────────────────
@@ -303,7 +315,8 @@ class TestSetRecipeTimer:
 
         mock_start.assert_awaited_once()
         start_args = mock_start.call_args[0]
-        assert start_args[1] == "timer.culiplan_session_sess_abc1_pasta"
+        # session_id[:8] = "sess_abc"; trailing/no-op underscore stripped.
+        assert start_args[1] == "timer.culiplan_session_sess_abc_pasta"
         assert start_args[2] == 600
 
     @pytest.mark.asyncio
@@ -394,8 +407,12 @@ class TestCancelRecipeTimer:
         call_obj = MagicMock()
         call_obj.data = {"label_or_id": "nonexistent"}
 
-        with pytest.raises(HomeAssistantError, match="No timer with label"):
+        # The error is raised with translation_key="timer_not_found".
+        # HomeAssistantError stringifies to the key on test infrastructure
+        # without a loaded translation cache; assert on the key.
+        with pytest.raises(HomeAssistantError) as excinfo:
             await handler(call_obj)
+        assert getattr(excinfo.value, "translation_key", "") == "timer_not_found"
 
     @pytest.mark.asyncio
     async def test_fires_timer_cancelled_event(self) -> None:

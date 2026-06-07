@@ -112,29 +112,8 @@ _BROKEN_TEST_IDS: frozenset[str] = frozenset(
         "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_byok_invalid_key_shows_error",
         "tests/test_config_flow_task1626.py::test_options_flow_advanced_ai_local_stores_endpoint",
         "tests/test_config_flow_task1626.py::test_options_flow_no_advanced_ai_toggle_returns_no_change",
-        # test_cooking_mode_services.py — entity_id slug rules changed
-        "tests/test_cooking_mode_services.py::TestTimerEntityId::test_basic_label",
-        "tests/test_cooking_mode_services.py::TestTimerEntityId::test_label_normalisation",
-        "tests/test_cooking_mode_services.py::TestAdvanceCookingStep::test_raises_on_last_step",
-        "tests/test_cooking_mode_services.py::TestAdvanceCookingStep::test_raises_when_no_active_session",
-        "tests/test_cooking_mode_services.py::TestSetRecipeTimer::test_appends_timer_and_starts_ha_timer",
-        "tests/test_cooking_mode_services.py::TestCancelRecipeTimer::test_raises_when_timer_not_found",
         # test_coordinator.py / test_debug_logger_ttl.py / test_energy_sensor.py
         "tests/test_coordinator.py::test_stale_token_refreshed_before_connect",
-        # test_intents.py — coroutine never awaited (test setup bug)
-        "tests/test_intents.py::test_register_intents_creates_task",
-        "tests/test_intents.py::test_register_intents_uses_executor_for_yaml_load",
-        "tests/test_intents.py::test_register_intents_yaml_error_is_non_fatal",
-        "tests/test_intents.py::test_register_intents_registers_known_intents",
-        # test_local_ai.py — aiohttp lingering timer leak
-        "tests/test_local_ai.py::test_probe_makes_no_external_calls",
-        "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_ollama_detected_with_models",
-        "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_lmstudio_detected",
-        "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_no_endpoints_detected",
-        "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_connection_timeout_handled_gracefully",
-        "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_both_endpoints_detected",
-        "tests/test_local_ai.py::TestProbeCustomEndpoint::test_custom_ollama_endpoint_reachable",
-        "tests/test_local_ai.py::TestProbeCustomEndpoint::test_custom_endpoint_unreachable_returns_none",
         # test_mealie_config_flow.py — entry-creation short-circuit
         "tests/test_mealie_config_flow.py::test_ai_provider_leads_to_mealie_offer",
         "tests/test_mealie_config_flow.py::test_mealie_offer_accept_shows_credentials",
@@ -151,14 +130,6 @@ _BROKEN_TEST_IDS: frozenset[str] = frozenset(
         "tests/test_mealie_config_flow.py::test_credentials_error_shows_form_again",
         "tests/test_mealie_config_flow.py::test_start_error_falls_through_to_done",
         "tests/test_mealie_config_flow.py::test_rollback_no_type_error_on_network_failure",
-        # test_phase2_services.py — pantry / scale-tonight contract drift
-        "tests/test_phase2_services.py::test_pantry_decrement_success",
-        "tests/test_phase2_services.py::test_pantry_decrement_barcode_not_found_creates_repair",
-        "tests/test_phase2_services.py::test_pantry_expiring_fires_ha_event",
-        "tests/test_phase2_services.py::test_scale_tonight_servings_success",
-        "tests/test_phase2_services.py::test_scale_tonight_servings_premium_required_creates_repair",
-        "tests/test_phase2_services.py::test_pantry_item_not_found_error_message",
-        "tests/test_phase2_services.py::test_insufficient_stock_error_message",
         # test_repairs.py
         "tests/test_repairs.py::TestServicesRepairIntegration::test_403_creates_repairs_issue",
         "tests/test_repairs.py::TestServicesRepairIntegration::test_403_does_not_create_notification",

@@ -160,10 +160,16 @@ async def _patch_session(
 
 
 def _timer_entity_id(session_id: str, label: str) -> str:
-    """Build deterministic HA timer entity ID from session ID and label."""
-    short_id = session_id[:8]
+    """Build deterministic HA timer entity ID from session ID and label.
+
+    Both the session ID prefix and the label are normalised the same way
+    (alnum + underscore, no leading/trailing underscores) so we never
+    emit ``session__label`` with a double separator when the truncated
+    ID ends on an underscore.
+    """
+    short_id_slug = re.sub(r"[^a-z0-9]+", "_", session_id[:8].lower()).strip("_")
     label_slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
-    return f"timer.culiplan_session_{short_id}_{label_slug}"
+    return f"timer.culiplan_session_{short_id_slug}_{label_slug}"
 
 
 async def _ha_timer_start(
