@@ -512,16 +512,9 @@ class CuliplanPanel extends HTMLElement {
     const iframe = document.createElement("iframe");
     iframe.className = "fill";
     iframe.title = "Culiplan";
-    // `allow-popups-to-escape-sandbox` lets the embedded app open a NON-sandboxed
-    // top-level tab via window.open. The barcode scanner needs this: when HA is
-    // served over HTTP the iframe is a non-secure context (no camera), so the app
-    // pops a top-level https://culiplan.com/scan tab — a real secure context where
-    // getUserMedia works — and the scanned barcode is handed back same-origin.
-    // Without this flag the popup inherits the sandbox and the camera is blocked
-    // there too.
     iframe.setAttribute(
       "sandbox",
-      "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+      "allow-scripts allow-same-origin allow-forms allow-popups",
     );
     // Delegate camera permission into the cross-origin iframe so the embedded
     // Culiplan app can call getUserMedia for barcode scanning (kitchen-tablet

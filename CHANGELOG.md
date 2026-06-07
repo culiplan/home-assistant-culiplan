@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-06-07
+
+Camera scanning over HTTP: simplified to a clear warning. Reverts the v0.10.0 secure-tab approach.
+
+### Changed
+
+- **Barcode scanning over HTTP now shows a concise warning instead of opening a separate scan tab.** v0.10.0 tried to work around the non-secure-context camera limitation by popping a top-level `https://culiplan.com/scan` tab. In practice that was too much friction and — because browsers partition storage/BroadcastChannel by top-level site — the scanned result could not reliably be handed back from the tab to the embedded panel. The embedded scanner now detects the non-secure context and, instead, shows a short translated explanation ("camera scanning needs HTTPS") with manual barcode entry and a suggestion to scan from the Culiplan app on a phone or tablet. To scan with the camera directly in the panel, serve Home Assistant over HTTPS (Nabu Casa, Tailscale, Cloudflare Tunnel, or a TLS reverse proxy). The panel iframe `sandbox` reverts to its tighter pre-v0.10.0 value (no `allow-popups-to-escape-sandbox`). Requires the matching front-end deploy.
+
 ## [0.10.0] — 2026-06-07
 
 Feature release. Barcode scanning now works even when Home Assistant is served over plain HTTP.
