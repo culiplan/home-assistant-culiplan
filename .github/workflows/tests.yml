@@ -65,9 +65,16 @@ jobs:
             "PyYAML>=6.0.2" \
             "openai>=1.77.0" \
             "anthropic>=0.49.0" \
-            "hassil" \
             "home-assistant-intents" \
             "josepy<2"
+          # Different hassil versions per HA lane: HA 2024.10 calls
+          # `UnmatchedRangeEntity` which only exists in hassil <2.0;
+          # HA 2025.1 / 2026.6 work with the latest hassil.
+          if [ "${{ matrix.ha-version }}" = "2024.10.0" ]; then
+            pip install "hassil<2"
+          else
+            pip install "hassil"
+          fi
           # google-genai installs are intentionally skipped: every recent
           # 1.x release depends on httpx>=0.28.1, which conflicts with
           # HA 2024.10/2025.1's httpx<0.28 pin. The dispatcher imports it
