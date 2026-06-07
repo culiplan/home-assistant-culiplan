@@ -186,12 +186,14 @@ def test_factory_cloud_mode_raises():
 
 @pytest.fixture
 def mock_openai_client():
-    """Mock the AsyncOpenAI client."""
-    with patch(
-        "custom_components.culiplan.ai.dispatchers.AsyncOpenAI", autospec=True
-    ) as MockClass:
-        instance = MockClass.return_value
-        yield instance
+    """Mock the AsyncOpenAI client instance.
+
+    Note: ``AsyncOpenAI`` is imported lazily inside
+    ``OpenAICompatibleDispatcher.__init__``, so there is no module-level
+    symbol to patch. Tests that need a fake client construct the
+    dispatcher via ``__new__`` and inject ``_client`` directly.
+    """
+    return MagicMock()
 
 
 class TestOpenAICompatibleDispatcher:
@@ -340,10 +342,8 @@ class TestOpenAICompatibleDispatcher:
             await dispatcher.dispatch(make_envelope())
 
     @pytest.mark.asyncio
-    async def test_debug_mode_logs_prompt(self, mock_openai_client, caplog):
+    async def test_debug_mode_logs_prompt(self, mock_openai_client):
         """AC#5: debug mode logs the prompt content at DEBUG level (client-side only)."""
-        import logging
-
         choice = MagicMock()
         choice.finish_reason = "stop"
         choice.message.content = "Debug answer."
@@ -355,13 +355,16 @@ class TestOpenAICompatibleDispatcher:
         dispatcher = OpenAICompatibleDispatcher.__new__(OpenAICompatibleDispatcher)
         dispatcher._client = mock_openai_client
         dispatcher._debug = True
+        # Inject a stand-in debug logger so we can assert it was used.
+        # The real `_debug_logger` is set up in __init__ when debug=True;
+        # this test bypasses __init__ to keep the fixture lean.
+        dispatcher._debug_logger = MagicMock()
 
-        with caplog.at_level(
-            logging.DEBUG, logger="custom_components.culiplan.ai.dispatchers"
-        ):
-            await dispatcher.dispatch(make_envelope())
+        await dispatcher.dispatch(make_envelope())
 
-        assert any("DEBUG MODE" in r.message for r in caplog.records)
+        # The dispatcher must call .debug() with a message containing "DEBUG MODE".
+        debug_calls = dispatcher._debug_logger.debug.call_args_list
+        assert any("DEBUG MODE" in str(c) for c in debug_calls)
 
 
 # ─── AnthropicDispatcher ──────────────────────────────────────────────────────
@@ -369,11 +372,9 @@ class TestOpenAICompatibleDispatcher:
 
 @pytest.fixture
 def mock_anthropic_client():
-    with patch(
-        "custom_components.culiplan.ai.dispatchers.AsyncAnthropic", autospec=True
-    ) as MockClass:
-        instance = MockClass.return_value
-        yield instance
+    """AsyncAnthropic is lazy-imported inside AnthropicDispatcher.__init__,
+    so no module-level patch is needed; tests inject ``_client`` directly."""
+    return MagicMock()
 
 
 class TestAnthropicDispatcher:
@@ -503,10 +504,9 @@ class TestAnthropicDispatcher:
 
 @pytest.fixture
 def mock_google_client():
-    with patch("custom_components.culiplan.ai.dispatchers.genai") as MockGenai:
-        instance = MagicMock()
-        MockGenai.Client.return_value = instance
-        yield instance
+    """genai is lazy-imported inside GoogleDispatcher.__init__,
+    so no module-level patch is needed; tests inject ``_client`` directly."""
+    return MagicMock()
 
 
 class TestGoogleDispatcher:

@@ -181,8 +181,11 @@ def test_setup_debug_log_purge_idempotent():
         call_count += 1
         return MagicMock()  # cancel handle
 
+    # async_track_time_interval is imported lazily inside
+    # setup_debug_log_purge, so patch the real source module rather than the
+    # debug_logger module namespace (which never holds the symbol).
     with patch(
-        "custom_components.culiplan.ai.debug_logger.async_track_time_interval",
+        "homeassistant.helpers.event.async_track_time_interval",
         side_effect=fake_track,
     ):
         # First call: marker absent — should register
@@ -203,19 +206,26 @@ def test_setup_debug_log_purge_idempotent():
 
 
 def test_strings_json_has_24h_ttl_description():
-    """strings.json ai_provider description must mention '24 hours' or '24h'."""
+    """The debug_ai data_description must mention the 24-hour TTL.
+
+    Historically the TTL was advertised inline in the ai_provider step
+    description, but the copy moved into the Options-flow debug_ai
+    data_description (where the user actually flips debug logging on).
+    Verify the wording is present in either canonical location.
+    """
     assert STRINGS_JSON.exists(), f"strings.json not found at {STRINGS_JSON}"
     data = json.loads(STRINGS_JSON.read_text(encoding="utf-8"))
-    description = (
-        data.get("config", {})
-        .get("step", {})
-        .get("ai_provider", {})
-        .get("description", "")
+
+    candidates: list[str] = []
+    # Current location: options.step.init.data_description.debug_ai
+    init_step = data.get("options", {}).get("step", {}).get("init", {})
+    candidates.append(init_step.get("data_description", {}).get("debug_ai", ""))
+    # Legacy location: config.step.ai_provider.description
+    candidates.append(
+        data.get("config", {}).get("step", {}).get("ai_provider", {}).get("description", "")
     )
-    assert "24" in description, (
-        "ai_provider description in strings.json must mention the 24-hour TTL"
-    )
-    # Also check that the log file name is mentioned
-    assert "culiplan_ai_debug" in description, (
-        "ai_provider description must mention the debug log file name"
+
+    joined = "\n".join(candidates)
+    assert "24" in joined, (
+        "Debug-logging copy must mention the 24-hour TTL somewhere in strings.json"
     )

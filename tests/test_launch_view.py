@@ -163,7 +163,11 @@ class TestHappyPath:
         # The code must be in the URL fragment only — not as a top-level field
         assert "code" not in body
         assert "sso_code_xyz" in body["redirect_url"]
-        assert body["redirect_url"].startswith("https://culiplan.com/ha-bridge#")
+        # Base URL is https://culiplan.com/ha-bridge with an optional
+        # `?embed=ha` query so the bridge page knows it's running inside HA.
+        # The code is in the fragment regardless.
+        assert body["redirect_url"].startswith("https://culiplan.com/ha-bridge")
+        assert "#sso_code_xyz" in body["redirect_url"]
 
         # The raw bearer token must NOT appear anywhere in the response body
         assert "tok_secret" not in resp.text

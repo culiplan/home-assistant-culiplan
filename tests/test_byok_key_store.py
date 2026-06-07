@@ -119,7 +119,7 @@ class TestValidateOpenAIKey:
     @pytest.mark.asyncio
     async def test_valid_key_succeeds(self):
         """Valid key returns True."""
-        with patch("custom_components.culiplan.ai.key_store.AsyncOpenAI") as MockClass:
+        with patch("openai.AsyncOpenAI") as MockClass:
             instance = MockClass.return_value
             instance.models.list = AsyncMock(return_value=MagicMock())
             result = await validate_openai_key("sk-valid-key")
@@ -128,7 +128,7 @@ class TestValidateOpenAIKey:
     @pytest.mark.asyncio
     async def test_invalid_key_raises_provider_auth_error(self):
         """401 from OpenAI raises ProviderAuthError — key not stored (AC#4)."""
-        with patch("custom_components.culiplan.ai.key_store.AsyncOpenAI") as MockClass:
+        with patch("openai.AsyncOpenAI") as MockClass:
             instance = MockClass.return_value
             instance.models.list = AsyncMock(
                 side_effect=Exception("401 Invalid API key")
@@ -139,7 +139,7 @@ class TestValidateOpenAIKey:
     @pytest.mark.asyncio
     async def test_generic_error_raises_provider_auth_error(self):
         """Network errors also surface as ProviderAuthError."""
-        with patch("custom_components.culiplan.ai.key_store.AsyncOpenAI") as MockClass:
+        with patch("openai.AsyncOpenAI") as MockClass:
             instance = MockClass.return_value
             instance.models.list = AsyncMock(
                 side_effect=Exception("Connection refused")
@@ -152,7 +152,7 @@ class TestValidateAnthropicKey:
     @pytest.mark.asyncio
     async def test_valid_key_succeeds(self):
         with patch(
-            "custom_components.culiplan.ai.key_store.AsyncAnthropic"
+            "anthropic.AsyncAnthropic"
         ) as MockClass:
             instance = MockClass.return_value
             instance.messages.create = AsyncMock(
@@ -164,7 +164,7 @@ class TestValidateAnthropicKey:
     @pytest.mark.asyncio
     async def test_invalid_key_raises_provider_auth_error(self):
         with patch(
-            "custom_components.culiplan.ai.key_store.AsyncAnthropic"
+            "anthropic.AsyncAnthropic"
         ) as MockClass:
             instance = MockClass.return_value
             instance.messages.create = AsyncMock(
@@ -177,10 +177,14 @@ class TestValidateAnthropicKey:
 class TestValidateGoogleKey:
     @pytest.mark.asyncio
     async def test_valid_key_succeeds(self):
+        # Ensure the submodule is loaded so `patch` can find the attribute
+        # (the `google` namespace package only exposes `genai` once imported).
+        import google.genai  # noqa: F401
+
         async def fake_list():
             yield MagicMock(name="gemini-2.5-flash")
 
-        with patch("custom_components.culiplan.ai.key_store.genai") as MockGenai:
+        with patch("google.genai") as MockGenai:
             instance = MockGenai.Client.return_value
             instance.aio.models.list = MagicMock(return_value=fake_list())
             result = await validate_google_key("AIzaValid")
@@ -188,13 +192,10 @@ class TestValidateGoogleKey:
 
     @pytest.mark.asyncio
     async def test_invalid_key_raises_provider_auth_error(self):
-        with patch("custom_components.culiplan.ai.key_store.genai") as MockGenai:
+        import google.genai  # noqa: F401
+
+        with patch("google.genai") as MockGenai:
             instance = MockGenai.Client.return_value
-
-            async def raise_exc():
-                raise Exception("API_KEY_INVALID: The provided API key is invalid.")
-                yield  # make it an async generator
-
             instance.aio.models.list = MagicMock(
                 side_effect=Exception("API_KEY_INVALID")
             )
@@ -241,13 +242,23 @@ class TestConfigFlowBYOKValidation:
 
     @pytest.mark.asyncio
     async def test_valid_byok_key_stored_not_in_entry_data(self, hass):
-        """Valid key is stored in BYOKKeyStore; NOT in config entry data."""
+        """Valid key is stored in BYOKKeyStore; NOT in config entry data.
+
+        BYOK input moved to its own ``async_step_ai_byok`` step in the flow
+        refactor — the original test driver called ``async_step_ai_provider``
+        with the BYOK fields in the same payload, which silently fell back to
+        the form. Drive the dedicated step directly.
+        """
         from custom_components.culiplan.config_flow import OAuth2FlowHandler
 
         handler = OAuth2FlowHandler()
         handler.hass = hass
         handler._oauth_data = {
             "token": {"access_token": "tok_test", "refresh_token": "ref_test"}
+        }
+        handler._entry_data = {
+            **handler._oauth_data,
+            "ai_mode": "byok",
         }
 
         with (
@@ -259,15 +270,24 @@ class TestConfigFlowBYOKValidation:
             patch(
                 "custom_components.culiplan.config_flow.BYOKKeyStore"
             ) as MockKeyStore,
+            patch.object(
+                handler,
+                "async_step_mealie_offer",
+                new=AsyncMock(
+                    return_value={
+                        "type": "create_entry",
+                        "data": {**handler._entry_data, "byok_provider": "anthropic"},
+                    }
+                ),
+            ),
         ):
             mock_store_instance = AsyncMock()
             MockKeyStore.return_value = mock_store_instance
             mock_store_instance.async_load = AsyncMock()
             mock_store_instance.async_set_key = AsyncMock()
 
-            result = await handler.async_step_ai_provider(
+            result = await handler.async_step_ai_byok(
                 {
-                    "ai_mode": "byok",
                     "byok_provider": "anthropic",
                     "byok_api_key": "sk-ant-valid-key",
                 }
@@ -295,6 +315,10 @@ class TestConfigFlowBYOKValidation:
         handler._oauth_data = {
             "token": {"access_token": "tok_test", "refresh_token": "ref_test"}
         }
+        handler._entry_data = {
+            **handler._oauth_data,
+            "ai_mode": "byok",
+        }
 
         with (
             patch(
@@ -311,9 +335,8 @@ class TestConfigFlowBYOKValidation:
             mock_store_instance.async_load = AsyncMock()
             mock_store_instance.async_set_key = AsyncMock()
 
-            result = await handler.async_step_ai_provider(
+            result = await handler.async_step_ai_byok(
                 {
-                    "ai_mode": "byok",
                     "byok_provider": "anthropic",
                     "byok_api_key": "sk-ant-INVALID",
                 }

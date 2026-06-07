@@ -240,14 +240,29 @@ class TestPlannedKwhTodaySensor:
         )
         assert sensor.native_unit_of_measurement == "kWh"
 
-    def test_icon(self, coordinator_with_energy, device, mock_config_entry):
-        """Sensor icon must be mdi:flash."""
-        from custom_components.culiplan.sensor import PlannedKwhTodaySensor
+    def test_icon_declared_in_icons_json(
+        self, coordinator_with_energy, device, mock_config_entry
+    ):
+        """Icon is declared in icons.json (modern HA pattern), not on _attr_icon.
 
-        sensor = PlannedKwhTodaySensor(
-            coordinator_with_energy, device, mock_config_entry
+        The legacy test asserted ``sensor.icon == "mdi:flash"`` on the
+        entity instance — but Culiplan moved per-entity icons into the
+        HA-canonical ``icons.json`` translation file (loaded by the
+        frontend, NOT a Python attribute). Verify the mapping is in
+        icons.json under the sensor's translation_key.
+        """
+        import json
+        from pathlib import Path
+
+        icons_path = (
+            Path(__file__).parent.parent
+            / "custom_components"
+            / "culiplan"
+            / "icons.json"
         )
-        assert sensor.icon == "mdi:flash"
+        icons = json.loads(icons_path.read_text(encoding="utf-8"))
+        sensor_icons = icons["entity"]["sensor"]
+        assert sensor_icons["planned_kwh_today"]["default"] == "mdi:flash"
 
     def test_slots_without_recipe_excluded_from_recipe_ids(
         self, hass, mock_api_client, mock_config_entry, device

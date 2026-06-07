@@ -97,38 +97,6 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 _BROKEN_TEST_IDS: frozenset[str] = frozenset(
     {
-        # test_ai_dispatchers.py — AsyncOpenAI patch path drift
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_text_response_no_tool_calls",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_tool_call_response",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_tool_results_appended_as_tool_messages",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_auth_error_raises_provider_auth_error",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_rate_limit_raises_provider_rate_limit_error",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_server_error_raises_provider_unavailable",
-        "tests/test_ai_dispatchers.py::TestOpenAICompatibleDispatcher::test_debug_mode_logs_prompt",
-        "tests/test_ai_dispatchers.py::TestAnthropicDispatcher::test_text_response",
-        "tests/test_ai_dispatchers.py::TestAnthropicDispatcher::test_tool_use_response",
-        "tests/test_ai_dispatchers.py::TestAnthropicDispatcher::test_system_prompt_separated",
-        "tests/test_ai_dispatchers.py::TestAnthropicDispatcher::test_auth_error",
-        "tests/test_ai_dispatchers.py::TestAnthropicDispatcher::test_tool_results_forwarded_as_user_content",
-        "tests/test_ai_dispatchers.py::TestGoogleDispatcher::test_text_response",
-        "tests/test_ai_dispatchers.py::TestGoogleDispatcher::test_function_call_response",
-        "tests/test_ai_dispatchers.py::TestGoogleDispatcher::test_auth_error",
-        # test_blueprint_generator.py — slug / envelope assertions
-        "tests/test_blueprint_generator.py::TestMakeSlug::test_special_chars",
-        "tests/test_blueprint_generator.py::TestBYOKMode::test_byok_uses_envelope",
-        "tests/test_blueprint_generator.py::TestBYOKMode::test_byok_missing_key_raises_error",
-        # test_byok_key_store.py — provider validator contract drift
-        "tests/test_byok_key_store.py::TestValidateOpenAIKey::test_valid_key_succeeds",
-        "tests/test_byok_key_store.py::TestValidateOpenAIKey::test_invalid_key_raises_provider_auth_error",
-        "tests/test_byok_key_store.py::TestValidateOpenAIKey::test_generic_error_raises_provider_auth_error",
-        "tests/test_byok_key_store.py::TestValidateAnthropicKey::test_valid_key_succeeds",
-        "tests/test_byok_key_store.py::TestValidateAnthropicKey::test_invalid_key_raises_provider_auth_error",
-        "tests/test_byok_key_store.py::TestValidateGoogleKey::test_valid_key_succeeds",
-        "tests/test_byok_key_store.py::TestValidateGoogleKey::test_invalid_key_raises_provider_auth_error",
-        "tests/test_byok_key_store.py::TestValidateBYOKKey::test_delegates_to_correct_validator_openai",
-        "tests/test_byok_key_store.py::TestValidateBYOKKey::test_delegates_to_correct_validator_anthropic",
-        "tests/test_byok_key_store.py::TestConfigFlowBYOKValidation::test_valid_byok_key_stored_not_in_entry_data",
-        "tests/test_byok_key_store.py::TestConfigFlowBYOKValidation::test_invalid_byok_key_shows_error_not_stored",
         # test_config_flow.py / test_config_flow_task1626.py — flow drift
         "tests/test_config_flow.py::test_config_flow_cloud_ai_happy_path",
         "tests/test_config_flow.py::test_ai_provider_step_cloud_leads_to_mealie_offer",
@@ -153,18 +121,11 @@ _BROKEN_TEST_IDS: frozenset[str] = frozenset(
         "tests/test_cooking_mode_services.py::TestCancelRecipeTimer::test_raises_when_timer_not_found",
         # test_coordinator.py / test_debug_logger_ttl.py / test_energy_sensor.py
         "tests/test_coordinator.py::test_stale_token_refreshed_before_connect",
-        "tests/test_debug_logger_ttl.py::test_setup_debug_log_purge_idempotent",
-        "tests/test_debug_logger_ttl.py::test_strings_json_has_24h_ttl_description",
-        "tests/test_energy_sensor.py::TestPlannedKwhTodaySensor::test_icon",
-        # test_entities.py
-        "tests/test_entities.py::TestCuliplanShoppingList::test_create_item_calls_api_and_refreshes",
         # test_intents.py — coroutine never awaited (test setup bug)
         "tests/test_intents.py::test_register_intents_creates_task",
         "tests/test_intents.py::test_register_intents_uses_executor_for_yaml_load",
         "tests/test_intents.py::test_register_intents_yaml_error_is_non_fatal",
         "tests/test_intents.py::test_register_intents_registers_known_intents",
-        # test_launch_view.py
-        "tests/test_launch_view.py::TestHappyPath::test_200_json_shape",
         # test_local_ai.py — aiohttp lingering timer leak
         "tests/test_local_ai.py::test_probe_makes_no_external_calls",
         "tests/test_local_ai.py::TestProbeLocalAIEndpoints::test_ollama_detected_with_models",

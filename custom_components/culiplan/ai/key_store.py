@@ -193,10 +193,15 @@ async def validate_google_key(api_key: str) -> bool:
 
 # ─── Provider dispatch ────────────────────────────────────────────────────────
 
-_VALIDATORS = {
-    "openai": validate_openai_key,
-    "anthropic": validate_anthropic_key,
-    "google": validate_google_key,
+# Provider → name of the validator function in *this* module. We resolve the
+# name to the live function inside ``validate_byok_key`` rather than holding a
+# direct reference so test code can ``patch("...key_store.validate_openai_key")``
+# and have it actually take effect (a dict-of-functions captures the original
+# reference at import time and silently bypasses the patch).
+_VALIDATOR_NAMES: dict[str, str] = {
+    "openai": "validate_openai_key",
+    "anthropic": "validate_anthropic_key",
+    "google": "validate_google_key",
 }
 
 
@@ -208,9 +213,14 @@ async def validate_byok_key(provider: str, api_key: str) -> bool:
         ValueError:         If provider is not a known BYOK provider.
         ProviderAuthError:  If the key is invalid or cannot authenticate.
     """
-    if provider not in _VALIDATORS:
+    if provider not in _VALIDATOR_NAMES:
         raise ValueError(
-            f"Unknown BYOK provider '{provider}'. Supported: {list(_VALIDATORS.keys())}"
+            f"Unknown BYOK provider '{provider}'. "
+            f"Supported: {list(_VALIDATOR_NAMES.keys())}"
         )
-    validator = _VALIDATORS[provider]
+    # Look up the current module attribute so unittest.mock.patch can
+    # intercept the call by patching the function at module scope.
+    import sys
+
+    validator = getattr(sys.modules[__name__], _VALIDATOR_NAMES[provider])
     return await validator(api_key)

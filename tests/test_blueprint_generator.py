@@ -69,9 +69,11 @@ BYOK_ENVELOPE_RESPONSE = {
         ],
         "tools": [],
         "model": "gpt-4o",
+        # PromptEnvelope.from_dict requires intent_id + mode inside the
+        # envelope itself (top-level intent_id is unrelated).
+        "intent_id": "generate_blueprint",
         "mode": "byok-openai",
     },
-    "intent_id": "generate_blueprint",
 }
 
 
@@ -94,6 +96,10 @@ def make_hass(ai_mode=AI_MODE_CLOUD, byok_provider="openai"):
         CONF_AI_MODE: ai_mode,
         CONF_BYOK_PROVIDER: byok_provider,
     }
+    # Must be a real dict so `{**entry.data, **entry.options}` works in
+    # blueprint_generator.handle_generate_blueprint (otherwise MagicMock
+    # auto-attrs blow up the spread).
+    entry.options = {}
 
     hass.data = {
         DOMAIN: {
@@ -128,7 +134,9 @@ class TestMakeSlug:
         assert _make_slug("Daily meal notification") == "daily_meal_notification"
 
     def test_special_chars(self):
-        assert _make_slug("Notify me at 7am!") == "notify_me_at_7am_"
+        # `!` and other punctuation collapse to `_`; trailing `_` is stripped
+        # because `<slug>.yaml` reads cleaner without dangling underscores.
+        assert _make_slug("Notify me at 7am!") == "notify_me_at_7am"
 
     def test_empty_name(self):
         assert _make_slug("") == "blueprint"
@@ -296,9 +304,10 @@ class TestBYOKMode:
                 "custom_components.culiplan.blueprint_generator.async_create_premium_repair"
             ),
         ):
-            # BYOKKeyStore.get_key must return a non-empty key
-            mock_ks_instance = AsyncMock()
-            mock_ks_instance.get_key.return_value = "sk-test-key"
+            # BYOKKeyStore: `async_load` is async, `get_key` is sync.
+            mock_ks_instance = MagicMock()
+            mock_ks_instance.async_load = AsyncMock(return_value=None)
+            mock_ks_instance.get_key = MagicMock(return_value="sk-test-key")
             MockKeyStore.return_value = mock_ks_instance
 
             await handle_generate_blueprint(hass, make_service_call(), "test_entry_id")
@@ -324,19 +333,24 @@ class TestBYOKMode:
         from homeassistant.exceptions import HomeAssistantError
 
         hass, entry_data, entry = make_hass(AI_MODE_BYOK)
-        client = entry_data["client"]
 
         with patch(
             "custom_components.culiplan.blueprint_generator.BYOKKeyStore"
         ) as MockKeyStore:
-            mock_ks_instance = AsyncMock()
-            mock_ks_instance.get_key.return_value = ""
+            mock_ks_instance = MagicMock()
+            mock_ks_instance.async_load = AsyncMock(return_value=None)
+            mock_ks_instance.get_key = MagicMock(return_value="")
             MockKeyStore.return_value = mock_ks_instance
 
-            with pytest.raises(HomeAssistantError, match="No BYOK key"):
+            # The error surfaces via translation_key "byok_key_missing", which
+            # HA renders as a generic "key missing" message — match the
+            # underlying translation_key in the cause chain rather than the
+            # rendered text (which varies by HA version).
+            with pytest.raises(HomeAssistantError) as excinfo:
                 await handle_generate_blueprint(
                     hass, make_service_call(), "test_entry_id"
                 )
+            assert getattr(excinfo.value, "translation_key", "") == "byok_key_missing"
 
 
 # ─── Integration tests: blueprint install ────────────────────────────────────

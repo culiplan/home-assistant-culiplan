@@ -162,6 +162,7 @@ class TestCuliplanShoppingList:
     ):
         from custom_components.culiplan.todo import CuliplanShoppingList
         from homeassistant.components.todo import TodoItem, TodoItemStatus
+        from unittest.mock import patch
 
         entity = CuliplanShoppingList(
             full_coordinator,
@@ -173,7 +174,11 @@ class TestCuliplanShoppingList:
         mock_api_client.async_get_shopping_lists.return_value = [
             {**full_coordinator.data["shopping_lists"][0]}
         ]
-        await entity.async_create_todo_item(new_item)
+        # The entity isn't attached to hass in this unit test, so
+        # async_write_ha_state would raise. Patch it out — the assertion is
+        # about the API call, not the state write.
+        with patch.object(entity, "async_write_ha_state"):
+            await entity.async_create_todo_item(new_item)
         mock_api_client.async_add_shopping_item.assert_awaited_once_with(
             "sl1", name="Bread"
         )
