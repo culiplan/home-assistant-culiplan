@@ -31,7 +31,9 @@ from custom_components.culiplan.const import (
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
-def _build_options_flow(hass, entry_data: dict | None = None, options: dict | None = None):
+def _build_options_flow(
+    hass, entry_data: dict | None = None, options: dict | None = None
+):
     """Construct a MealieOptionsFlow with a real ``MockConfigEntry``.
 
     HA 2024.10 lets you set ``config_entry`` as a plain attribute. HA 2026.6+
