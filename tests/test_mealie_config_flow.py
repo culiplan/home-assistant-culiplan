@@ -33,13 +33,17 @@ from custom_components.culiplan.const import (
 def _set_config_entry_compat(flow, entry) -> None:
     """Cross-HA-version setter for OptionsFlow.config_entry.
 
-    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
-    ``_config_entry``; HA 2024.10 (the CI floor) keeps it as a plain attribute.
+    HA 2026.6+ promoted ``config_entry`` to a property that resolves
+    through ``hass.config_entries.async_get_known_entry(
+    self._config_entry_id)``, so the entry MUST be registered with hass.
+    HA 2024.10 (the CI floor) keeps ``config_entry`` as a plain attribute.
     """
+    flow._config_entry_id = getattr(entry, "entry_id", "test_entry_id")  # type: ignore[attr-defined]
+    flow.handler = getattr(entry, "entry_id", "test_entry_id")
     try:
         flow.config_entry = entry
     except AttributeError:
-        flow._config_entry = entry  # type: ignore[attr-defined]
+        pass
 
 
 def _mock_oauth_data() -> dict:
@@ -276,20 +280,22 @@ async def test_mealie_done_creates_entry_with_job_id(hass):
 
 
 def _make_options_flow(entry_data: dict, hass) -> "MealieOptionsFlow":  # type: ignore[name-defined]
-    """Construct MealieOptionsFlow the HA-2025.12+ way.
+    """Construct MealieOptionsFlow with a real registered MockConfigEntry.
 
-    The legacy ``MealieOptionsFlow(entry)`` constructor was removed when HA
-    moved to a framework-assigned ``self.config_entry``. The framework does
-    that for real flows; for unit tests we assign it manually.
+    HA 2026.6+ resolves ``config_entry`` through the manager via
+    ``self._config_entry_id`` so the entry must be registered with hass.
+    HA 2024.10 (the CI floor) still works with the legacy attribute path.
     """
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-    entry = MagicMock()
-    entry.data = entry_data
-    entry.options = {}
+    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    from custom_components.culiplan.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={})
+    entry.add_to_hass(hass)
     flow = MealieOptionsFlow()
-    _set_config_entry_compat(flow, entry)
     flow.hass = hass
+    _set_config_entry_compat(flow, entry)
     return flow
 
 

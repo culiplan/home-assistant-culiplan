@@ -17,31 +17,41 @@ from homeassistant.data_entry_flow import FlowResultType
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
-def _set_config_entry(flow, entry) -> None:
-    """Cross-HA-version setter for OptionsFlow.config_entry.
-
-    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
-    ``_config_entry``. HA 2024.10 (the integration's CI floor) keeps it
-    as a plain attribute. Setting both keeps the tests passing across
-    the whole matrix.
-    """
-    try:
-        flow.config_entry = entry
-    except AttributeError:
-        flow._config_entry = entry  # type: ignore[attr-defined]
-
-
 def _make_options_flow(
     hass, entry_data: dict | None = None, options: dict | None = None
 ):
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    """Construct a MealieOptionsFlow for unit testing across HA versions.
 
-    entry = MagicMock()
-    entry.data = entry_data or {}
-    entry.options = options or {}
+    HA 2024.10 (the integration's CI floor) lets you set ``config_entry``
+    as a plain attribute. HA 2026.6+ promoted ``config_entry`` to a
+    property that resolves through
+    ``hass.config_entries.async_get_known_entry(self._config_entry_id)``,
+    so a real ``MockConfigEntry`` has to be registered with the test
+    hass; setting an attribute on the flow no longer suffices.
+    """
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    from custom_components.culiplan.const import DOMAIN
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=entry_data or {},
+        options=options or {},
+    )
+    entry.add_to_hass(hass)
+
     flow = MealieOptionsFlow()
-    _set_config_entry(flow, entry)
     flow.hass = hass
+    # HA 2026.6+ — `config_entry` is a property reading `_config_entry_id`
+    # via the manager. HA 2024.10 — plain attribute. Setting both keeps
+    # the tests passing across the whole matrix.
+    flow._config_entry_id = entry.entry_id  # type: ignore[attr-defined]
+    flow.handler = entry.entry_id
+    try:
+        flow.config_entry = entry
+    except AttributeError:
+        pass
     return flow
 
 

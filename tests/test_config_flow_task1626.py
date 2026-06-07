@@ -31,16 +31,51 @@ from custom_components.culiplan.const import (
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
-def _set_config_entry_compat(flow, entry) -> None:
-    """Cross-HA-version setter for OptionsFlow.config_entry.
+def _build_options_flow(hass, entry_data: dict | None = None, options: dict | None = None):
+    """Construct a MealieOptionsFlow with a real ``MockConfigEntry``.
 
-    HA 2026.6+ promoted ``config_entry`` to a read-only property backed by
-    ``_config_entry``; HA 2024.10 (the CI floor) keeps it as a plain attribute.
+    HA 2024.10 lets you set ``config_entry`` as a plain attribute. HA 2026.6+
+    made it a property that resolves through ``hass.config_entries
+    .async_get_known_entry(self._config_entry_id)``, so the entry MUST be
+    registered with ``hass.config_entries``. Setting `_config_entry_id` and
+    `handler` covers the property; setting `config_entry` directly is a
+    no-op on 2026.6 but works on 2024.10.
     """
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.culiplan.config_flow import MealieOptionsFlow
+    from custom_components.culiplan.const import DOMAIN
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=entry_data or {},
+        options=options or {},
+    )
+    entry.add_to_hass(hass)
+    flow = MealieOptionsFlow()
+    flow.hass = hass
+    flow._config_entry_id = entry.entry_id  # type: ignore[attr-defined]
+    flow.handler = entry.entry_id
     try:
         flow.config_entry = entry
     except AttributeError:
-        flow._config_entry = entry  # type: ignore[attr-defined]
+        pass
+    return flow, entry
+
+
+def _set_config_entry_compat(flow, entry) -> None:
+    """Legacy hook for tests that build their own MagicMock entry.
+
+    Prefer ``_build_options_flow``; this is kept so older sites can call
+    it after manually registering the entry. Sets the attribute path that
+    works on whatever HA version is loaded.
+    """
+    flow._config_entry_id = getattr(entry, "entry_id", "test_entry_id")  # type: ignore[attr-defined]
+    flow.handler = getattr(entry, "entry_id", "test_entry_id")
+    try:
+        flow.config_entry = entry
+    except AttributeError:
+        pass
 
 
 def _mock_oauth_data() -> dict:
@@ -161,14 +196,7 @@ async def test_options_flow_init_shows_advanced_ai_toggle(hass):
 
     task-1626 AC#3.
     """
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
-
-    flow = MealieOptionsFlow()
-    _set_config_entry_compat(flow, entry)
-    flow.hass = hass
+    flow, _entry = _build_options_flow(hass, entry_data={CONF_AI_MODE: AI_MODE_CLOUD})
 
     result = await flow.async_step_init()
 
@@ -185,14 +213,7 @@ async def test_options_flow_advanced_ai_toggle_opens_ai_step(hass):
 
     task-1626 AC#3.
     """
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
-
-    flow = MealieOptionsFlow()
-    _set_config_entry_compat(flow, entry)
-    flow.hass = hass
+    flow, _entry = _build_options_flow(hass, entry_data={CONF_AI_MODE: AI_MODE_CLOUD})
 
     with patch(
         "custom_components.culiplan.config_flow.probe_local_ai_endpoints",
@@ -342,14 +363,7 @@ async def test_options_flow_no_advanced_ai_toggle_returns_no_change(hass):
 
     task-1626 AC#4: existing entry is NOT removed on options save.
     """
-    from custom_components.culiplan.config_flow import MealieOptionsFlow
-
-    entry = MagicMock()
-    entry.data = {CONF_AI_MODE: AI_MODE_CLOUD}
-
-    flow = MealieOptionsFlow()
-    _set_config_entry_compat(flow, entry)
-    flow.hass = hass
+    flow, _entry = _build_options_flow(hass, entry_data={CONF_AI_MODE: AI_MODE_CLOUD})
 
     result = await flow.async_step_init(user_input={CONF_ADVANCED_AI: False})
 
