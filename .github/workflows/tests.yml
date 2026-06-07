@@ -78,13 +78,21 @@ jobs:
           fi
 
       - name: Run tests with coverage
-        # 95% Platinum gate. asyncio_mode lives in pyproject.toml so it
-        # applies uniformly to local `pytest` runs and CI.
+        # 95% Platinum gate applies on the HA 2026.6 lane (which installs
+        # google-genai). The 2024.10/2025.1 lanes skip the ~50 lines in
+        # GoogleDispatcher.dispatch and validate_google_key (their httpx
+        # pin blocks the SDK install), bringing measured coverage to
+        # ~93%. Gate accordingly.
         run: |
+          if [ "${{ matrix.ha-version }}" = "2026.6.0" ]; then
+            FLOOR=95
+          else
+            FLOOR=92
+          fi
           pytest tests/ -v --tb=short \
             --cov=custom_components/culiplan \
             --cov-report=term-missing \
-            --cov-fail-under=95
+            --cov-fail-under=$FLOOR
 
       - name: Upload coverage report
         if: matrix.ha-version == '2026.6.0'
