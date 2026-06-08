@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] — 2026-06-08
+
+Bugfix. Clears the blocking-call warnings the self-updater raised inside the event loop.
+
+### Fixed
+
+- **The self-updater no longer does blocking file I/O on the event loop.** `async_perform_update` opened the temp zip file (`zip_path.open("wb")`) and let `tempfile.TemporaryDirectory()` run its `scandir` cleanup directly in the loop, which HA flags with `Detected blocking call to open / scandir`. The download now streams into memory (async), and **all** filesystem work — writing the zip, extracting, the backup/copytree swap, and temp-dir cleanup — runs in a single `async_add_executor_job`. No behavioural change to what gets installed; the zip-slip guard, backup/rollback, and empty/missing-component checks are unchanged.
+
 ## [0.13.1] — 2026-06-08
 
 Reliability fix. Stops long-lived entries from being forced into reauthentication once the access token ages past its TTL.

@@ -146,32 +146,42 @@ async def async_perform_update(hass: HomeAssistant, zipball_url: str) -> None:
     target_dir = Path(__file__).parent
     backup_dir = target_dir.with_suffix(".bak")
 
-    # ── 1. Download the zip to a temp file (async, non-blocking) ──────────────
-    with tempfile.TemporaryDirectory() as tmp_root:
-        tmp_root_path = Path(tmp_root)
-        zip_path = tmp_root_path / "release.zip"
+    # ── 1. Stream the zip into memory (async, non-blocking) ───────────────────
+    # The download must stay in the event loop (it uses the async aiohttp
+    # session), but every filesystem operation — opening the temp file, the
+    # TemporaryDirectory scandir cleanup, extraction, the copytree swap — is
+    # blocking and must NOT run in the loop. So we buffer the bytes here and
+    # hand all disk work to a single executor job below. Release zips for this
+    # integration are a few MB, well within memory.
+    session = async_get_clientsession(hass)
+    _LOGGER.info("[culiplan][updater] Downloading release zip from %s", zipball_url)
+    try:
+        async with session.get(
+            zipball_url,
+            timeout=_DOWNLOAD_TIMEOUT,
+            allow_redirects=True,
+        ) as resp:
+            resp.raise_for_status()
+            buffer = bytearray()
+            async for chunk in resp.content.iter_chunked(_CHUNK_SIZE):
+                buffer.extend(chunk)
+    except Exception as exc:
+        _LOGGER.error("[culiplan][updater] Download failed: %s", exc)
+        raise
 
-        session = async_get_clientsession(hass)
-        _LOGGER.info("[culiplan][updater] Downloading release zip from %s", zipball_url)
-        try:
-            async with session.get(
-                zipball_url,
-                timeout=_DOWNLOAD_TIMEOUT,
-                allow_redirects=True,
-            ) as resp:
-                resp.raise_for_status()
-                with zip_path.open("wb") as fh:
-                    async for chunk in resp.content.iter_chunked(_CHUNK_SIZE):
-                        fh.write(chunk)
-        except Exception as exc:
-            _LOGGER.error("[culiplan][updater] Download failed: %s", exc)
-            raise
+    zip_bytes = bytes(buffer)
 
-        # ── 2. Extract + locate custom_components/culiplan/ (executor) ────────
-        extract_dir = tmp_root_path / "extracted"
+    # ── 2-4. All filesystem work runs in the executor ─────────────────────────
+    def _apply_update() -> None:
+        """Blocking: write, extract, validate, back up and swap in the files."""
+        with tempfile.TemporaryDirectory() as tmp_root:
+            tmp_root_path = Path(tmp_root)
+            zip_path = tmp_root_path / "release.zip"
+            with zip_path.open("wb") as fh:
+                fh.write(zip_bytes)
 
-        def _extract_and_locate() -> Path:
-            """Blocking: extract zip and return path to culiplan component dir."""
+            # Extract + locate custom_components/culiplan/
+            extract_dir = tmp_root_path / "extracted"
             extract_dir.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(zip_path) as zf:
                 # Zip-slip guard: every member must resolve to a path that
@@ -198,24 +208,12 @@ async def async_perform_update(hass: HomeAssistant, zipball_url: str) -> None:
                 raise FileNotFoundError(
                     f"custom_components/culiplan/ not found inside zip at {component_src}"
                 )
-            return component_src
 
-        try:
-            component_src = await hass.async_add_executor_job(_extract_and_locate)
-        except Exception as exc:
-            _LOGGER.error("[culiplan][updater] Extraction failed: %s", exc)
-            raise
-
-        # ── 3. Backup current dir + 4. Copy new files (executor) ──────────────
-        def _swap() -> None:
-            """Blocking: back up current dir and replace with extracted files."""
-            # Remove stale backup if it exists
+            # Back up current dir, then copy the new files in.
             if backup_dir.exists():
                 shutil.rmtree(backup_dir)
-
             # Rename target → .bak (atomic on same filesystem)
             target_dir.rename(backup_dir)
-
             try:
                 shutil.copytree(component_src, target_dir)
             except Exception:
@@ -228,13 +226,13 @@ async def async_perform_update(hass: HomeAssistant, zipball_url: str) -> None:
             # Success — remove backup
             shutil.rmtree(backup_dir)
 
-        try:
-            await hass.async_add_executor_job(_swap)
-        except Exception as exc:
-            _LOGGER.error(
-                "[culiplan][updater] File swap failed (rolled back to backup): %s",
-                exc,
-            )
-            raise
+    try:
+        await hass.async_add_executor_job(_apply_update)
+    except Exception as exc:
+        _LOGGER.error(
+            "[culiplan][updater] Update failed (rolled back to backup if taken): %s",
+            exc,
+        )
+        raise
 
     _LOGGER.info("[culiplan][updater] Update applied successfully. Restart required.")
