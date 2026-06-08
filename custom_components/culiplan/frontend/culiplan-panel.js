@@ -46,6 +46,13 @@ const CODE_VALID_MS = 50_000;
 const CULIPLAN_ORIGIN = "https://culiplan.com";
 
 /**
+ * Integration version, surfaced only in failure breadcrumbs (_logFailure) so a
+ * shared console log tells us which build hit the problem. Keep in sync with
+ * `manifest.json` — it is informational, never load-bearing.
+ */
+const CULIPLAN_INTEGRATION_VERSION = "0.14.0";
+
+/**
  * HA design tokens we forward to the embedded app. The web app keeps a
  * matching whitelist so an arbitrary postMessage cannot inject arbitrary
  * CSS variables. Keep this list in sync with `ALLOWED_HA_TOKENS` in
@@ -131,6 +138,17 @@ const STYLES = `
   }
   .retry-button:hover { opacity: 0.85; }
   .retry-button:active { opacity: 0.7; }
+  .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .retry-button.secondary {
+    background: transparent;
+    color: var(--primary-color, #03a9f4);
+    border: 1px solid var(--divider-color, #e0e0e0);
+  }
   .spinner {
     width: 24px;
     height: 24px;
@@ -151,6 +169,21 @@ class CuliplanPanel extends HTMLElement {
     this._state = "loading"; // "loading" | "ready" | "error"
     this._redirectUrl = "";
     this._errorMessage = "";
+    /**
+     * Machine-readable failure code from the launch endpoint (no_entry,
+     * token_expired, exchange_failed, network_error, invalid_response) or a
+     * panel-local code (ha_session, reload_failed). Drives which recovery
+     * actions the error card offers. Null while not in an error state.
+     * @type {string | null}
+     */
+    this._errorCode = null;
+    /** @type {number | null} HTTP status that accompanied the failure, if any. */
+    this._errorStatus = null;
+    /**
+     * True when the iframe is showing the unauthenticated app (login fallback)
+     * rather than an SSO-bridged session. See _loginFallback().
+     */
+    this._isFallback = false;
     /** @type {number | null} Timestamp when the current code was fetched */
     this._fetchedAt = null;
 
@@ -395,16 +428,38 @@ class CuliplanPanel extends HTMLElement {
       data = await this._hass.callApi("GET", "culiplan/launch");
     } catch (err) {
       this._fetchedAt = null;
-      if (err && err.status_code === 401) {
+      const status = err && err.status_code;
+      // launch_view.py returns a machine-readable `error` code alongside the
+      // human `message`. Earlier versions threw the code away; we keep it so
+      // the error card can offer the right recovery action per cause.
+      const code = (err && err.body && err.body.error) || null;
+      const message =
+        (err && err.body && err.body.message) ||
+        `Unexpected error from launch endpoint${status ? ` (HTTP ${status})` : ""}.`;
+
+      this._logFailure(code, status, message);
+
+      // HA's own session expired (the panel couldn't even authenticate to its
+      // own backend) — re-fetching won't help until the page reloads.
+      if (status === 401) {
         this._fail(
           "Home Assistant session expired. Refresh the page and try again.",
+          "ha_session",
+          status,
         );
         return;
       }
-      const message =
-        err?.body?.message ??
-        `Unexpected error from launch endpoint${err?.status_code ? ` (HTTP ${err.status_code})` : ""}.`;
-      this._fail(message);
+
+      // exchange_failed = the backend got a valid HA token but rejected it
+      // (revoked grant, token desync). Re-running the bridge will fail the same
+      // way, but the user CAN still sign in directly: load the app
+      // unauthenticated and let its in-iframe login form take over.
+      if (code === "exchange_failed") {
+        this._loginFallback();
+        return;
+      }
+
+      this._fail(message, code, status);
       return;
     }
 
@@ -422,17 +477,47 @@ class CuliplanPanel extends HTMLElement {
     this._render();
   }
 
-  _fail(message) {
+  _fail(message, code = null, status = null) {
     this._state = "error";
     this._errorMessage = message;
+    this._errorCode = code;
+    this._errorStatus = status;
+    this._isFallback = false;
     this._render();
+  }
+
+  /**
+   * Emit a structured breadcrumb for an SSO-bridge failure. Stays in the
+   * browser console (the panel has no authenticated channel back to Culiplan
+   * once the bridge has failed), but gives us — and any user who shares their
+   * logs — a consistent, greppable trace: which error code, which HTTP status,
+   * which integration/HA build. The server-side counterpart is the
+   * `sso_exchange_auth_failed` audit event in the backend exchange route.
+   */
+  _logFailure(code, status, message) {
+    try {
+      const haVersion =
+        (this._hass && this._hass.config && this._hass.config.version) || null;
+      // eslint-disable-next-line no-console
+      console.warn("[culiplan][panel] SSO bridge launch failed", {
+        code: code || "unknown",
+        status: status || null,
+        message,
+        integrationVersion: CULIPLAN_INTEGRATION_VERSION,
+        haVersion,
+      });
+    } catch (_) {
+      // Logging must never throw.
+    }
   }
 
   _onIframeError = () => {
     this._fetchedAt = null;
+    this._logFailure("iframe_load", null, "iframe failed to load");
     this._fail(
       "The Culiplan page could not load inside Home Assistant. " +
         "This may be a content security policy issue or a temporary outage.",
+      "iframe_load",
     );
   };
 
@@ -440,6 +525,123 @@ class CuliplanPanel extends HTMLElement {
     this._fetchedAt = null;
     this._launch();
   };
+
+  /**
+   * Load the Culiplan web app *unauthenticated* (no SSO code) so its own
+   * in-iframe login form can take over. Used when the SSO exchange is rejected
+   * by the backend (exchange_failed): re-running the bridge would fail
+   * identically, but the user can still sign in directly. The front-end detects
+   * `embed=ha` + unauthenticated state and surfaces email/password + magic-link
+   * (social SSO is hidden — Google blocks its pages inside iframes).
+   */
+  _loginFallback() {
+    this._redirectUrl = `${CULIPLAN_ORIGIN}/?embed=ha`;
+    this._fetchedAt = null; // not a single-use code — never treat as "fresh"
+    this._isFallback = true;
+    this._errorCode = null;
+    this._errorMessage = "";
+    this._state = "ready";
+    this._render();
+  }
+
+  /**
+   * Navigate HA's frontend without a full reload. The panel lives in HA's
+   * top-level document, so we use the standard custom-element pattern:
+   * pushState + a `location-changed` event that HA's router listens for.
+   * Falls back to a hard navigation if anything throws.
+   */
+  _navigate(path) {
+    try {
+      history.pushState(null, "", path);
+      window.dispatchEvent(
+        new CustomEvent("location-changed", { detail: { replace: false } }),
+      );
+    } catch (_) {
+      window.location.assign(path);
+    }
+  }
+
+  /** Deep-link to the Culiplan integration page so the user can re-link / re-auth. */
+  _reconnect = () => {
+    this._navigate("/config/integrations/integration/culiplan");
+  };
+
+  /**
+   * Reload the Culiplan config entry (softer than restarting all of HA), then
+   * re-launch. Looks the entry up via the WS API since the panel isn't handed
+   * one directly; if that fails, fall back to the integration page.
+   */
+  _reloadIntegration = async () => {
+    if (!this._hass || typeof this._hass.callWS !== "function") {
+      this._reconnect();
+      return;
+    }
+    this._state = "loading";
+    this._render();
+    try {
+      const entries = await this._hass.callWS({
+        type: "config_entries/get",
+        domain: "culiplan",
+      });
+      const list = Array.isArray(entries) ? entries : [];
+      const entry =
+        list.find((e) => e && e.state === "loaded") || list[0] || null;
+      if (!entry || !entry.entry_id) {
+        this._reconnect();
+        return;
+      }
+      await this._hass.callWS({
+        type: "config_entries/reload",
+        entry_id: entry.entry_id,
+      });
+      this._retry();
+    } catch (e) {
+      this._logFailure("reload_failed", null, String((e && e.message) || e));
+      this._fail(
+        "Could not reload the Culiplan integration. Open the integration page to re-link it.",
+        "reload_failed",
+      );
+    }
+  };
+
+  /** Install the available integration update via the HACS update entity. */
+  _installUpdate = () => {
+    const st = this._findUpdateEntity();
+    if (!st || typeof this._hass.callService !== "function") return;
+    this._state = "loading";
+    this._render();
+    this._hass
+      .callService("update", "install", { entity_id: st.entity_id })
+      .then(() => this._retry())
+      .catch((e) => {
+        this._logFailure("update_install_failed", null, String((e && e.message) || e));
+        this._fail(
+          "Could not install the update. Try again from Settings → Updates.",
+          "update_install_failed",
+        );
+      });
+  };
+
+  /**
+   * Map the current error code to the recovery buttons the card should show.
+   * Returns an array of { label, primary, onClick }.
+   */
+  _errorActions() {
+    switch (this._errorCode) {
+      case "no_entry":
+        // Not linked yet → only re-linking helps.
+        return [{ label: "Connect Culiplan", primary: true, onClick: this._reconnect }];
+      case "token_expired":
+        // Grant went stale → re-link, or try a softer integration reload first.
+        return [
+          { label: "Reconnect Culiplan", primary: true, onClick: this._reconnect },
+          { label: "Reload integration", primary: false, onClick: this._reloadIntegration },
+        ];
+      default:
+        // network_error, invalid_response, ha_session, iframe_load, transient.
+        return [{ label: "Try again", primary: true, onClick: this._retry }];
+    }
+  }
 
   _render() {
     const shadow = this.shadowRoot;
@@ -498,12 +700,35 @@ class CuliplanPanel extends HTMLElement {
       msg.className = "error-message";
       msg.textContent = this._errorMessage;
 
-      const button = document.createElement("button");
-      button.className = "retry-button";
-      button.textContent = "Try again";
-      button.addEventListener("click", this._retry);
+      // Recovery buttons chosen by error code (reconnect / reload / retry).
+      const actions = this._errorActions();
 
-      card.append(icon, title, msg, button);
+      // If a HACS update is available, a stale integration is a plausible cause
+      // of the failure — offer to install it as a secondary action.
+      const updateState = this._findUpdateEntity();
+      if (updateState && updateState.state === "on") {
+        const latest =
+          (updateState.attributes && updateState.attributes.latest_version) || "";
+        actions.push({
+          label: latest ? `Update to ${latest}` : "Install update",
+          primary: false,
+          onClick: this._installUpdate,
+        });
+      }
+
+      const buttonRow = document.createElement("div");
+      buttonRow.className = "button-row";
+      for (const action of actions) {
+        const button = document.createElement("button");
+        button.className = action.primary
+          ? "retry-button"
+          : "retry-button secondary";
+        button.textContent = action.label;
+        button.addEventListener("click", action.onClick);
+        buttonRow.append(button);
+      }
+
+      card.append(icon, title, msg, buttonRow);
       wrap.append(card);
       return wrap;
     }
