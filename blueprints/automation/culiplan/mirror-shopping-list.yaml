@@ -1,0 +1,225 @@
+blueprint:
+  name: "Culiplan: Mirror shopping list → To-Do (Microsoft To Do, Todoist, …)"
+  description: >
+    Keeps your Culiplan shopping list mirrored into any other Home Assistant
+    To-Do list — including **Microsoft To Do**, Todoist, Google Tasks, or the
+    built-in local to-do list.
+
+    Home Assistant has no native Microsoft To Do integration, but several
+    community ones expose it as a standard `todo.*` entity (e.g.
+    `black-roland/homeassistant-microsoft-todo` or `RogerSelwyn/MS365-ToDo`).
+    Once such an entity exists, this blueprint copies items picked in Culiplan
+    straight into it, so you can shop from your Microsoft To Do list at the
+    store.
+
+    **How it works**
+
+    Whenever the Culiplan shopping list changes — and on a configurable safety
+    interval — the automation reads both lists with `todo.get_items`, matches
+    items by name (case-insensitive), and:
+
+    - adds any Culiplan item that is missing from the target list;
+    - (optional) marks an item completed in the target when it is checked off
+      in Culiplan;
+    - (optional) removes target items that are no longer on the Culiplan list.
+
+    **Direction:** one-way, Culiplan → target. Items you add directly in
+    Microsoft To Do are left untouched unless you enable pruning.
+
+    **Prerequisites**
+
+    - Culiplan integration installed and connected (provides
+      `todo.culiplan_shopping_list`).
+    - A second To-Do integration providing the target list (for Microsoft To
+      Do, install one of the community HACS components above and sign in).
+
+    **Free tier**: Yes — no Culiplan Premium required.
+  domain: automation
+  source_url: https://github.com/culiplan/home-assistant-culiplan/blob/main/blueprints/automation/culiplan/mirror-shopping-list.yaml
+  author: Culiplan
+  homeassistant:
+    min_version: "2024.6.0"
+
+  input:
+    source_list:
+      name: Culiplan shopping list
+      description: >
+        The Culiplan shopping list to mirror from. This is normally
+        `todo.culiplan_shopping_list`.
+      default: todo.culiplan_shopping_list
+      selector:
+        entity:
+          filter:
+            - integration: culiplan
+              domain: todo
+
+    target_list:
+      name: Target To-Do list
+      description: >
+        The list to mirror into — your Microsoft To Do shopping list, a
+        Todoist project, Google Tasks list, or the local to-do list.
+      selector:
+        entity:
+          filter:
+            - domain: todo
+
+    resync_interval:
+      name: Safety re-sync interval
+      description: >
+        A periodic full reconcile, in addition to live syncing on every
+        change. Catches edits that don't change the item count (e.g. swapping
+        one item for another). "/15" = every 15 minutes.
+      default: "/15"
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - label: Every 5 minutes
+              value: "/5"
+            - label: Every 15 minutes
+              value: "/15"
+            - label: Every 30 minutes
+              value: "/30"
+            - label: Hourly
+              value: "/60"
+
+    sync_completed:
+      name: Sync checked-off items
+      description: >
+        When an item is checked off in Culiplan, mark the matching item
+        completed in the target list (instead of leaving it open).
+      default: true
+      selector:
+        boolean: {}
+
+    prune_removed:
+      name: Remove items deleted from Culiplan
+      description: >
+        Delete items from the target list once they are no longer on the
+        Culiplan list. Leave OFF to protect items you add directly in
+        Microsoft To Do — only ON if you want a strict mirror.
+      default: false
+      selector:
+        boolean: {}
+
+variables:
+  source_entity: !input source_list
+  target_entity: !input target_list
+  sync_completed: !input sync_completed
+  prune_removed: !input prune_removed
+
+trigger:
+  - platform: state
+    entity_id: !input source_list
+  - platform: time_pattern
+    minutes: !input resync_interval
+  - platform: homeassistant
+    event: start
+
+condition:
+  - alias: "Both lists are available"
+    condition: template
+    value_template: >
+      {{ states(source_entity) not in ('unknown', 'unavailable', '')
+         and states(target_entity) not in ('unknown', 'unavailable', '') }}
+
+action:
+  - alias: "Read Culiplan items"
+    service: todo.get_items
+    target:
+      entity_id: !input source_list
+    data:
+      status:
+        - needs_action
+        - completed
+    response_variable: source_resp
+
+  - alias: "Read target items"
+    service: todo.get_items
+    target:
+      entity_id: !input target_list
+    data:
+      status:
+        - needs_action
+        - completed
+    response_variable: target_resp
+
+  - alias: "Diff the two lists"
+    variables:
+      source_items: "{{ source_resp[source_entity]['items'] | default([], true) }}"
+      target_items: "{{ target_resp[target_entity]['items'] | default([], true) }}"
+      # Normalised name sets for matching (trim + lowercase).
+      target_open_names: >
+        {{ target_items | selectattr('status', 'eq', 'needs_action')
+           | map(attribute='summary') | map('lower') | map('trim') | list }}
+      target_all_names: >
+        {{ target_items | map(attribute='summary') | map('lower')
+           | map('trim') | list }}
+      source_all_names: >
+        {{ source_items | map(attribute='summary') | map('lower')
+           | map('trim') | list }}
+      # Open Culiplan items not yet on the target → add.
+      to_add: >
+        {% set ns = namespace(items=[]) %}
+        {% for it in source_items if it.status == 'needs_action' %}
+          {% if (it.summary | lower | trim) not in target_all_names %}
+            {% set ns.items = ns.items + [it.summary] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items }}
+      # Culiplan items checked off that are still open on the target → complete.
+      to_complete: >
+        {% set ns = namespace(items=[]) %}
+        {% if sync_completed %}
+          {% for it in source_items if it.status == 'completed' %}
+            {% if (it.summary | lower | trim) in target_open_names %}
+              {% set ns.items = ns.items + [it.summary] %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ ns.items }}
+      # Open target items no longer on the Culiplan list → remove (opt-in).
+      to_remove: >
+        {% set ns = namespace(items=[]) %}
+        {% if prune_removed %}
+          {% for it in target_items if it.status == 'needs_action' %}
+            {% if (it.summary | lower | trim) not in source_all_names %}
+              {% set ns.items = ns.items + [it.summary] %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ ns.items }}
+
+  - alias: "Add missing items to target"
+    repeat:
+      for_each: "{{ to_add }}"
+      sequence:
+        - service: todo.add_item
+          target:
+            entity_id: !input target_list
+          data:
+            item: "{{ repeat.item }}"
+
+  - alias: "Mark checked-off items complete in target"
+    repeat:
+      for_each: "{{ to_complete }}"
+      sequence:
+        - service: todo.update_item
+          target:
+            entity_id: !input target_list
+          data:
+            item: "{{ repeat.item }}"
+            status: completed
+
+  - alias: "Remove items deleted from Culiplan"
+    repeat:
+      for_each: "{{ to_remove }}"
+      sequence:
+        - service: todo.remove_item
+          target:
+            entity_id: !input target_list
+          data:
+            item: "{{ repeat.item }}"
+
+mode: single
+max_exceeded: silent

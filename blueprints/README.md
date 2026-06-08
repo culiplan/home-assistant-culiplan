@@ -287,6 +287,38 @@ Home Assistant run the kitchen together.
 
 ---
 
+### 11. Mirror Shopping List → To-Do (Microsoft To Do, Todoist, …)
+
+**File:** `automation/culiplan/mirror-shopping-list.yaml`
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fculiplan%2Fhome-assistant-culiplan%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fculiplan%2Fmirror-shopping-list.yaml)
+
+Mirrors your `todo.culiplan_shopping_list` into any other Home Assistant
+To-Do list — **Microsoft To Do**, Todoist, Google Tasks, or the built-in local
+list. Home Assistant has no native Microsoft To Do integration, so you first
+add a community one (e.g. `black-roland/homeassistant-microsoft-todo` or
+`RogerSelwyn/MS365-ToDo`) to expose your Microsoft list as a `todo.*` entity;
+this blueprint then keeps it in sync. On every shopping-list change — plus a
+configurable safety interval — it reads both lists with `todo.get_items`,
+matches items by name (case-insensitive), adds anything missing, optionally
+marks checked-off items complete, and optionally removes items you've cleared
+from Culiplan. Sync is **one-way** (Culiplan → target); items you add directly
+in Microsoft To Do are left alone unless you turn on pruning.
+
+**Configurable inputs:** Culiplan source list, target To-Do list, safety
+re-sync interval (5/15/30/60 min), sync checked-off items toggle, remove
+deleted items toggle.
+
+**Marketing copy (for culiplan.com/home-assistant/blueprints):**
+Already living in Microsoft To Do? Keep using it. This blueprint pipes your
+Culiplan shopping list straight into your existing Microsoft To Do (or Todoist,
+or Google Tasks) list, so the items you plan in Culiplan are waiting on your
+phone at the store — checked off in one place, mirrored to the other. One-way,
+name-matched, and safe: your own to-do items stay untouched. Pick the two lists
+once and the loop runs itself.
+
+---
+
 ## Installation
 
 ### Option A: One-click import (recommended)
@@ -338,6 +370,14 @@ automations can subscribe to these:
 ---
 
 ## Changelog
+
+### v1.2.0 (2026-06-08)
+
+- Added blueprint #11: Mirror Shopping List → To-Do — one-way, name-matched
+  sync of `todo.culiplan_shopping_list` into any other HA To-Do list
+  (Microsoft To Do via community HACS components, Todoist, Google Tasks, local).
+  Live sync on change plus a configurable safety re-sync interval; opt-in
+  checked-off sync and pruning. No Premium required.
 
 ### v1.1.0 (2026-04-25)
 
