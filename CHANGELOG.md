@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] — 2026-06-08
+
+Reliability fix. Stops long-lived entries from being forced into reauthentication once the access token ages past its TTL.
+
+### Fixed
+
+- **The integration no longer drops into "reauthentication required" after running for a while.** `CuliplanApiClient` captured the access token once at setup and reused it for every REST call. The coordinator only refreshed it on a Socket.IO (re)connect, so an event-driven refresh or a user service call made hours later sent a stale token, got a `401`, and `ConfigEntryAuthFailed` forced a full reauth. The client now resolves the bearer through a shared async token provider on **every** request — `async_ensure_token_valid()` refreshes it transparently when it is near expiry. A single `OAuth2Session` is now shared between the REST client and the Socket.IO coordinator (the coordinator previously built its own), so the two consumers cannot race the backend's single-use refresh-token rotation. Pairs with the backend rotation grace window shipped the same day.
+
 ## [0.13.0] — 2026-06-07
 
 Quality release. Fixes a real multi-account bug, drives the test suite from 52% with 98 skips to 95.11% with zero skips, and tightens the Platinum-tier mypy / ruff / pytest gates so CI now enforces the same floor end-to-end. Targeted at Home Assistant Core inclusion review.

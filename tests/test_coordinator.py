@@ -139,31 +139,19 @@ async def test_reconnect_resets_miss_count(coordinator):
 
 
 @pytest.mark.asyncio
-async def test_stale_token_refreshed_before_connect(coordinator, mock_entry):
-    """_get_valid_token() calls async_ensure_token_valid and returns the token."""
-    mock_impl = MagicMock()
-    mock_oauth_session = MagicMock()
-    mock_oauth_session.async_ensure_token_valid = AsyncMock()
-    mock_oauth_session.token = {"access_token": "tok_refreshed"}
+async def test_get_valid_token_delegates_to_client(coordinator, mock_client):
+    """_get_valid_token() sources the token from the client's shared provider.
 
-    # config_entry_oauth2_flow is imported lazily inside _get_valid_token,
-    # so patch the symbols at their source module.
-    with (
-        patch(
-            "homeassistant.helpers.config_entry_oauth2_flow"
-            ".async_get_config_entry_implementation",
-            new_callable=AsyncMock,
-            return_value=mock_impl,
-        ),
-        patch(
-            "homeassistant.helpers.config_entry_oauth2_flow.OAuth2Session",
-            return_value=mock_oauth_session,
-        ),
-    ):
-        token = await coordinator._get_valid_token()
+    The coordinator no longer builds its own OAuth2Session — a single session
+    owns refresh so the two consumers can't race the single-use rotation. The
+    client's provider does the async_ensure_token_valid refresh.
+    """
+    mock_client.async_get_access_token = AsyncMock(return_value="tok_refreshed")
+
+    token = await coordinator._get_valid_token()
 
     assert token == "tok_refreshed"
-    mock_oauth_session.async_ensure_token_valid.assert_awaited_once()
+    mock_client.async_get_access_token.assert_awaited_once()
 
 
 # ─── Additional coverage (v0.13.0) ───────────────────────────────────────────

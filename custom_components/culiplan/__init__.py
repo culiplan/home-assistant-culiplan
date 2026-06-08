@@ -308,9 +308,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
     await session.async_ensure_token_valid()
 
+    async def _async_token() -> str:
+        """Ensure the OAuth token is valid (refresh if near expiry) and return it.
+
+        Shared by the REST client and the Socket.IO coordinator so a single
+        OAuth2Session owns refresh — avoids two sessions racing a rotation and
+        keeps long-lived entries from 401-ing once the initial token ages out.
+        """
+        await session.async_ensure_token_valid()
+        return cast(str, session.token["access_token"])
+
     client = CuliplanApiClient(
         session=aiohttp_client.async_get_clientsession(hass),
         access_token=session.token["access_token"],
+        token_provider=_async_token,
     )
 
     coordinator = CuliplanCoordinator(hass, client, entry)

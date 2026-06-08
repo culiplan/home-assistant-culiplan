@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from aiohttp import ClientSession
@@ -18,9 +19,33 @@ _LOGGER = logging.getLogger(__name__)
 class CuliplanApiClient:
     """Client for the Culiplan REST API."""
 
-    def __init__(self, session: ClientSession, access_token: str) -> None:
+    def __init__(
+        self,
+        session: ClientSession,
+        access_token: str,
+        *,
+        token_provider: Callable[[], Awaitable[str]] | None = None,
+    ) -> None:
         self._session = session
         self._access_token = access_token
+        # When supplied, an async callable that ensures the OAuth token is
+        # valid (refreshing if near expiry) and returns the current access
+        # token. Every request resolves the token through this so long-lived
+        # entries don't 401 once the captured token ages past its TTL — which
+        # otherwise forces a full reauth on the next event-driven REST call or
+        # user service invocation.
+        self._token_provider = token_provider
+
+    async def async_get_access_token(self) -> str:
+        """Return a currently-valid access token, refreshing if needed."""
+        if self._token_provider is not None:
+            self._access_token = await self._token_provider()
+        return self._access_token
+
+    async def _async_headers(self) -> dict[str, str]:
+        """Build auth headers with a freshly-validated token."""
+        await self.async_get_access_token()
+        return self._headers()
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -203,7 +228,7 @@ class CuliplanApiClient:
 
     async def _get(self, path: str) -> Any:
         async with self._session.get(
-            f"{BASE_URL}{path}", headers=self._headers()
+            f"{BASE_URL}{path}", headers=await self._async_headers()
         ) as resp:
             self._raise_for_status(resp.status, path)
             resp.raise_for_status()
@@ -211,7 +236,7 @@ class CuliplanApiClient:
 
     async def _post(self, path: str, payload: dict[str, Any]) -> Any:
         async with self._session.post(
-            f"{BASE_URL}{path}", headers=self._headers(), json=payload
+            f"{BASE_URL}{path}", headers=await self._async_headers(), json=payload
         ) as resp:
             self._raise_for_status(resp.status, path)
             if resp.status == 403:
@@ -248,7 +273,7 @@ class CuliplanApiClient:
         import json as _json
 
         async with self._session.post(
-            f"{BASE_URL}{path}", headers=self._headers(), json=payload
+            f"{BASE_URL}{path}", headers=await self._async_headers(), json=payload
         ) as resp:
             self._raise_for_status(resp.status, path)
             if not resp.ok:
@@ -262,7 +287,7 @@ class CuliplanApiClient:
 
     async def _patch(self, path: str, payload: dict[str, Any]) -> Any:
         async with self._session.patch(
-            f"{BASE_URL}{path}", headers=self._headers(), json=payload
+            f"{BASE_URL}{path}", headers=await self._async_headers(), json=payload
         ) as resp:
             self._raise_for_status(resp.status, path)
             resp.raise_for_status()
@@ -270,7 +295,7 @@ class CuliplanApiClient:
 
     async def _delete(self, path: str) -> None:
         async with self._session.delete(
-            f"{BASE_URL}{path}", headers=self._headers()
+            f"{BASE_URL}{path}", headers=await self._async_headers()
         ) as resp:
             self._raise_for_status(resp.status, path)
             resp.raise_for_status()

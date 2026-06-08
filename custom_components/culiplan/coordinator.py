@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, cast
+from typing import Any
 
 import socketio
 
@@ -316,17 +316,10 @@ class CuliplanCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ─── Token helpers ───────────────────────────────────────────────────────
 
     async def _get_valid_token(self) -> str:
-        from homeassistant.helpers import config_entry_oauth2_flow
+        """Return a currently-valid access token for the Socket.IO handshake.
 
-        implementation = (
-            await config_entry_oauth2_flow.async_get_config_entry_implementation(
-                self.hass, self.entry
-            )
-        )
-        session = config_entry_oauth2_flow.OAuth2Session(
-            self.hass, self.entry, implementation
-        )
-        await session.async_ensure_token_valid()
-        token = cast(str, session.token.get("access_token", ""))
-        self.client._access_token = token  # noqa: SLF001
-        return token
+        Delegates to the REST client's shared token provider so a single
+        OAuth2Session owns refresh — two sessions refreshing the same entry
+        would race the single-use refresh-token rotation.
+        """
+        return await self.client.async_get_access_token()

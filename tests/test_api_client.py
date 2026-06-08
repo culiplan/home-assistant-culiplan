@@ -244,3 +244,45 @@ class TestMutations:
             "suggest_meal", {"mealSlot": "dinner"}
         )
         assert result["speakable"] == "OK"
+
+
+# ─── Token provider refresh (long-lived entries don't 401 after TTL) ─────────
+
+
+class TestTokenProvider:
+    @pytest.mark.asyncio
+    async def test_request_refreshes_token_via_provider(self):
+        """Each request resolves the bearer through the async provider, so a
+        token that aged past its TTL is refreshed instead of 401-ing."""
+        provider = AsyncMock(return_value="tok_refreshed")
+        resp = _make_resp(json_payload={"id": "u1"})
+        session = MagicMock(spec=ClientSession)
+        session.get = MagicMock(return_value=resp)
+        client = CuliplanApiClient(
+            session=session, access_token="tok_stale", token_provider=provider
+        )
+
+        await client.async_get_user()
+
+        provider.assert_awaited_once()
+        sent = session.get.call_args.kwargs["headers"]["Authorization"]
+        assert sent == "Bearer tok_refreshed"
+
+    @pytest.mark.asyncio
+    async def test_async_get_access_token_returns_provider_value(self):
+        provider = AsyncMock(return_value="tok_new")
+        client = CuliplanApiClient(
+            session=MagicMock(spec=ClientSession),
+            access_token="tok_old",
+            token_provider=provider,
+        )
+        assert await client.async_get_access_token() == "tok_new"
+
+    @pytest.mark.asyncio
+    async def test_static_token_used_when_no_provider(self):
+        """Backward-compat: without a provider the captured token is used."""
+        client = CuliplanApiClient(
+            session=MagicMock(spec=ClientSession), access_token="tok_static"
+        )
+        assert await client.async_get_access_token() == "tok_static"
+        assert client._headers()["Authorization"] == "Bearer tok_static"
