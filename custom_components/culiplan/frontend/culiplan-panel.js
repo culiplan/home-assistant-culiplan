@@ -46,13 +46,6 @@ const CODE_VALID_MS = 50_000;
 const CULIPLAN_ORIGIN = "https://culiplan.com";
 
 /**
- * Integration version, surfaced only in failure breadcrumbs (_logFailure) so a
- * shared console log tells us which build hit the problem. Keep in sync with
- * `manifest.json` — it is informational, never load-bearing.
- */
-const CULIPLAN_INTEGRATION_VERSION = "0.14.0";
-
-/**
  * HA design tokens we forward to the embedded app. The web app keeps a
  * matching whitelist so an arbitrary postMessage cannot inject arbitrary
  * CSS variables. Keep this list in sync with `ALLOWED_HA_TOKENS` in
@@ -332,7 +325,14 @@ class CuliplanPanel extends HTMLElement {
       // (Google blocks its OAuth pages from being framed).
       if (data.type === "culiplan.haRelaunch") {
         this._fetchedAt = null; // force _isCodeFresh() to return false
-        this._launch();
+        // If we're already in the direct-login fallback, the SSO bridge was
+        // failing — re-running it would just fail again. Reload the login
+        // surface instead of bouncing through a doomed bridge attempt.
+        if (this._isFallback) {
+          this._loginFallback();
+        } else {
+          this._launch();
+        }
         return;
       }
 
@@ -450,11 +450,14 @@ class CuliplanPanel extends HTMLElement {
         return;
       }
 
-      // exchange_failed = the backend got a valid HA token but rejected it
-      // (revoked grant, token desync). Re-running the bridge will fail the same
-      // way, but the user CAN still sign in directly: load the app
-      // unauthenticated and let its in-iframe login form take over.
-      if (code === "exchange_failed") {
+      // The backend got a valid HA token but rejected it (revoked grant, token
+      // desync). Re-running the bridge will fail the same way, but the user CAN
+      // still sign in directly: load the app unauthenticated and let its
+      // in-iframe login form take over. `exchange_failed` is the pre-v0.14.0
+      // code for the same condition — kept so a cached older panel still
+      // recovers gracefully. `backend_unavailable` deliberately does NOT fall
+      // here: that's a transient backend outage where retrying is correct.
+      if (code === "auth_rejected" || code === "exchange_failed") {
         this._loginFallback();
         return;
       }
@@ -498,12 +501,21 @@ class CuliplanPanel extends HTMLElement {
     try {
       const haVersion =
         (this._hass && this._hass.config && this._hass.config.version) || null;
+      // Read the live installed version off the HACS update entity rather than
+      // hard-coding it (which would silently drift from manifest.json). Null
+      // when the integration was installed manually / has no update entity.
+      const updateEntity = this._findUpdateEntity();
+      const integrationVersion =
+        (updateEntity &&
+          updateEntity.attributes &&
+          updateEntity.attributes.installed_version) ||
+        null;
       // eslint-disable-next-line no-console
       console.warn("[culiplan][panel] SSO bridge launch failed", {
         code: code || "unknown",
         status: status || null,
         message,
-        integrationVersion: CULIPLAN_INTEGRATION_VERSION,
+        integrationVersion,
         haVersion,
       });
     } catch (_) {

@@ -111,10 +111,22 @@ class CuliplanLaunchView(HomeAssistantView):
                         resp.status,
                         len(body),
                     )
+                    # Distinguish *why* the exchange failed so the panel can pick
+                    # the right recovery. 401/403 = the backend rejected our
+                    # (already-refreshed) token; the bridge can't succeed, but the
+                    # user can still sign in directly, so the panel falls back to
+                    # the in-app login. Any other status is a backend-side problem
+                    # (5xx, Redis down) where retrying shortly is the right move.
+                    if resp.status in (401, 403):
+                        return web.Response(
+                            status=502,
+                            content_type="application/json",
+                            text='{"error": "auth_rejected", "message": "Your Culiplan sign-in needs to be renewed. Please sign in again."}',
+                        )
                     return web.Response(
                         status=502,
                         content_type="application/json",
-                        text='{"error": "exchange_failed", "message": "Culiplan SSO bridge is unavailable. Please try again in a moment."}',
+                        text='{"error": "backend_unavailable", "message": "Culiplan SSO bridge is unavailable. Please try again in a moment."}',
                     )
                 payload: dict[str, Any] = await resp.json()
         except Exception as err:  # noqa: BLE001
