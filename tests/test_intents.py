@@ -101,7 +101,10 @@ import yaml
 from custom_components.culiplan.const import DOMAIN, PANTRY_LOCATIONS
 
 _INTENTS_DIR = (
-    Path(__file__).resolve().parent.parent / "custom_components" / "culiplan" / "intents"
+    Path(__file__).resolve().parent.parent
+    / "custom_components"
+    / "culiplan"
+    / "intents"
 )
 _LANGS = ("en", "nl", "de", "fr", "es")
 
@@ -142,7 +145,9 @@ async def test_register_intents_wires_pantry_add_handler(hass, mock_config_entry
     from homeassistant.helpers import intent as ha_intent
 
     hass.async_add_executor_job = AsyncMock(
-        return_value={"intents": {"CuliplanAddToPantry": {}, "CuliplanWhatsInPantry": {}}}
+        return_value={
+            "intents": {"CuliplanAddToPantry": {}, "CuliplanWhatsInPantry": {}}
+        }
     )
     with patch.object(ha_intent, "async_register") as mock_register:
         await _register_intents(hass, mock_config_entry)
@@ -165,7 +170,9 @@ async def test_register_intents_wires_pantry_add_handler(hass, mock_config_entry
         ("es", "pantry", "milk añadido a la despensa."),
     ],
 )
-async def test_pantry_add_intent_speaks_localised_confirmation(language, location, expected):
+async def test_pantry_add_intent_speaks_localised_confirmation(
+    language, location, expected
+):
     handler = _pantry_handler()
     intent_obj = _intent_obj({"item": "milk ", "location": location}, language=language)
     client = intent_obj.hass.data[DOMAIN]["test_entry_id"]["client"]
@@ -215,7 +222,10 @@ async def test_pantry_add_intent_unlisted_language_uses_backend_speakable():
     with patch(
         "custom_components.culiplan._call_pantry_add",
         new=AsyncMock(
-            return_value={"success": True, "speakableResponse": "leite adicionado à sua despensa."}
+            return_value={
+                "success": True,
+                "speakableResponse": "leite adicionado à sua despensa.",
+            }
         ),
     ):
         await handler.async_handle(intent_obj)
@@ -252,7 +262,9 @@ async def test_pantry_add_intent_falls_back_to_hass_language():
 async def test_pantry_add_intent_not_connected():
     handler = _pantry_handler()
     intent_obj = _intent_obj({"item": "milk"}, connected=False)
-    with patch("custom_components.culiplan._call_pantry_add", new=AsyncMock()) as helper:
+    with patch(
+        "custom_components.culiplan._call_pantry_add", new=AsyncMock()
+    ) as helper:
         await handler.async_handle(intent_obj)
     helper.assert_not_awaited()
     assert _spoken(intent_obj) == "Culiplan is not connected."
@@ -262,7 +274,9 @@ async def test_pantry_add_intent_not_connected():
 async def test_pantry_add_intent_empty_item():
     handler = _pantry_handler()
     intent_obj = _intent_obj({"item": "   "})
-    with patch("custom_components.culiplan._call_pantry_add", new=AsyncMock()) as helper:
+    with patch(
+        "custom_components.culiplan._call_pantry_add", new=AsyncMock()
+    ) as helper:
         await handler.async_handle(intent_obj)
     helper.assert_not_awaited()
     assert _spoken(intent_obj) == "Sorry, I didn't catch what to add."
@@ -299,8 +313,12 @@ def test_intent_yaml_declares_pantry_add(lang):
     outs = {v["out"] for v in data["lists"]["culiplan_location"]["values"]}
     assert outs == {"pantry", "fridge", "freezer", "counter", "spice_rack"}
     blocks = data["intents"]["CuliplanAddToPantry"]["data"]
-    with_location = [b for b in blocks if "{culiplan_location:location}" in " ".join(b["sentences"])]
-    without_location = [b for b in blocks if b.get("slots", {}).get("location") == "pantry"]
+    with_location = [
+        b for b in blocks if "{culiplan_location:location}" in " ".join(b["sentences"])
+    ]
+    without_location = [
+        b for b in blocks if b.get("slots", {}).get("location") == "pantry"
+    ]
     assert with_location and without_location
     assert "{{ slots.item }}" in data["responses"]["intents"]["CuliplanAddToPantry"]
 
@@ -379,9 +397,13 @@ def test_every_yaml_intent_has_a_handler_mapping():
         _PANTRY_ADD_INTENT,
     )
 
-    routed = set(_INTENT_TO_TOOL) | set(_COOKING_INTENT_TO_SERVICE) | {_PANTRY_ADD_INTENT}
+    routed = (
+        set(_INTENT_TO_TOOL) | set(_COOKING_INTENT_TO_SERVICE) | {_PANTRY_ADD_INTENT}
+    )
     for lang in _LANGS:
-        data = yaml.safe_load((_INTENTS_DIR / f"{lang}.yaml").read_text(encoding="utf-8"))
+        data = yaml.safe_load(
+            (_INTENTS_DIR / f"{lang}.yaml").read_text(encoding="utf-8")
+        )
         assert set(data["intents"]) <= routed, lang
         assert set(data["responses"]["intents"]) == set(data["intents"]), lang
 
@@ -438,7 +460,10 @@ async def test_generic_intent_success_false_speaks_backend_error():
     handler = _generic_handler("CuliplanWhatsDinnerTonight")
     intent_obj = _intent_obj({})
     _client_of(intent_obj).async_execute_voice_tool = AsyncMock(
-        return_value={"success": False, "speakableResponse": "Sorry, something went wrong."}
+        return_value={
+            "success": False,
+            "speakableResponse": "Sorry, something went wrong.",
+        }
     )
     await handler.async_handle(intent_obj)
     assert _spoken(intent_obj) == "Sorry, something went wrong."
@@ -470,7 +495,9 @@ async def test_generic_intent_transport_error_is_spoken_not_raised():
 async def test_generic_intent_success_without_text_says_done():
     handler = _generic_handler("CuliplanGetShoppingList")
     intent_obj = _intent_obj({})
-    _client_of(intent_obj).async_execute_voice_tool = AsyncMock(return_value={"success": True})
+    _client_of(intent_obj).async_execute_voice_tool = AsyncMock(
+        return_value={"success": True}
+    )
     await handler.async_handle(intent_obj)
     assert _spoken(intent_obj) == "Done."
 
@@ -521,7 +548,9 @@ def test_sync_custom_sentences_first_run_copies(tmp_path):
         config / "custom_sentences" / "en" / "culiplan.yaml",
         config / "custom_sentences" / "nl" / "culiplan.yaml",
     ]
-    assert (config / "custom_sentences" / "en" / "culiplan.yaml").read_bytes() == b"language: en\n"
+    assert (
+        config / "custom_sentences" / "en" / "culiplan.yaml"
+    ).read_bytes() == b"language: en\n"
     assert not (config / "custom_sentences" / "de").exists()  # no source → nothing
 
 
@@ -600,18 +629,24 @@ async def test_async_sync_custom_sentences_no_reload_without_conversation(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_async_sync_custom_sentences_write_failure_does_not_raise(tmp_path, caplog):
+async def test_async_sync_custom_sentences_write_failure_does_not_raise(
+    tmp_path, caplog
+):
     from custom_components.culiplan import _async_sync_custom_sentences
 
     hass = _sync_hass(tmp_path)
-    hass.async_add_executor_job = AsyncMock(side_effect=OSError("read-only file system"))
+    hass.async_add_executor_job = AsyncMock(
+        side_effect=OSError("read-only file system")
+    )
     await _async_sync_custom_sentences(hass)  # must not raise
     hass.services.async_call.assert_not_awaited()
     assert "read-only file system" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_async_sync_custom_sentences_reload_failure_does_not_raise(tmp_path, caplog):
+async def test_async_sync_custom_sentences_reload_failure_does_not_raise(
+    tmp_path, caplog
+):
     from custom_components.culiplan import _async_sync_custom_sentences
 
     hass = _sync_hass(tmp_path)

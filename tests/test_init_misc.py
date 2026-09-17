@@ -272,9 +272,7 @@ async def test_lovelace_resources_collapses_existing_duplicates():
     from custom_components.culiplan import _LOVELACE_RESOURCES
 
     target = _LOVELACE_RESOURCES[0]["url"]
-    stored = [
-        {"id": f"dup{i}", "url": target, "type": "module"} for i in range(20)
-    ]
+    stored = [{"id": f"dup{i}", "url": target, "type": "module"} for i in range(20)]
     collection = _FakeResourceCollection(stored)
 
     await _async_register_lovelace_resources(_hass_with(collection))
@@ -852,4 +850,3 @@ def test_read_manifest_version_falls_back_on_failure(monkeypatch):
 
     monkeypatch.setattr(const_mod, "_Path", _patched)
     assert const_mod._read_manifest_version() == "dev"
-

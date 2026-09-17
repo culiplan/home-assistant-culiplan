@@ -196,7 +196,12 @@ async def test_pantry_add_forwards_all_fields_and_returns_envelope():
     )
     assert result is envelope
     client.async_add_pantry_item.assert_awaited_once_with(
-        "milk", quantity=2.0, unit="l", location="fridge", expiration_days=5, language="nl"
+        "milk",
+        quantity=2.0,
+        unit="l",
+        location="fridge",
+        expiration_days=5,
+        language="nl",
     )
 
 
@@ -218,12 +223,18 @@ async def test_pantry_add_success_false_raises():
     from custom_components.culiplan.services import _call_pantry_add
 
     client = _pantry_add_client(
-        return_value={"success": False, "speakableResponse": "Sorry, something went wrong."}
+        return_value={
+            "success": False,
+            "speakableResponse": "Sorry, something went wrong.",
+        }
     )
     with pytest.raises(HomeAssistantError) as excinfo:
         await _call_pantry_add(client, "milk")
     assert excinfo.value.translation_key == "pantry_add_failed"
-    assert "Sorry, something went wrong." in excinfo.value.translation_placeholders["error"]
+    assert (
+        "Sorry, something went wrong."
+        in excinfo.value.translation_placeholders["error"]
+    )
 
 
 @pytest.mark.asyncio
@@ -264,7 +275,13 @@ def test_pantry_add_schema_defaults_and_validation():
     validated = PANTRY_ADD_SCHEMA({"name": "milk"})
     assert validated["location"] == "pantry"
     validated = PANTRY_ADD_SCHEMA(
-        {"name": "milk", "quantity": "2", "unit": "l", "location": "fridge", "expiration_days": "7"}
+        {
+            "name": "milk",
+            "quantity": "2",
+            "unit": "l",
+            "location": "fridge",
+            "expiration_days": "7",
+        }
     )
     assert validated["quantity"] == 2.0
     assert validated["expiration_days"] == 7
@@ -289,12 +306,23 @@ async def test_handle_pantry_add_calls_client_with_ha_language():
 
     call_obj = MagicMock()
     call_obj.data = schema(
-        {"name": "milk", "quantity": 2, "unit": "l", "location": "fridge", "expiration_days": 3}
+        {
+            "name": "milk",
+            "quantity": 2,
+            "unit": "l",
+            "location": "fridge",
+            "expiration_days": 3,
+        }
     )
     await handler(call_obj)
 
     client.async_add_pantry_item.assert_awaited_once_with(
-        "milk", quantity=2.0, unit="l", location="fridge", expiration_days=3, language="nl"
+        "milk",
+        quantity=2.0,
+        unit="l",
+        location="fridge",
+        expiration_days=3,
+        language="nl",
     )
 
 

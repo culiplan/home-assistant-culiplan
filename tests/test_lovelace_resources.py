@@ -28,7 +28,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-INIT_PATH = Path(__file__).resolve().parents[1] / "custom_components/culiplan/__init__.py"
+INIT_PATH = (
+    Path(__file__).resolve().parents[1] / "custom_components/culiplan/__init__.py"
+)
 
 
 def _parse_lovelace_resources(source: str) -> list[dict]:

@@ -295,7 +295,12 @@ class TestAddPantryItem:
         resp = _make_resp(
             json_payload={
                 "success": True,
-                "data": {"name": "milk", "quantity": 2, "unit": "l", "location": "fridge"},
+                "data": {
+                    "name": "milk",
+                    "quantity": 2,
+                    "unit": "l",
+                    "location": "fridge",
+                },
                 "speakableResponse": "Added milk to your pantry.",
             }
         )
