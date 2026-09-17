@@ -2,6 +2,27 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — 2026-09-17
+
+Adds the first pantry *write* path for Home Assistant, and fixes two bugs that meant no Culiplan Assist sentence has ever been recognised in production.
+
+### Added
+
+- **`culiplan.pantry_add` service** — `name` (required), `quantity`, `unit`, `location` (`pantry` / `fridge` / `freezer` / `counter` / `spice_rack` / `other`, default `pantry`), `expiration_days`. Turns a "new item on the fridge list" automation into a one-line service call.
+- **`add_to_pantry` LLM tool** — the seventh Culiplan tool exposed to any HA conversation agent (OpenAI / Anthropic / Google / Ollama), so "add milk to the fridge" works through whichever LLM you already run in HA.
+- **`CuliplanAddToPantry` Assist intent** in en / nl / de / fr / es — "add milk to the fridge", "zet melk in de koelkast", "füge Milch zum Kühlschrank hinzu", "ajoute du lait au frigo", "añade leche a la nevera" — with a location-aware spoken confirmation. The location slot is optional and defaults to the pantry.
+
+All three go through the backend's voice-tool executor (`POST /api/voice/execute`, tool `add_to_pantry`), which matches an existing catalog item before creating one and writes real stock. The raw `POST /api/pantry/items` endpoint was deliberately not used: it creates a catalog entry with no stock, so "add milk to the fridge" would have put nothing in the fridge.
+
+### Fixed
+
+- **Assist sentences are now actually installed.** Home Assistant only reads custom sentences from `<config>/custom_sentences/<lang>/`; the integration shipped its `intents/*.yaml` but never put them there, so every Culiplan sentence fell through to "Sorry, I couldn't understand that". Setup now copies each language file to `custom_sentences/<lang>/culiplan.yaml` (byte-compared, never rewritten when unchanged) and calls `conversation.reload` when something was written. The files are left in place when the integration is removed, in case you edited them.
+- **Assist intents no longer 400.** The generic intent handler posted to `/api/voice/ha-assist`, an endpoint that only accepts `suggest_meal` / `fill_shopping_list` and requires Premium, so "what's for dinner", "what's in my pantry" and "add … to the shopping list" all failed even when recognised. They now go through `/api/voice/execute` with the correct slot-to-parameter mapping; the non-existent `get_expiring_pantry` tool is remapped to `get_expiring_items`, and the registry's tool names are guarded by a test.
+
+### Tests
+
+- 756 passing, 2 skipped (was 683). Coverage 95.37%. New tests cover the API method, service, LLM tool, hassil recognition of 12 real sentences across the five languages, custom-sentences install/skip/overwrite/reload, and a snapshot of the backend voice-tool names.
+
 ## [0.14.3] — 2026-09-02
 
 Completes the panel fix from 0.14.2. That release made the panel *host* fill the viewport but left the iframe inside it at 150px, so the symptom was unchanged for users.
