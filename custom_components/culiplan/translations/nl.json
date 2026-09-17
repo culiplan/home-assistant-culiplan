@@ -74,6 +74,9 @@
     "pantry_decrement_failed": {
       "message": "Voorraad verminderen mislukt: {error}"
     },
+    "pantry_add_failed": {
+      "message": "Kon {name} niet aan de voorraad toevoegen: {error}"
+    },
     "pantry_expiring_failed": {
       "message": "Ophalen van bijna verlopen voorraad mislukt: {error}"
     },

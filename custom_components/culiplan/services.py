@@ -6,6 +6,7 @@ AI services (tasks 1388, 1389):
     culiplan.fill_shopping_list        — 3-mode AI shopping list fill
 
 Pantry / household services (tasks 1376, 1378, 1379):
+    culiplan.pantry_add                — add an item to the pantry (free)
     culiplan.pantry_decrement          — barcode-scan decrement (free)
     culiplan.pantry_expiring_items     — list expiring items (free)
     culiplan.scale_tonight_servings    — presence-based serving scale (PREMIUM)
@@ -40,6 +41,7 @@ from .const import (
     CONF_BYOK_PROVIDER,
     CONF_LOCAL_ENDPOINT,
     DOMAIN,
+    PANTRY_LOCATIONS,
 )
 from .ai.debug_logger import setup_debug_log_purge
 from .ai.key_store import BYOKKeyStore
@@ -55,6 +57,7 @@ SERVICE_SUGGEST_MEAL = "suggest_meal"
 SERVICE_FILL_SHOPPING_LIST = "fill_shopping_list"
 
 # Pantry / household services (Sonnet-D)
+SERVICE_PANTRY_ADD = "pantry_add"
 SERVICE_PANTRY_DECREMENT = "pantry_decrement"
 SERVICE_PANTRY_EXPIRING = "pantry_expiring_items"
 SERVICE_SCALE_TONIGHT_SERVINGS = "scale_tonight_servings"
@@ -73,6 +76,18 @@ SUGGEST_MEAL_SCHEMA = vol.Schema(
 FILL_SHOPPING_LIST_SCHEMA = vol.Schema(
     {
         vol.Optional("week_offset"): vol.Coerce(int),
+    }
+)
+
+PANTRY_ADD_SCHEMA = vol.Schema(
+    {
+        vol.Required("name"): vol.All(str, vol.Length(min=1, max=200)),
+        vol.Optional("quantity"): vol.All(vol.Coerce(float), vol.Range(min=0.01)),
+        vol.Optional("unit"): vol.All(str, vol.Length(min=1, max=40)),
+        vol.Optional("location", default="pantry"): vol.In(list(PANTRY_LOCATIONS)),
+        vol.Optional("expiration_days"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=3650)
+        ),
     }
 )
 
@@ -280,6 +295,59 @@ def _ensure_v1_path(endpoint: str) -> str:
     return url
 
 
+async def _call_pantry_add(
+    client: CuliplanApiClient,
+    name: str,
+    quantity: float | None = None,
+    unit: str | None = None,
+    location: str | None = None,
+    expiration_days: int | None = None,
+    *,
+    language: str | None = None,
+) -> dict[str, Any]:
+    """Add an item to the pantry via the ``add_to_pantry`` voice tool.
+
+    Shared by the ``pantry_add`` service, the ``add_to_pantry`` LLM tool and
+    the ``CuliplanAddToPantry`` Assist intent so all three surfaces get the
+    same error translation. Returns the raw ``/api/voice/execute`` envelope
+    (``speakableResponse`` is the localised confirmation).
+    """
+    try:
+        result = await client.async_add_pantry_item(
+            name,
+            quantity=quantity,
+            unit=unit,
+            location=location,
+            expiration_days=expiration_days,
+            language=language,
+        )
+    except HomeAssistantError:
+        # Already typed (ConfigEntryAuthFailed → reauth, api_forbidden, …).
+        raise
+    except Exception as exc:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="pantry_add_failed",
+            translation_placeholders={"name": name, "error": str(exc)},
+        ) from exc
+    # The voice executor reports a rejected tool call as HTTP 200 with
+    # ``success: false`` (unknown tool, handler threw, …) — surface it.
+    if isinstance(result, dict) and result.get("success") is False:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="pantry_add_failed",
+            translation_placeholders={
+                "name": name,
+                "error": str(
+                    result.get("speakableResponse")
+                    or result.get("error")
+                    or "backend rejected the request"
+                ),
+            },
+        )
+    return result
+
+
 async def _call_pantry_decrement(
     client: CuliplanApiClient,
     barcode: str,
@@ -463,6 +531,35 @@ def async_register_services(hass: HomeAssistant) -> None:
             },
         )
 
+    async def handle_pantry_add(call: ServiceCall) -> None:
+        entry_id = _find_entry_id(hass)
+        if not entry_id:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="not_configured",
+            )
+        client: CuliplanApiClient = hass.data[DOMAIN][entry_id]["client"]
+        name: str = call.data["name"]
+        location: str = call.data["location"]
+        result = await _call_pantry_add(
+            client,
+            name,
+            quantity=call.data.get("quantity"),
+            unit=call.data.get("unit"),
+            location=location,
+            expiration_days=call.data.get("expiration_days"),
+            language=hass.config.language,
+        )
+        raw = result.get("data")
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        _LOGGER.info(
+            "[culiplan] Pantry item added: name=%s qty=%s unit=%s location=%s",
+            name,
+            data.get("quantity", call.data.get("quantity")),
+            data.get("unit", call.data.get("unit")),
+            data.get("location", location),
+        )
+
     async def handle_pantry_decrement(call: ServiceCall) -> None:
         entry_id = _find_entry_id(hass)
         if not entry_id:
@@ -547,6 +644,7 @@ def async_register_services(hass: HomeAssistant) -> None:
             handle_fill_shopping_list,
             FILL_SHOPPING_LIST_SCHEMA,
         ),
+        (SERVICE_PANTRY_ADD, handle_pantry_add, PANTRY_ADD_SCHEMA),
         (SERVICE_PANTRY_DECREMENT, handle_pantry_decrement, PANTRY_DECREMENT_SCHEMA),
         (SERVICE_PANTRY_EXPIRING, handle_pantry_expiring, PANTRY_EXPIRING_SCHEMA),
         (
@@ -570,6 +668,7 @@ def async_unregister_services(hass: HomeAssistant) -> None:
     for name in (
         SERVICE_SUGGEST_MEAL,
         SERVICE_FILL_SHOPPING_LIST,
+        SERVICE_PANTRY_ADD,
         SERVICE_PANTRY_DECREMENT,
         SERVICE_PANTRY_EXPIRING,
         SERVICE_SCALE_TONIGHT_SERVINGS,

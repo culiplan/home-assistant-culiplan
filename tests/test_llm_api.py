@@ -38,7 +38,7 @@ def test_culiplan_llm_api_metadata() -> None:
 def test_build_tools_non_empty_and_well_formed() -> None:
     """Each tool has a name, description, and voluptuous parameter schema."""
     tools = _build_tools()
-    assert len(tools) >= 6, "Expected at least 6 LLM tools (v0.3.0 ship list)"
+    assert len(tools) >= 7, "Expected at least 7 LLM tools (v0.3.0 list + add_to_pantry)"
     names = {t.name for t in tools}
     assert {
         "get_meal_plan",
@@ -47,6 +47,7 @@ def test_build_tools_non_empty_and_well_formed() -> None:
         "find_recipes_by_ingredients",
         "get_recipe",
         "get_pantry_items",
+        "add_to_pantry",
     }.issubset(names)
     for tool in tools:
         assert tool.name, f"Tool missing name: {tool}"
@@ -124,6 +125,7 @@ from custom_components.culiplan.llm_api import (
     _find_entry_id,
     _get_client,
     _slot_in_range,
+    _AddToPantryTool,
     _AddToShoppingListTool,
     _FindRecipesByIngredientsTool,
     _GetMealPlanTool,
@@ -461,6 +463,76 @@ async def test_pantry_tool_not_configured():
 
 
 # Register failure non-fatal
+
+
+# ─── add_to_pantry ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_add_to_pantry_tool_calls_shared_helper():
+    from unittest.mock import patch
+
+    client = MagicMock()
+    hass = _hass_with_client(client)
+    ctx = MagicMock()
+    ctx.language = "de"
+    envelope = {
+        "success": True,
+        "data": {"name": "Milch", "quantity": 2, "unit": "l", "location": "fridge"},
+        "speakableResponse": "Milch zu deiner Vorratskammer hinzugefügt.",
+    }
+    with patch(
+        "custom_components.culiplan.llm_api._call_pantry_add",
+        new=AsyncMock(return_value=envelope),
+    ) as helper:
+        result = await _AddToPantryTool().async_call(
+            hass,
+            _ti({"name": "Milch", "quantity": 2, "unit": "l", "location": "fridge"}),
+            ctx,
+        )
+    helper.assert_awaited_once_with(
+        client, "Milch", quantity=2, unit="l", location="fridge", expiration_days=None, language="de"
+    )
+    assert result == {
+        "added": True,
+        "name": "Milch",
+        "quantity": 2,
+        "unit": "l",
+        "location": "fridge",
+        "message": "Milch zu deiner Vorratskammer hinzugefügt.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_add_to_pantry_tool_defaults_location_to_pantry():
+    from unittest.mock import patch
+
+    hass = _hass_with_client(MagicMock())
+    with patch(
+        "custom_components.culiplan.llm_api._call_pantry_add",
+        new=AsyncMock(return_value={"success": True}),
+    ) as helper:
+        result = await _AddToPantryTool().async_call(hass, _ti({"name": "rice"}), MagicMock())
+    assert helper.call_args.kwargs["location"] == "pantry"
+    assert result["location"] == "pantry"
+    assert result["added"] is True
+
+
+def test_add_to_pantry_tool_schema_rejects_unknown_location():
+    import voluptuous as vol
+
+    schema = _AddToPantryTool().parameters
+    assert schema({"name": "milk", "location": "freezer", "quantity": "1.5"})["quantity"] == 1.5
+    with pytest.raises(vol.Invalid):
+        schema({"name": "milk", "location": "garage"})
+
+
+@pytest.mark.asyncio
+async def test_add_to_pantry_tool_not_configured():
+    hass = MagicMock()
+    hass.data = {}
+    result = await _AddToPantryTool().async_call(hass, _ti({"name": "milk"}), MagicMock())
+    assert result["error"] == "not_configured"
 
 
 def test_register_failure_non_fatal():

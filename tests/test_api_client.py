@@ -246,6 +246,101 @@ class TestMutations:
         assert result["speakable"] == "OK"
 
 
+# ─── Voice tool executor ─────────────────────────────────────────────────────
+
+
+class TestExecuteVoiceTool:
+    @pytest.mark.asyncio
+    async def test_posts_to_voice_execute_with_language(self):
+        resp = _make_resp(
+            json_payload={"success": True, "data": {}, "speakableResponse": "ok"}
+        )
+        client = _make_client("post", resp)
+        result = await client.async_execute_voice_tool(
+            "add_to_shopping_list", {"name": "milk"}, language="nl"
+        )
+        assert result["speakableResponse"] == "ok"
+        call = client._session.post.call_args
+        assert call.args[0].endswith("/api/voice/execute")
+        assert call.kwargs["json"] == {
+            "toolName": "add_to_shopping_list",
+            "params": {"name": "milk"},
+            "source": "home_assistant",
+            "language": "nl",
+        }
+
+    @pytest.mark.asyncio
+    async def test_language_omitted_when_not_given(self):
+        client = _make_client("post", _make_resp(json_payload={"success": True}))
+        await client.async_execute_voice_tool("whats_for_dinner", {})
+        assert "language" not in client._session.post.call_args.kwargs["json"]
+
+    @pytest.mark.asyncio
+    async def test_ha_assist_endpoint_still_used_for_cloud_ai(self):
+        """suggest_meal / fill_shopping_list keep going to /voice/ha-assist."""
+        client = _make_client("post", _make_resp(json_payload={"speakable": "OK"}))
+        await client.async_call_voice_tool("suggest_meal", {})
+        call = client._session.post.call_args
+        assert call.args[0].endswith("/api/voice/ha-assist")
+        assert call.kwargs["json"] == {"tool": "suggest_meal", "params": {}}
+
+
+# ─── Pantry add (voice tool executor) ────────────────────────────────────────
+
+
+class TestAddPantryItem:
+    @pytest.mark.asyncio
+    async def test_posts_add_to_pantry_voice_tool(self):
+        """Full payload goes to POST /api/voice/execute as the add_to_pantry tool."""
+        resp = _make_resp(
+            json_payload={
+                "success": True,
+                "data": {"name": "milk", "quantity": 2, "unit": "l", "location": "fridge"},
+                "speakableResponse": "Added milk to your pantry.",
+            }
+        )
+        client = _make_client("post", resp)
+        result = await client.async_add_pantry_item(
+            "milk",
+            quantity=2,
+            unit="l",
+            location="fridge",
+            expiration_days=7,
+            language="en",
+        )
+        assert result["success"] is True
+        call = client._session.post.call_args
+        assert call.args[0].endswith("/api/voice/execute")
+        assert call.kwargs["json"] == {
+            "toolName": "add_to_pantry",
+            "params": {
+                "name": "milk",
+                "quantity": 2,
+                "unit": "l",
+                "location": "fridge",
+                "expirationDays": 7,
+            },
+            "source": "home_assistant",
+            "language": "en",
+        }
+
+    @pytest.mark.asyncio
+    async def test_omits_unset_optional_params(self):
+        """Only the name is sent when nothing else is given (backend defaults apply)."""
+        resp = _make_resp(json_payload={"success": True, "data": {}})
+        client = _make_client("post", resp)
+        await client.async_add_pantry_item("bread")
+        body = client._session.post.call_args.kwargs["json"]
+        assert body["params"] == {"name": "bread"}
+        assert "language" not in body
+
+    @pytest.mark.asyncio
+    async def test_401_raises_auth_failed(self):
+        client = _make_client("post", _make_resp(status=401))
+        with pytest.raises(ConfigEntryAuthFailed):
+            await client.async_add_pantry_item("milk")
+
+
 # ─── Token provider refresh (long-lived entries don't 401 after TTL) ─────────
 
 

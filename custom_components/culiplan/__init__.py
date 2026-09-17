@@ -25,7 +25,13 @@ from homeassistant.helpers import (
 from homeassistant.helpers.typing import ConfigType
 
 from .api import CuliplanApiClient
-from .const import DOMAIN, MANIFEST_VERSION, OAUTH_CLIENT_ID, PLATFORMS
+from .const import (
+    DOMAIN,
+    MANIFEST_VERSION,
+    OAUTH_CLIENT_ID,
+    PANTRY_LOCATIONS,
+    PLATFORMS,
+)
 from .coordinator import CuliplanCoordinator
 from .cooking_services import (
     async_register_cooking_services,
@@ -33,7 +39,11 @@ from .cooking_services import (
 )
 from .launch_view import CuliplanLaunchView
 from .llm_api import async_register_llm_api, async_unregister_llm_api
-from .services import async_register_services, async_unregister_services
+from .services import (
+    _call_pantry_add,
+    async_register_services,
+    async_unregister_services,
+)
 
 
 # ─── Lovelace resource auto-registration (task-1408) ─────────────────────────
@@ -97,14 +107,35 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _INTENTS_DIR = Path(__file__).parent / "intents"
 
+# Assist intent → backend voice tool, executed on POST /api/voice/execute.
+# Every value must exist by that exact name in the backend's
+# voiceToolRegistry.ts (verified 2026-09-17; the earlier
+# "get_expiring_pantry" never existed — the tool is get_expiring_items).
 _INTENT_TO_TOOL: dict[str, str] = {
     "CuliplanWhatsDinnerTonight": "whats_for_dinner",
     "CuliplanGetWeekMeals": "get_week_meals",
     "CuliplanGetShoppingList": "get_shopping_list",
     "CuliplanAddToShoppingList": "add_to_shopping_list",
     "CuliplanWhatsInPantry": "whats_in_pantry",
-    "CuliplanWhatsExpiringSoon": "get_expiring_pantry",
+    "CuliplanWhatsExpiringSoon": "get_expiring_items",
 }
+
+# Sentence slot name → tool parameter name, where they differ.
+_INTENT_SLOT_TO_PARAM: dict[str, dict[str, str]] = {
+    "CuliplanAddToShoppingList": {"item": "name"},
+}
+
+# Languages we ship Assist sentences for (custom_components/culiplan/intents/).
+_INTENT_LANGS: tuple[str, ...] = ("en", "nl", "de", "fr", "es")
+
+# HA's default conversation agent only reads sentence files from
+# <config>/custom_sentences/<lang>/*.yaml — there is no hook for a custom
+# component to ship them in its own directory. So on every setup we install
+# our per-language YAML there under this name (byte-compare first, so an
+# unchanged file is never rewritten) and ask the conversation integration to
+# reload if anything changed. The files are deliberately left in place on
+# unload / removal: the user may have edited them.
+_CUSTOM_SENTENCES_FILENAME = "culiplan.yaml"
 
 # Cooking-mode intents that map directly to HA services (task-1397).
 # These call the local service rather than the remote voice-tool endpoint.
@@ -112,6 +143,73 @@ _COOKING_INTENT_TO_SERVICE: dict[str, str] = {
     "CuliplanNextCookingStep": "advance_cooking_step",
     "CuliplanSetRecipeTimer": "set_recipe_timer",
     "CuliplanCancelRecipeTimer": "cancel_recipe_timer",
+}
+
+# "Add {item} to the fridge" — writes to the pantry through the same helper
+# as the culiplan.pantry_add service (services._call_pantry_add).
+_PANTRY_ADD_INTENT = "CuliplanAddToPantry"
+
+# Spoken confirmation per language: (template, location → spoken phrase).
+# Composed locally so the reply echoes the location Assist understood
+# ("Added milk to your fridge"); the backend's own speakable string is
+# location-agnostic ("Added milk to your pantry") and is used as fallback
+# for any language not listed here. Keys mirror PANTRY_LOCATIONS.
+_PANTRY_ADD_SPEECH: dict[str, tuple[str, dict[str, str]]] = {
+    "en": (
+        "Added {item} to your {location}.",
+        {
+            "pantry": "pantry",
+            "fridge": "fridge",
+            "freezer": "freezer",
+            "counter": "counter",
+            "spice_rack": "spice rack",
+            "other": "pantry",
+        },
+    ),
+    "nl": (
+        "{item} toegevoegd aan je {location}.",
+        {
+            "pantry": "voorraad",
+            "fridge": "koelkast",
+            "freezer": "diepvries",
+            "counter": "aanrecht",
+            "spice_rack": "kruidenrek",
+            "other": "voorraad",
+        },
+    ),
+    "de": (
+        "{item} {location} hinzugefügt.",
+        {
+            "pantry": "zum Vorrat",
+            "fridge": "zum Kühlschrank",
+            "freezer": "zum Gefrierschrank",
+            "counter": "zur Arbeitsplatte",
+            "spice_rack": "zum Gewürzregal",
+            "other": "zum Vorrat",
+        },
+    ),
+    "fr": (
+        "{item} ajouté {location}.",
+        {
+            "pantry": "au garde-manger",
+            "fridge": "au frigo",
+            "freezer": "au congélateur",
+            "counter": "sur le plan de travail",
+            "spice_rack": "à l'étagère à épices",
+            "other": "au garde-manger",
+        },
+    ),
+    "es": (
+        "{item} añadido {location}.",
+        {
+            "pantry": "a la despensa",
+            "fridge": "a la nevera",
+            "freezer": "al congelador",
+            "counter": "a la encimera",
+            "spice_rack": "al especiero",
+            "other": "a la despensa",
+        },
+    ),
 }
 
 
@@ -429,6 +527,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry, [Platform(p) for p in PLATFORMS]
     )
 
+    await _async_sync_custom_sentences(hass)
     await _register_intents(hass, entry)
     async_register_services(hass)
     async_register_cooking_services(hass)
@@ -547,6 +646,72 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+# ─── Assist sentence installation ────────────────────────────────────────────
+
+
+def _sync_custom_sentences_sync(src_dir: Path, config_dir: Path) -> list[Path]:
+    """Copy each shipped intents/<lang>.yaml into custom_sentences/<lang>/.
+
+    Blocking helper — runs in the executor. Returns the destination paths
+    that were actually written; a destination whose bytes already equal the
+    source is skipped so unchanged files are never rewritten.
+    """
+    written: list[Path] = []
+    for lang in _INTENT_LANGS:
+        src = src_dir / f"{lang}.yaml"
+        if not src.is_file():
+            continue
+        payload = src.read_bytes()
+        dest = config_dir / "custom_sentences" / lang / _CUSTOM_SENTENCES_FILENAME
+        if dest.is_file() and dest.read_bytes() == payload:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(payload)
+        written.append(dest)
+    return written
+
+
+async def _async_sync_custom_sentences(hass: HomeAssistant) -> None:
+    """Install the Assist sentence files and reload conversation if needed.
+
+    Never raises: a read-only config dir or a failed reload must not stop
+    the integration from setting up — the sentences are then simply picked
+    up on the next Home Assistant restart.
+    """
+    try:
+        config_dir = Path(hass.config.config_dir)
+        written = await hass.async_add_executor_job(
+            _sync_custom_sentences_sync, _INTENTS_DIR, config_dir
+        )
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Could not install Culiplan Assist sentences into "
+            "custom_sentences/ (%s); voice commands may not be recognised",
+            err,
+        )
+        return
+    if not written:
+        _LOGGER.debug("Culiplan Assist sentences already up to date")
+        return
+    _LOGGER.info(
+        "Installed Culiplan Assist sentences: %s",
+        ", ".join(str(p) for p in written),
+    )
+    if "conversation" not in hass.config.components:
+        _LOGGER.debug(
+            "conversation integration not loaded; sentences load on next start"
+        )
+        return
+    try:
+        await hass.services.async_call("conversation", "reload", {}, blocking=True)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "conversation.reload failed after installing Culiplan sentences "
+            "(%s); restart Home Assistant to pick them up",
+            err,
+        )
+
+
 # ─── Assist intent registration ──────────────────────────────────────────────
 
 
@@ -559,7 +724,7 @@ async def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
     registered before async_setup_entry returns (closes voice-command race).
     """
     lang = hass.config.language.split("-")[0].lower()
-    if lang not in ("en", "nl", "de", "fr", "es"):
+    if lang not in _INTENT_LANGS:
         lang = "en"
 
     intents_file = _INTENTS_DIR / f"{lang}.yaml"
@@ -584,6 +749,8 @@ async def _register_intents(hass: HomeAssistant, entry: ConfigEntry) -> None:
             # Cooking-mode intents are handled by local HA service calls.
             if intent_name in _COOKING_INTENT_TO_SERVICE:
                 handler = _make_cooking_intent_handler(intent_name, entry)
+            elif intent_name == _PANTRY_ADD_INTENT:
+                handler = _make_pantry_add_intent_handler(entry)
             else:
                 handler = _make_intent_handler(intent_name, entry)
             # async_register is idempotent (overwrites on reload).
@@ -618,16 +785,33 @@ def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentH
             tool = _INTENT_TO_TOOL.get(intent_name)
             if not tool:
                 return _speech(intent_obj, "That intent is not configured.")
-            slots: dict[str, Any] = {
-                k: v.get("value") for k, v in intent_obj.slots.items()
-            }
+            # Rename sentence slots to the tool's parameter names and drop
+            # empty ones; wildcard slot text carries trailing whitespace.
+            slot_map = _INTENT_SLOT_TO_PARAM.get(intent_name, {})
+            params: dict[str, Any] = {}
+            for slot_name, slot in intent_obj.slots.items():
+                value = slot.get("value")
+                if isinstance(value, str):
+                    value = value.strip()
+                if value in (None, ""):
+                    continue
+                params[slot_map.get(slot_name, slot_name)] = value
+            fallback = "Sorry, Culiplan couldn't complete that request."
             try:
-                result = await client.async_call_voice_tool(tool, slots)
-                text = result.get("speakable") or result.get("message") or "Done."
+                result = await client.async_execute_voice_tool(
+                    tool, params, language=_intent_language(intent_obj)
+                )
             except Exception as err:
                 _LOGGER.error("Voice tool '%s' failed: %s", tool, err)
-                text = "Sorry, Culiplan couldn't complete that request."
-            return _speech(intent_obj, text)
+                return _speech(intent_obj, fallback)
+            spoken = result.get("speakableResponse") or result.get("message")
+            if result.get("success") is False:
+                # HTTP 200 with a spoken error — surface the backend's text.
+                _LOGGER.warning(
+                    "Voice tool '%s' rejected the request: %s", tool, spoken
+                )
+                return _speech(intent_obj, spoken or fallback)
+            return _speech(intent_obj, spoken or "Done.")
 
     return _Handler()
 
@@ -696,6 +880,73 @@ def _make_cooking_intent_handler(
             return _speech(intent_obj, text)
 
     return _CookingHandler()
+
+
+def _make_pantry_add_intent_handler(entry: ConfigEntry) -> intent.IntentHandler:
+    """Return the IntentHandler for CuliplanAddToPantry.
+
+    Slots: ``item`` (wildcard, required) and ``location`` (optional; one of
+    PANTRY_LOCATIONS, defaults to "pantry"). Goes through
+    services._call_pantry_add so the intent, the service and the LLM tool
+    share one code path and one error translation.
+    """
+
+    class _PantryAddHandler(intent.IntentHandler):
+        intent_type = _PANTRY_ADD_INTENT
+
+        async def async_handle(
+            self, intent_obj: intent.Intent
+        ) -> intent.IntentResponse:
+            data = intent_obj.hass.data.get(DOMAIN, {}).get(entry.entry_id)
+            if not data:
+                return _speech(intent_obj, "Culiplan is not connected.")
+            client: CuliplanApiClient = data["client"]
+            slots: dict[str, Any] = {
+                k: v.get("value") for k, v in intent_obj.slots.items()
+            }
+            item = str(slots.get("item") or "").strip()
+            if not item:
+                return _speech(intent_obj, "Sorry, I didn't catch what to add.")
+            location = str(slots.get("location") or "pantry").strip().lower()
+            if location not in PANTRY_LOCATIONS:
+                location = "pantry"
+            lang = _intent_language(intent_obj)
+            try:
+                result = await _call_pantry_add(
+                    client, item, location=location, language=lang
+                )
+            except Exception as err:
+                _LOGGER.error("Pantry add intent failed for '%s': %s", item, err)
+                return _speech(
+                    intent_obj, "Sorry, Culiplan couldn't add that to your pantry."
+                )
+            return _speech(intent_obj, _pantry_add_speech(lang, item, location, result))
+
+    return _PantryAddHandler()
+
+
+def _pantry_add_speech(
+    lang: str, item: str, location: str, result: dict[str, Any]
+) -> str:
+    """Localised confirmation for a pantry add (see _PANTRY_ADD_SPEECH)."""
+    entry = _PANTRY_ADD_SPEECH.get(lang)
+    if entry is None:
+        backend = result.get("speakableResponse")
+        if isinstance(backend, str) and backend:
+            return backend
+        entry = _PANTRY_ADD_SPEECH["en"]
+    template, locations = entry
+    return template.format(
+        item=item, location=locations.get(location, locations["pantry"])
+    )
+
+
+def _intent_language(intent_obj: intent.Intent) -> str:
+    """Base language code ("nl" for "nl-BE") of the intent, else of HA."""
+    language = str(
+        getattr(intent_obj, "language", None) or intent_obj.hass.config.language or "en"
+    )
+    return language.split("-")[0].lower()
 
 
 def _speech(intent_obj: intent.Intent, text: str) -> intent.IntentResponse:

@@ -25,7 +25,33 @@ Bring your [Culiplan](https://culiplan.com) meal planning account into Home Assi
 | `sensor.culiplan_expiring_pantry` | Pantry items expiring within 3 days |
 | `sensor.culiplan_planned_kwh_today` | Estimated cooking energy (kWh) for today's planned meals — Phase 3 |
 
-Voice (Assist): say "Add bread to the shopping list" or "What's for dinner tonight?" once the integration is linked.
+### Voice (Assist)
+
+The integration ships its Assist sentences for English, Dutch, German, French and Spanish. Home Assistant only reads sentence files from `<config>/custom_sentences/<lang>/`, so on every setup the integration copies its files there as `custom_sentences/<lang>/culiplan.yaml` (only when missing or changed) and calls `conversation.reload` so they take effect immediately. If the reload is not possible (for example, the conversation integration is not loaded yet), a Home Assistant restart or a manual `conversation.reload` service call picks them up. The files are **not** removed when the integration is unloaded or removed, so any edits you made survive; delete them yourself if you no longer want them.
+
+Example sentences (English; the other languages have equivalents):
+
+| Intent | Say |
+|---|---|
+| What's for dinner | "what's for dinner tonight", "what am I cooking today", "what's on the menu" |
+| This week's meals | "what's planned this week", "what's for dinner tomorrow" |
+| Shopping list | "what do I need to buy", "show my shopping list" |
+| Add to shopping list | "add bread to my shopping list", "I need to buy milk" |
+| What's in my pantry | "what's in my pantry", "what can I cook with what I have" |
+| Expiring soon | "what's expiring soon", "what should I use up" |
+| Add to pantry | "add milk to the fridge", "put bread in the freezer", "add rice to my pantry", "I bought apples" (location optional, defaults to pantry) |
+| Cooking mode | "next step", "start the pasta timer for 600 seconds", "cancel the pasta timer" |
+
+### Services
+
+| Service | Description |
+|---|---|
+| `culiplan.pantry_add` | Add an item to your pantry stock (name, optional quantity / unit / location / expiration_days). Free. |
+| `culiplan.pantry_decrement` | Decrement stock for a barcode (FEFO); unknown barcodes raise a Repairs issue. Free. |
+| `culiplan.pantry_expiring_items` | Fire `culiplan_pantry_expiring_result` with the items expiring within a window. Free. |
+| `culiplan.scale_tonight_servings` | Scale tonight's servings to the number of people present. Premium. |
+| `culiplan.suggest_meal` / `culiplan.fill_shopping_list` / `culiplan.generate_blueprint` | AI services — Cloud (Premium), BYOK or Local AI. |
+| `culiplan.start_cooking_mode`, `advance_cooking_step`, `set_recipe_timer`, `cancel_recipe_timer`, `pause_cooking_mode`, `resume_cooking_mode`, `complete_cooking_mode` | Guided cooking-session controls. |
 
 ### Lovelace Card Pack
 
@@ -159,10 +185,11 @@ Full feature surface as of 2026-06-05:
   - Cloud (Culiplan Premium)
   - BYOK (your own OpenAI / Anthropic / Google key, stored in HA only)
   - Local (Ollama / LM Studio on your LAN)
-- **`llm.API` registration** — six Culiplan tools (`get_meal_plan`, `suggest_meal`, `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items`) are available to **any** HA-configured Conversation Agent (OpenAI / Anthropic / Google / Ollama / Voice Preview) — no BYOK needed if you already have an HA LLM agent.
+- **Pantry services** — `culiplan.pantry_add` ("add milk to the fridge" from an automation), `culiplan.pantry_decrement` (barcode scan), `culiplan.pantry_expiring_items`.
+- **`llm.API` registration** — seven Culiplan tools (`get_meal_plan`, `suggest_meal`, `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items`, `add_to_pantry`) are available to **any** HA-configured Conversation Agent (OpenAI / Anthropic / Google / Ollama / Voice Preview) — no BYOK needed if you already have an HA LLM agent.
 - **Mealie import wizard** — one-click migration during config flow (24-hour rollback).
 - **Smart pantry recommendations** — premium-gated, surfaced via Repairs upsell when called.
-- **Assist voice intents** — `what's for dinner tonight`, `what's in my pantry`, `add to shopping list`, cooking-mode controls (en / nl / de / fr / es).
+- **Assist voice intents** — `what's for dinner tonight`, `what's in my pantry`, `add to shopping list`, `add {item} to the fridge / freezer / pantry` (location optional, defaults to pantry), cooking-mode controls (en / nl / de / fr / es).
 - **Premium gating** — gracefully surfaces Repairs upsell flows on 403; users without Premium see a clean "upgrade" link instead of a stack trace.
 - **Live push updates** via Socket.IO (no polling).
 - **MCP server** — Culiplan tools also reachable via `mcp.culiplan.com` for HA's built-in MCP client. See [docs/integrations/home-assistant-paths.md](https://github.com/culiplan/Flavorplan/blob/master/docs/integrations/home-assistant-paths.md).

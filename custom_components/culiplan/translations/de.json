@@ -74,6 +74,9 @@
     "pantry_decrement_failed": {
       "message": "Vorratsverminderung fehlgeschlagen: {error}"
     },
+    "pantry_add_failed": {
+      "message": "{name} konnte nicht zum Vorrat hinzugefügt werden: {error}"
+    },
     "pantry_expiring_failed": {
       "message": "Abruf der ablaufenden Vorräte fehlgeschlagen: {error}"
     },

@@ -180,6 +180,9 @@
     "pantry_decrement_failed": {
       "message": "Pantry decrement failed: {error}"
     },
+    "pantry_add_failed": {
+      "message": "Could not add {name} to the pantry: {error}"
+    },
     "pantry_expiring_failed": {
       "message": "Pantry expiring fetch failed: {error}"
     },

@@ -74,6 +74,9 @@
     "pantry_decrement_failed": {
       "message": "Error al decrementar la despensa: {error}"
     },
+    "pantry_add_failed": {
+      "message": "No se pudo añadir {name} a la despensa: {error}"
+    },
     "pantry_expiring_failed": {
       "message": "Error al obtener los artículos que caducan: {error}"
     },

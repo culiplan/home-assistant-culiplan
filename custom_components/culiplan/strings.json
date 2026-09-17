@@ -218,6 +218,32 @@
         }
       }
     },
+    "pantry_add": {
+      "name": "Add pantry item",
+      "description": "Adds an item to your Culiplan pantry stock (same as saying \"add milk to the fridge\"). Existing items are matched by name; a new stock line is created with the given quantity, unit, location and expiry.",
+      "fields": {
+        "name": {
+          "name": "Item name",
+          "description": "What to add, e.g. \"milk\" or \"basmati rice\"."
+        },
+        "quantity": {
+          "name": "Quantity",
+          "description": "How much to add. Defaults to 1."
+        },
+        "unit": {
+          "name": "Unit",
+          "description": "Unit of measurement, e.g. piece, g, kg, ml, l, pack. Defaults to piece."
+        },
+        "location": {
+          "name": "Storage location",
+          "description": "Where the item is stored: pantry, fridge, freezer, counter, spice_rack or other. Defaults to pantry."
+        },
+        "expiration_days": {
+          "name": "Expires in (days)",
+          "description": "Days from today until the item expires. Leave empty if unknown."
+        }
+      }
+    },
     "start_cooking_mode": {
       "name": "Start cooking mode",
       "description": "Starts a guided cooking session for the given recipe."
@@ -318,6 +344,9 @@
     },
     "pantry_decrement_failed": {
       "message": "Pantry decrement failed: {error}"
+    },
+    "pantry_add_failed": {
+      "message": "Could not add {name} to the pantry: {error}"
     },
     "pantry_expiring_failed": {
       "message": "Pantry expiring fetch failed: {error}"

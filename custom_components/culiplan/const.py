@@ -66,6 +66,18 @@ CONF_MEALIE_IMPORT_AT = "mealie_import_at"
 # How long the rollback button remains available after import (seconds)
 MEALIE_ROLLBACK_WINDOW_SECONDS = 24 * 60 * 60  # 24 hours
 
+# ─── Pantry ───────────────────────────────────────────────────────────────────
+# Storage locations accepted by the backend (PantryStock.location enum, sent
+# lower-case; the backend upper-cases). Shared by the pantry_add service, the
+# add_to_pantry LLM tool and the CuliplanAddToPantry Assist intent.
+PANTRY_LOCATIONS: tuple[str, ...] = (
+    "pantry",
+    "fridge",
+    "freezer",
+    "counter",
+    "spice_rack",
+    "other",
+)
 
 
 # ─── Integration version ─────────────────────────────────────────────────────

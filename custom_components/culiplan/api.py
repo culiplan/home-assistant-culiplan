@@ -204,9 +204,102 @@ class CuliplanApiClient:
     async def async_remove_shopping_item(self, list_id: str, item_id: str) -> None:
         await self._delete(f"/api/shopping-list/{item_id}")
 
+    # ─── Pantry mutations ────────────────────────────────────────────────────
+
+    async def async_add_pantry_item(
+        self,
+        name: str,
+        quantity: float | None = None,
+        unit: str | None = None,
+        location: str | None = None,
+        expiration_days: int | None = None,
+        *,
+        language: str | None = None,
+    ) -> dict[str, Any]:
+        """Add stock of an item to the user's pantry.
+
+        Routed through the voice-tool executor (``POST /api/voice/execute``
+        with ``toolName=add_to_pantry`` — the same tool the mobile voice
+        assistant uses) rather than the raw ``POST /api/pantry/items``
+        create endpoint, because only the voice tool does what a spoken
+        "add milk to the fridge" needs:
+
+        * name normalisation / dedup — it matches an existing catalog item
+          by canonical key first (spelling, plural and language variants),
+          then case-insensitively by name, and only creates a new item when
+          neither hits; ``/api/pantry/items`` always inserts a new row.
+        * it creates the ``PantryStock`` row (quantity / unit / location /
+          expiry) — ``/api/pantry/items`` only creates the catalog entry with
+          no stock, so nothing would actually show up "in the fridge".
+        * a 60 s retry-dedup window merges a re-issued voice command into the
+          just-created stock instead of double-adding.
+        * a localised ``speakableResponse`` (language taken from the body,
+          falling back to the profile language) ready for Assist.
+
+        The endpoint accepts the integration's OAuth bearer, needs no extra
+        scope, is free-tier, and is rate-limited to 20 req/h per IP.
+
+        Response shape: ``{success, data: {success, name, quantity, unit,
+        location}, speakableResponse, processingTime}`` — note a rejected
+        tool call comes back as HTTP 200 with ``success: false``; callers
+        must check it (see services._call_pantry_add).
+        """
+        params: dict[str, Any] = {"name": name}
+        if quantity is not None:
+            params["quantity"] = quantity
+        if unit:
+            params["unit"] = unit
+        if location:
+            params["location"] = location
+        if expiration_days is not None:
+            params["expirationDays"] = expiration_days
+        return await self.async_execute_voice_tool(
+            "add_to_pantry", params, language=language
+        )
+
+    # ─── Voice tools ─────────────────────────────────────────────────────────
+
+    async def async_execute_voice_tool(
+        self,
+        tool_name: str,
+        params: dict[str, Any],
+        *,
+        language: str | None = None,
+    ) -> dict[str, Any]:
+        """Run one tool from the backend voice-tool registry.
+
+        ``POST /api/voice/execute`` — the same executor the mobile voice
+        assistant, Siri and Google Assistant use. Free tier, no extra OAuth
+        scope, 20 req/h per IP. ``tool_name`` must exist by that exact name
+        in the backend's ``voiceToolRegistry.ts``; ``params`` keys must match
+        the tool's declared parameter names (e.g. ``name`` for
+        ``add_to_shopping_list``).
+
+        Response: ``{success, data, speakableResponse, processingTime}``. A
+        rejected call (unknown tool, handler error) is HTTP 200 with
+        ``success: false`` and a spoken error in ``speakableResponse`` —
+        callers must check it.
+        """
+        body: dict[str, Any] = {
+            "toolName": tool_name,
+            "params": params,
+            "source": "home_assistant",
+        }
+        if language:
+            body["language"] = language
+        return cast(dict[str, Any], await self._post("/api/voice/execute", body))
+
     async def async_call_voice_tool(
         self, tool_name: str, params: dict[str, Any]
     ) -> dict[str, Any]:
+        """Run a Cloud-AI intent on ``POST /api/voice/ha-assist``.
+
+        Only ``suggest_meal`` and ``fill_shopping_list`` are accepted there,
+        and it needs Premium + the ``ai:suggestions`` scope. Used by the AI
+        dispatcher (services._run_cloud_intent, ai/service.py) — NOT for
+        the data-fetch Assist intents, which go through
+        async_execute_voice_tool.
+        """
         return cast(
             dict[str, Any],
             await self._post(

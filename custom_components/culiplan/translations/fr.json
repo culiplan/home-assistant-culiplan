@@ -74,6 +74,9 @@
     "pantry_decrement_failed": {
       "message": "Échec du décrément du garde-manger : {error}"
     },
+    "pantry_add_failed": {
+      "message": "Impossible d'ajouter {name} au garde-manger : {error}"
+    },
     "pantry_expiring_failed": {
       "message": "Échec de la récupération des articles expirants : {error}"
     },

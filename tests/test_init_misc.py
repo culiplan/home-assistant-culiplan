@@ -347,7 +347,8 @@ async def test_lovelace_resources_outer_exception_is_non_fatal():
 
 @pytest.mark.asyncio
 async def test_intent_handler_returns_speakable():
-    """The standard intent handler calls the voice tool and surfaces speakable."""
+    """The standard intent handler runs the tool on /voice/execute and speaks
+    the backend's speakableResponse."""
     entry = MagicMock()
     entry.entry_id = "e1"
 
@@ -355,20 +356,28 @@ async def test_intent_handler_returns_speakable():
     assert handler.intent_type == "CuliplanWhatsDinnerTonight"
 
     client = MagicMock()
-    client.async_call_voice_tool = AsyncMock(
-        return_value={"speakable": "Tonight you're cooking pasta."}
+    client.async_execute_voice_tool = AsyncMock(
+        return_value={
+            "success": True,
+            "speakableResponse": "Tonight you're cooking pasta.",
+        }
     )
     hass = MagicMock()
     hass.data = {DOMAIN: {"e1": {"client": client}}}
+    hass.config.language = "en"
 
     intent_obj = MagicMock()
     intent_obj.hass = hass
+    intent_obj.language = "en"
     intent_obj.slots = {}
     intent_obj.create_response = MagicMock(return_value=MagicMock())
 
     response = await handler.async_handle(intent_obj)
     assert response is not None
-    client.async_call_voice_tool.assert_awaited_once()
+    client.async_execute_voice_tool.assert_awaited_once_with(
+        "whats_for_dinner", {}, language="en"
+    )
+    response.async_set_speech.assert_called_once_with("Tonight you're cooking pasta.")
 
 
 @pytest.mark.asyncio
@@ -575,6 +584,10 @@ async def test_async_setup_entry_wires_everything():
             return_value=coordinator,
         ),
         patch("custom_components.culiplan._register_intents", new=AsyncMock()),
+        patch(
+            "custom_components.culiplan._async_sync_custom_sentences",
+            new=AsyncMock(),
+        ) as sync_sentences,
         patch("custom_components.culiplan.async_register_services"),
         patch("custom_components.culiplan.async_register_cooking_services"),
         patch("custom_components.culiplan.async_register_llm_api"),
@@ -594,6 +607,8 @@ async def test_async_setup_entry_wires_everything():
     coordinator.async_start.assert_awaited_once()
     assert hass.data[DOMAIN]["e1"]["coordinator"] is coordinator
     hass.config_entries.async_forward_entry_setups.assert_awaited_once()
+    # Assist sentences are installed into custom_sentences/ on every setup.
+    sync_sentences.assert_awaited_once_with(hass)
 
 
 def _token_refresh_error(status: int):

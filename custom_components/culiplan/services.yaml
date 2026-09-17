@@ -69,6 +69,65 @@ fill_shopping_list:
           step: 1
           mode: box
 
+pantry_add:
+  name: Add pantry item
+  description: >
+    Adds an item to your Culiplan pantry stock — the same action as saying
+    "add milk to the fridge" to the Culiplan voice assistant. Existing items
+    are matched by name (spelling / plural / language variants merge into one
+    entry) and a new stock line is created with the given quantity, unit,
+    location and expiry. Free tier — no Culiplan Premium required.
+  fields:
+    name:
+      name: Item name
+      description: What to add, e.g. "milk" or "basmati rice".
+      required: true
+      selector:
+        text: {}
+    quantity:
+      name: Quantity
+      description: How much to add. Defaults to 1 on the backend.
+      required: false
+      selector:
+        number:
+          min: 0.01
+          max: 10000
+          step: 0.01
+          mode: box
+    unit:
+      name: Unit
+      description: >
+        Unit of measurement, e.g. piece, g, kg, ml, l, pack. Defaults to
+        piece on the backend.
+      required: false
+      selector:
+        text: {}
+    location:
+      name: Storage location
+      description: Where the item is stored. Defaults to the pantry.
+      required: false
+      default: pantry
+      selector:
+        select:
+          options:
+            - pantry
+            - fridge
+            - freezer
+            - counter
+            - spice_rack
+            - other
+    expiration_days:
+      name: Expires in (days)
+      description: Days from today until the item expires. Leave empty if unknown.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 3650
+          step: 1
+          unit_of_measurement: d
+          mode: box
+
 pantry_decrement:
   name: Decrement pantry item
   description: >

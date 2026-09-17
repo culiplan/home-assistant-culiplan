@@ -36,7 +36,8 @@ from homeassistant.helpers import llm
 from homeassistant.util.json import JsonObjectType
 
 from .api import CuliplanApiClient
-from .const import DOMAIN
+from .const import DOMAIN, PANTRY_LOCATIONS
+from .services import _call_pantry_add
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,9 +49,10 @@ LLM_API_ID = f"{DOMAIN}-llm"
 # selected this API. Kept short — HA already includes a generic preamble.
 _PROMPT = (
     "You can answer questions about the user's meal plan, recipes, "
-    "shopping list, and pantry. Use the Culiplan tools to fetch live "
-    "data — never invent recipes or quantities. If a tool returns no "
-    "results, say so honestly. Dates are ISO 8601 (YYYY-MM-DD)."
+    "shopping list, and pantry, and add items to the shopping list or "
+    "pantry. Use the Culiplan tools to fetch live data — never invent "
+    "recipes or quantities. If a tool returns no results, say so "
+    "honestly. Dates are ISO 8601 (YYYY-MM-DD)."
 )
 
 
@@ -94,6 +96,7 @@ def _build_tools() -> list[llm.Tool]:
         _FindRecipesByIngredientsTool(),
         _GetRecipeTool(),
         _GetPantryItemsTool(),
+        _AddToPantryTool(),
     ]
 
 
@@ -487,6 +490,69 @@ class _GetPantryItemsTool(llm.Tool):
                 "truncated": len(items) > 50,
             },
         )
+
+
+class _AddToPantryTool(llm.Tool):
+    """Add stock of an item to the user's pantry."""
+
+    name = "add_to_pantry"
+    description = (
+        "Add an item to the user's Culiplan pantry stock. Use this for "
+        "'add milk to the fridge', 'put bread in the freezer' or 'I bought "
+        "two kilograms of rice'. location is one of pantry, fridge, "
+        "freezer, counter, spice_rack or other (default pantry). quantity "
+        "is a number and unit a short label such as piece, g, kg, ml or l. "
+        "expiration_days is the number of days until the item expires. "
+        "Do not use this for the shopping list — see add_to_shopping_list."
+    )
+    parameters = vol.Schema(
+        {
+            vol.Required("name"): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Optional("quantity"): vol.All(vol.Coerce(float), vol.Range(min=0.01)),
+            vol.Optional("unit"): vol.All(str, vol.Length(min=1, max=40)),
+            vol.Optional("location"): vol.In(list(PANTRY_LOCATIONS)),
+            vol.Optional("expiration_days"): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=3650)
+            ),
+        }
+    )
+
+    async def async_call(
+        self,
+        hass: HomeAssistant,
+        tool_input: llm.ToolInput,
+        llm_context: llm.LLMContext,
+    ) -> JsonObjectType:
+        client = _get_client(hass)
+        if not client:
+            return _not_configured()
+
+        args = tool_input.tool_args
+        name: str = args["name"]
+        location: str = args.get("location") or "pantry"
+        # Same helper as the pantry_add service, so the LLM surface gets
+        # identical dedup behaviour and error translation. Errors propagate
+        # as HomeAssistantError — the Conversation Agent reports those to
+        # the model as a tool error, matching the other write tools here.
+        result = await _call_pantry_add(
+            client,
+            name,
+            quantity=args.get("quantity"),
+            unit=args.get("unit"),
+            location=location,
+            expiration_days=args.get("expiration_days"),
+            language=llm_context.language,
+        )
+        raw = result.get("data")
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        return {
+            "added": True,
+            "name": name,
+            "quantity": data.get("quantity", args.get("quantity")),
+            "unit": data.get("unit", args.get("unit")),
+            "location": data.get("location", location),
+            "message": result.get("speakableResponse"),
+        }
 
 
 # ─── Date helpers ────────────────────────────────────────────────────────────
