@@ -337,7 +337,10 @@ def test_intent_yaml_sentences_recognise_with_hassil(lang, sentence, item, locat
     result = recognize(sentence, intents)
     assert result is not None, sentence
     assert result.intent.name == "CuliplanAddToPantry"
-    assert result.entities["item"].value.strip() == item
+    # hassil 1.x lowercases wildcard text, 2.x/3.x keep the user's casing
+    # ("Milch" in German). The backend normalises names, so compare
+    # case-insensitively here.
+    assert result.entities["item"].value.strip().lower() == item
     assert result.entities["location"].value == location
 
 
