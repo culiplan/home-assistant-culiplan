@@ -2,6 +2,15 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] — 2026-09-17
+
+Dependency fix only; no functional change from 0.15.0.
+
+### Fixed
+
+- **`anthropic` is now constrained to `>=0.49.0,<1`.** The Anthropic Python SDK 1.x (August 2026) moved its HTTP layer to `httpx2`, and `import anthropic` then fails with `ValueError: httpx2.Timeout must either include a default…` under the pydantic versions Home Assistant pins. On a fresh install that would have broken the BYOK Anthropic dispatcher at load time. Home Assistant core pins the 0.x series too, so the cap does not conflict with the built-in Anthropic integration. Migrating the dispatcher to SDK 1.x is tracked as follow-up work.
+- **CI lint is pinned to `ruff==0.15.16` / `mypy==2.1.0`**, matching the versions the repo is linted with. ruff 0.16 turned on 413 default rules (up from 59), which made the unpinned Validate workflow fail on every push since 2 September with findings in untouched files. Adopting the new defaults is a separate, deliberate change.
+
 ## [0.15.0] — 2026-09-17
 
 Adds the first pantry *write* path for Home Assistant, and fixes two bugs that meant no Culiplan Assist sentence has ever been recognised in production.

@@ -59,6 +59,11 @@ jobs:
         # requirements (manifest.json) — tests import them through the
         # dispatcher modules even when patched, so they have to be on the
         # install list explicitly.
+        # anthropic is capped at <1: the 1.x SDK (2026-08) moved to httpx2,
+        # and `import anthropic` then raises ValueError from
+        # httpx2.Timeout under the pydantic pins of every HA lane here.
+        # Mirrors the manifest.json constraint; HA core pins 0.x as well.
+        # Lift once the dispatcher is migrated to SDK 1.x.
         run: |
           pip install \
             homeassistant==${{ matrix.ha-version }} \
@@ -70,7 +75,7 @@ jobs:
             "python-socketio>=5.12.0" \
             "PyYAML>=6.0.2" \
             "openai>=1.77.0" \
-            "anthropic>=0.49.0" \
+            "anthropic>=0.49.0,<1" \
             "home-assistant-intents"
           # HA 2024.10 + 2025.1 still pin nabucasa+acme to josepy<2
           # (ComparableX509); HA 2026.6 moved to josepy>=2. Independently,
