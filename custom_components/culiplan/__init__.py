@@ -799,7 +799,10 @@ def _make_intent_handler(intent_name: str, entry: ConfigEntry) -> intent.IntentH
             fallback = "Sorry, Culiplan couldn't complete that request."
             try:
                 result = await client.async_execute_voice_tool(
-                    tool, params, language=_intent_language(intent_obj)
+                    tool,
+                    params,
+                    language=_intent_language(intent_obj),
+                    timezone=intent_obj.hass.config.time_zone,
                 )
             except Exception as err:
                 _LOGGER.error("Voice tool '%s' failed: %s", tool, err)

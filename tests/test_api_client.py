@@ -330,6 +330,23 @@ class TestAddPantryItem:
         }
 
     @pytest.mark.asyncio
+    async def test_forwards_timezone_for_calendar_date_maths(self):
+        """``timezone`` is sent so "expires in N days" is counted from HA's local today.
+
+        Without it the backend falls back to the profile timezone, then UTC —
+        and an 08:00 AEST add with ``expiration_days=3`` landed a day early
+        because 08:00 AEST is still the previous calendar day in UTC.
+        """
+        resp = _make_resp(json_payload={"success": True, "data": {}})
+        client = _make_client("post", resp)
+        await client.async_add_pantry_item(
+            "milk", expiration_days=3, timezone="Australia/Sydney"
+        )
+        body = client._session.post.call_args.kwargs["json"]
+        assert body["timezone"] == "Australia/Sydney"
+        assert body["params"] == {"name": "milk", "expirationDays": 3}
+
+    @pytest.mark.asyncio
     async def test_omits_unset_optional_params(self):
         """Only the name is sent when nothing else is given (backend defaults apply)."""
         resp = _make_resp(json_payload={"success": True, "data": {}})

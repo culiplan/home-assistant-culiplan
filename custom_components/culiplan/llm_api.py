@@ -542,6 +542,7 @@ class _AddToPantryTool(llm.Tool):
             location=location,
             expiration_days=args.get("expiration_days"),
             language=llm_context.language,
+            timezone=hass.config.time_zone,
         )
         raw = result.get("data")
         data: dict[str, Any] = raw if isinstance(raw, dict) else {}

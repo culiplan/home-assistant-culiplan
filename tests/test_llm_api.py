@@ -12,7 +12,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 import voluptuous as vol
@@ -500,6 +500,7 @@ async def test_add_to_pantry_tool_calls_shared_helper():
         location="fridge",
         expiration_days=None,
         language="de",
+        timezone=ANY,
     )
     assert result == {
         "added": True,

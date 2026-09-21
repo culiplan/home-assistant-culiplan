@@ -2,6 +2,12 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] — 2026-09-21
+
+### Fixed
+
+- **Pantry expiry no longer lands a day early for users east of UTC.** `culiplan.pantry_add`, the `add_to_pantry` LLM tool and the `CuliplanAddToPantry` Assist intent now send Home Assistant's configured timezone (`hass.config.time_zone`) with every `/api/voice/execute` call. The backend counts "expires in N days" from *that* zone's calendar day instead of the server's UTC instant, so an 08:00 AEST "add milk to the fridge, expires in 3 days" gets the 3-days-from-today date the user meant. Previously it fell back to the timezone synced from the Culiplan mobile app, and to UTC for HA-only accounts — where anything added before the local UTC offset had elapsed that morning was stored one day short. Reported by a user in Australia; the matching backend and app fixes ship separately.
+
 ## [0.15.1] — 2026-09-17
 
 Dependency fix only; no functional change from 0.15.0.

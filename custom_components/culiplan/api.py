@@ -215,6 +215,7 @@ class CuliplanApiClient:
         expiration_days: int | None = None,
         *,
         language: str | None = None,
+        timezone: str | None = None,
     ) -> dict[str, Any]:
         """Add stock of an item to the user's pantry.
 
@@ -254,7 +255,7 @@ class CuliplanApiClient:
         if expiration_days is not None:
             params["expirationDays"] = expiration_days
         return await self.async_execute_voice_tool(
-            "add_to_pantry", params, language=language
+            "add_to_pantry", params, language=language, timezone=timezone
         )
 
     # ─── Voice tools ─────────────────────────────────────────────────────────
@@ -265,6 +266,7 @@ class CuliplanApiClient:
         params: dict[str, Any],
         *,
         language: str | None = None,
+        timezone: str | None = None,
     ) -> dict[str, Any]:
         """Run one tool from the backend voice-tool registry.
 
@@ -287,6 +289,14 @@ class CuliplanApiClient:
         }
         if language:
             body["language"] = language
+        if timezone:
+            # IANA zone (``hass.config.time_zone``). The backend resolves
+            # "today", "tomorrow" and "expires in N days" as calendar dates
+            # in this zone; without it, it falls back to the profile timezone
+            # synced from the mobile app, then UTC — which puts an expiry a
+            # day early for anyone east of Greenwich adding items before
+            # their UTC offset has elapsed that morning.
+            body["timezone"] = timezone
         return cast(dict[str, Any], await self._post("/api/voice/execute", body))
 
     async def async_call_voice_tool(

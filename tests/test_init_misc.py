@@ -9,7 +9,7 @@ async_setup/async_setup_entry/async_unload_entry plumbing.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -373,7 +373,7 @@ async def test_intent_handler_returns_speakable():
     response = await handler.async_handle(intent_obj)
     assert response is not None
     client.async_execute_voice_tool.assert_awaited_once_with(
-        "whats_for_dinner", {}, language="en"
+        "whats_for_dinner", {}, language="en", timezone=ANY
     )
     response.async_set_speech.assert_called_once_with("Tonight you're cooking pasta.")
 

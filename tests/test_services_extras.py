@@ -3,7 +3,7 @@ and test_phase2_services."""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 import pytest
 
@@ -202,6 +202,7 @@ async def test_pantry_add_forwards_all_fields_and_returns_envelope():
         location="fridge",
         expiration_days=5,
         language="nl",
+        timezone=ANY,
     )
 
 
@@ -323,6 +324,7 @@ async def test_handle_pantry_add_calls_client_with_ha_language():
         location="fridge",
         expiration_days=3,
         language="nl",
+        timezone=ANY,
     )
 
 

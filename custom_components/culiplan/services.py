@@ -304,6 +304,7 @@ async def _call_pantry_add(
     expiration_days: int | None = None,
     *,
     language: str | None = None,
+    timezone: str | None = None,
 ) -> dict[str, Any]:
     """Add an item to the pantry via the ``add_to_pantry`` voice tool.
 
@@ -320,6 +321,7 @@ async def _call_pantry_add(
             location=location,
             expiration_days=expiration_days,
             language=language,
+            timezone=timezone,
         )
     except HomeAssistantError:
         # Already typed (ConfigEntryAuthFailed → reauth, api_forbidden, …).
@@ -549,6 +551,7 @@ def async_register_services(hass: HomeAssistant) -> None:
             location=location,
             expiration_days=call.data.get("expiration_days"),
             language=hass.config.language,
+            timezone=hass.config.time_zone,
         )
         raw = result.get("data")
         data: dict[str, Any] = raw if isinstance(raw, dict) else {}

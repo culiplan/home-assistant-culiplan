@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -434,7 +434,7 @@ async def test_generic_intent_executes_voice_tool_with_renamed_slots():
     await handler.async_handle(intent_obj)
 
     client.async_execute_voice_tool.assert_awaited_once_with(
-        "add_to_shopping_list", {"name": "milk"}, language="nl"
+        "add_to_shopping_list", {"name": "milk"}, language="nl", timezone=ANY
     )
     client.async_call_voice_tool.assert_not_awaited()  # never /voice/ha-assist
     assert _spoken(intent_obj) == "melk toegevoegd."
@@ -450,7 +450,7 @@ async def test_generic_intent_without_slots_sends_empty_params():
     )
     await handler.async_handle(intent_obj)
     client.async_execute_voice_tool.assert_awaited_once_with(
-        "get_expiring_items", {}, language="en"
+        "get_expiring_items", {}, language="en", timezone=ANY
     )
     assert _spoken(intent_obj) == "3 items expiring."
 
