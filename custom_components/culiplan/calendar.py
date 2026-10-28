@@ -27,7 +27,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up Culiplan calendar entities."""
     coordinator: CuliplanCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    meal_plans = (coordinator.data or {}).get("meal_plans", [])
+    # Always create the meal-plan calendar, even for a brand-new account with
+    # nothing planned yet: an empty calendar reads as "off", which is clear,
+    # while a missing entity looks broken. The API client already emits the
+    # "current" plan for the backend's grouped response; this covers the
+    # bare-list / unexpected-payload paths that can come back empty.
+    meal_plans = (coordinator.data or {}).get("meal_plans") or [
+        {"id": "current", "name": "Meal Plan", "slots": []}
+    ]
     async_add_entities(
         CuliplanCalendar(coordinator, plan, entry) for plan in meal_plans
     )

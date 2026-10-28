@@ -4,21 +4,9 @@
       "pick_implementation": {
         "title": "Culiplan verbinden"
       },
-      "ai_provider": {
-        "title": "KI-Anbieter",
-        "description": "Wähle aus, wie Culiplan KI-Funktionen in Home Assistant ausführt.\n\n**Cloud-KI** — Culiplan verarbeitet Anfragen (Premium-Abonnement erforderlich).\n**BYOK** — Dein API-Schlüssel wird lokal gespeichert und direkt an den KI-Anbieter gesendet; Culiplan sieht ihn nie.\n**Lokale KI** — Anfragen gehen an deinen lokalen Ollama- oder LM Studio-Endpunkt.",
-        "data": {
-          "ai_mode": "KI-Modus",
-          "byok_provider": "KI-Anbieter",
-          "byok_api_key": "API-Schlüssel",
-          "local_endpoint": "Lokale KI-Endpunkt-URL",
-          "local_model": "Modellname"
-        },
-        "data_description": {
-          "byok_api_key": "Nur in Home Assistant gespeichert — wird nie an Culiplan gesendet.",
-          "local_endpoint": "z. B. http://localhost:11434",
-          "local_model": "z. B. llama3.2"
-        }
+      "auth": {
+        "title": "Bei Culiplan anmelden",
+        "description": "Melde dich an und erlaube den Zugriff. Danach geht es automatisch zurück zu Home Assistant und die Einrichtung wird abgeschlossen.\n\nTipp: Kehrt der Browser nach der Freigabe nicht zu Home Assistant zurück, lege eine externe URL fest (Einstellungen → System → Netzwerk) oder aktiviere My Home Assistant und versuche es erneut."
       },
       "reauth_confirm": {
         "title": "Culiplan erneut authentifizieren",
@@ -27,14 +15,46 @@
     },
     "error": {
       "cannot_connect": "Verbindung zu Culiplan nicht möglich",
-      "invalid_api_key": "Ungültiger API-Schlüssel — bitte prüfe den Schlüssel und versuche es erneut.",
-      "invalid_endpoint": "Der lokale KI-Endpunkt ist nicht erreichbar. Überprüfe die URL und ob der Dienst läuft.",
-      "unknown": "Unerwarteter Fehler"
+      "unknown": "Unerwarteter Fehler",
+      "mealie_token_required": "Bitte gib ein Mealie-API-Token ein."
     },
     "abort": {
       "already_configured": "Culiplan ist bereits konfiguriert",
       "oauth_error": "OAuth-Fehler: {error}",
       "missing_configuration": "Integration nicht konfiguriert. Bitte in der Benutzeroberfläche konfigurieren."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "advanced_ai": "KI-Modus ändern"
+        },
+        "data_description": {
+          "advanced_ai": "Cloud-KI ist der Standard. Schalte dies ein, um deinen eigenen API-Schlüssel oder ein lokales Modell zu nutzen."
+        }
+      },
+      "advanced_ai": {
+        "title": "KI-Modus",
+        "description": "Wähle, wie die KI-Funktionen von Culiplan laufen.\n\n**Cloud** (Standard): Culiplan führt KI-Anfragen für dich aus. Kostenlos, keine Einrichtung nötig.\n**Eigener Schlüssel**: Dein API-Schlüssel bleibt in Home Assistant und Anfragen gehen direkt an den KI-Anbieter. Culiplan sieht den Schlüssel nie.\n**Lokal**: Anfragen gehen an deinen eigenen Ollama- oder LM-Studio-Server."
+      }
+    }
+  },
+  "issues": {
+    "feature_unavailable": {
+      "title": "Eine Culiplan-Funktion ist nicht verfügbar",
+      "description": "**{feature}** ist für dein Culiplan-Konto nicht verfügbar. Wenn du glaubst, dass das ein Fehler ist, [kontaktiere den Culiplan-Support]({support_url})."
+    },
+    "plan_first_week": {
+      "title": "Plane deine erste Woche in Culiplan",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Plane deine erste Woche in Culiplan",
+            "description": "Dein Culiplan-Essensplan ist noch leer, daher zeigen Kalender und Mahlzeiten-Sensoren noch nichts an.\n\n[Öffne den Culiplan-Planer]({planner_url}) und füge ein paar Mahlzeiten hinzu. Der Kalender füllt sich automatisch, ein Neustart ist nicht nötig.\n\nWähle **Absenden**, um diese Meldung auszublenden."
+          }
+        }
+      }
     }
   },
   "entity": {

@@ -125,11 +125,15 @@ class ProviderUnavailableError(DispatcherError):
 
 class PremiumRequiredError(_HomeAssistantError):
     """
-    Raised when a premium-gated feature is invoked by a free-tier user.
+    Raised when the backend refuses a gated feature for this account.
 
     Populated from the structured 403 body returned by the Culiplan backend:
         {"error": "premium_required", "feature": "ai.suggestion",
-         "upgradeUrl": "https://culiplan.com/premium?source=ha"}
+         "upgradeUrl": "..."}
+
+    The wire name is historical. Culiplan is free (v0.16.0 copy): the message
+    says the feature isn't available and points to support; ``upgrade_url``
+    is kept on the object for compatibility but never shown.
 
     Both api.py (raises) and services.py (catches) import this from here to
     avoid circular imports (task-1416).
@@ -139,5 +143,6 @@ class PremiumRequiredError(_HomeAssistantError):
         self.feature = feature
         self.upgrade_url = upgrade_url
         super().__init__(
-            f"'{feature}' requires Culiplan Premium. Upgrade at: {upgrade_url}"
+            f"'{feature}' isn't available for your Culiplan account. "
+            "Need help? https://culiplan.com/contact"
         )

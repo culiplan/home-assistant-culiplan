@@ -10,7 +10,7 @@ suggest_meal:
     Asks Culiplan AI to suggest a meal based on optional constraints (dietary
     preferences, time budget, meal slot). The suggestion is returned as a
     `culiplan_suggest_meal_result` HA event and as a persistent notification.
-    **Cloud AI mode requires Culiplan Premium.** BYOK and Local AI are free.
+    Works in Cloud, BYOK and Local AI mode.
   fields:
     constraints:
       name: Constraints
@@ -53,7 +53,7 @@ fill_shopping_list:
     the planned meals of the given week. Already-present items are not
     duplicated. The result is returned as a `culiplan_fill_shopping_list_result`
     HA event and as a persistent notification.
-    **Cloud AI mode requires Culiplan Premium.** BYOK and Local AI are free.
+    Works in Cloud, BYOK and Local AI mode.
   fields:
     week_offset:
       name: Week offset
@@ -72,11 +72,11 @@ fill_shopping_list:
 pantry_add:
   name: Add pantry item
   description: >
-    Adds an item to your Culiplan pantry stock — the same action as saying
+    Adds an item to your Culiplan pantry stock. Same action as saying
     "add milk to the fridge" to the Culiplan voice assistant. Existing items
     are matched by name (spelling / plural / language variants merge into one
     entry) and a new stock line is created with the given quantity, unit,
-    location and expiry. Free tier — no Culiplan Premium required.
+    location and expiry.
   fields:
     name:
       name: Item name
@@ -134,7 +134,6 @@ pantry_decrement:
     Decrements stock for the pantry item identified by the given barcode.
     Uses FEFO (First Expired First Out) logic. If the item is not found, a
     Repairs issue is created prompting you to add it in Culiplan.
-    Free tier — no Culiplan Premium required.
   fields:
     barcode:
       name: Barcode
@@ -161,7 +160,6 @@ pantry_expiring_items:
   description: >
     Fetches the list of pantry items expiring within the given window and fires
     a `culiplan_pantry_expiring_result` HA event with the item IDs.
-    Free tier — no Culiplan Premium required.
   fields:
     window_hours:
       name: Expiry window (hours)
@@ -183,7 +181,6 @@ scale_tonight_servings:
     Records the number of household members currently home and updates tonight's
     meal plan so Culiplan can display ingredient quantities scaled to the
     present count.
-    **Requires Culiplan Premium.** Free users will see a Repairs upsell issue.
   fields:
     present_count:
       name: Present count
@@ -211,7 +208,6 @@ start_cooking_mode:
     Starts a guided cooking session for the given recipe in Culiplan.
     Any previously active session is automatically completed first.
     Fires a `culiplan_cooking_session_started` HA event on success.
-    **May require Culiplan Premium** depending on recipe type.
   fields:
     recipe_id:
       name: Recipe ID
@@ -330,7 +326,6 @@ generate_blueprint:
     description using Culiplan AI.
 
     **Cloud AI mode**: Culiplan generates the YAML server-side.
-    **Requires Culiplan Premium** for Cloud AI mode; free for BYOK / Local AI.
 
     **BYOK / Local AI mode**: The backend returns a prompt envelope only; your
     locally-configured AI model generates the YAML. Your API key never leaves

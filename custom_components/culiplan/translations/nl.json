@@ -4,21 +4,9 @@
       "pick_implementation": {
         "title": "Culiplan verbinden"
       },
-      "ai_provider": {
-        "title": "AI-aanbieder",
-        "description": "Kies hoe Culiplan AI-functies in Home Assistant worden uitgevoerd.\n\n**Cloud AI** — Culiplan verwerkt aanvragen (Premium-abonnement vereist).\n**BYOK** — Jouw API-sleutel wordt lokaal opgeslagen en rechtstreeks naar de AI-aanbieder gestuurd; Culiplan ziet hem nooit.\n**Lokale AI** — Aanvragen gaan naar jouw lokale Ollama- of LM Studio-eindpunt.",
-        "data": {
-          "ai_mode": "AI-modus",
-          "byok_provider": "AI-aanbieder",
-          "byok_api_key": "API-sleutel",
-          "local_endpoint": "Lokale AI-eindpunt-URL",
-          "local_model": "Modelnaam"
-        },
-        "data_description": {
-          "byok_api_key": "Alleen opgeslagen in Home Assistant — nooit naar Culiplan gestuurd.",
-          "local_endpoint": "bijv. http://localhost:11434",
-          "local_model": "bijv. llama3.2"
-        }
+      "auth": {
+        "title": "Inloggen bij Culiplan",
+        "description": "Log in en geef toegang. Je wordt daarna teruggestuurd naar Home Assistant en de installatie rondt vanzelf af.\n\nTip: keert de browser na het goedkeuren niet terug naar Home Assistant? Stel een externe URL in (Instellingen → Systeem → Netwerk) of zet My Home Assistant aan en probeer het opnieuw."
       },
       "reauth_confirm": {
         "title": "Culiplan opnieuw verifiëren",
@@ -27,14 +15,46 @@
     },
     "error": {
       "cannot_connect": "Kan geen verbinding maken met Culiplan",
-      "invalid_api_key": "Ongeldige API-sleutel — controleer de sleutel en probeer opnieuw.",
-      "invalid_endpoint": "Kan het lokale AI-eindpunt niet bereiken. Controleer de URL en of de service actief is.",
-      "unknown": "Onverwachte fout"
+      "unknown": "Onverwachte fout",
+      "mealie_token_required": "Vul een Mealie API-token in."
     },
     "abort": {
       "already_configured": "Culiplan is al geconfigureerd",
       "oauth_error": "OAuth-fout: {error}",
       "missing_configuration": "Integratie niet geconfigureerd. Configureer deze via de UI."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "advanced_ai": "AI-modus wijzigen"
+        },
+        "data_description": {
+          "advanced_ai": "Cloud AI is de standaard. Zet dit aan om je eigen API-sleutel of een lokaal model te gebruiken."
+        }
+      },
+      "advanced_ai": {
+        "title": "AI-modus",
+        "description": "Kies hoe de AI-functies van Culiplan werken.\n\n**Cloud** (standaard): Culiplan voert AI-verzoeken voor je uit. Gratis, niets in te stellen.\n**Eigen sleutel**: je API-sleutel blijft in Home Assistant en verzoeken gaan rechtstreeks naar de AI-aanbieder. Culiplan ziet de sleutel nooit.\n**Lokaal**: verzoeken gaan naar je eigen Ollama- of LM Studio-server."
+      }
+    }
+  },
+  "issues": {
+    "feature_unavailable": {
+      "title": "Een Culiplan-functie is niet beschikbaar",
+      "description": "**{feature}** is niet beschikbaar voor je Culiplan-account. Denk je dat dit niet klopt? [Neem contact op met Culiplan-support]({support_url})."
+    },
+    "plan_first_week": {
+      "title": "Plan je eerste week in Culiplan",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Plan je eerste week in Culiplan",
+            "description": "Je Culiplan-maaltijdplanning is nog leeg, dus de agenda en maaltijdsensoren hebben nog niets te tonen.\n\n[Open de Culiplan-planner]({planner_url}) en voeg een paar maaltijden toe. De agenda vult zich automatisch, opnieuw opstarten is niet nodig.\n\nKies **Verzenden** om dit bericht te verbergen."
+          }
+        }
+      }
     }
   },
   "entity": {

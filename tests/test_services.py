@@ -66,13 +66,14 @@ class TestPremiumRequiredError:
         assert err.feature == "suggest_meal"
         assert err.upgrade_url == "https://culiplan.com/premium"
 
-    def test_message_contains_feature_and_url(self):
+    def test_message_names_feature_and_links_support(self):
         err = PremiumRequiredError(
             feature="fill_shopping_list", upgrade_url="https://culiplan.com/upgrade"
         )
         msg = str(err)
         assert "fill_shopping_list" in msg
-        assert "https://culiplan.com/upgrade" in msg
+        assert "culiplan.com/contact" in msg
+        assert "upgrade" not in msg.lower()
 
 
 # ─── _run_cloud_intent ────────────────────────────────────────────────────────

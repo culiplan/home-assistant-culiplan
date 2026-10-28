@@ -1,28 +1,29 @@
 """
-Tests for the Culiplan HA Repairs UI — premium upsell deep-link (task-1395).
+Tests for the Culiplan HA Repairs platform.
 
-AC coverage:
-  AC#1 — Repairs flow registered: parses {feature, upgradeUrl} from 403 body.
-  AC#2 — Repair issue copy is plain language.
-  AC#3 — Action button opens upgradeUrl in browser; URL includes ha_install_id.
-  AC#4 — Repair auto-resolves on next successful call.
-  AC#5 — Tested by stubbing 403 from backend (via PremiumRequiredError in services).
+- "feature isn't available" issue (task-1395, reworded in v0.16.0: Culiplan is
+  free, so no upgrade / billing wording and no upgrade link; it links to
+  support instead).
+- ``async_create_fix_flow`` (the repairs platform hook), including the
+  first-week hint's fix flow.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 
 from custom_components.culiplan.repairs import (
+    FirstWeekRepairFlow,
+    async_create_fix_flow,
     async_create_premium_repair,
     async_resolve_premium_repair,
     _repair_issue_id,
-    _append_ha_install_id,
-    _FEATURE_TITLES,
-    _FEATURE_DESCRIPTIONS,
+    _FEATURE_NAMES,
 )
 from custom_components.culiplan.services import (
     PremiumRequiredError,
@@ -32,7 +33,10 @@ from custom_components.culiplan.const import (
     AI_MODE_CLOUD,
     CONF_AI_MODE,
     DOMAIN,
+    SUPPORT_URL,
 )
+
+_COMPONENT = Path(__file__).parent.parent / "custom_components" / "culiplan"
 
 
 # ─── _repair_issue_id ─────────────────────────────────────────────────────────
@@ -50,153 +54,84 @@ class TestRepairIssueId:
     def test_unique_per_feature(self):
         assert _repair_issue_id("ai.suggestion") != _repair_issue_id("ai.shopping_fill")
 
-    def test_prefix_matches_domain(self):
-        assert _repair_issue_id("ai.suggestion").startswith("premium_required_")
+    def test_prefix_is_neutral(self):
+        assert _repair_issue_id("ai.suggestion").startswith("feature_unavailable_")
 
 
-# ─── _append_ha_install_id ────────────────────────────────────────────────────
+# ─── async_create_premium_repair (feature unavailable) ───────────────────────
 
 
-class TestAppendHaInstallId:
-    """AC#3: ha_install_id is appended to upgradeUrl."""
+class TestFeatureUnavailableRepair:
+    """The 403 issue is neutral, non-fixable and links to support."""
 
-    def _make_hass(self, ha_id: str = "test-ha-uuid-1234") -> MagicMock:
+    def _create(self, feature: str, url: str | None = "https://x/premium"):
         hass = MagicMock()
-        hass.data = {"core.uuid": ha_id}
-        return hass
-
-    def test_appends_ha_install_id_to_clean_url(self):
-        hass = self._make_hass("my-ha-id")
-        result = _append_ha_install_id("https://culiplan.com/premium?ref=ha_gate", hass)
-        assert "ha_install_id=my-ha-id" in result
-
-    def test_appends_ha_install_id_to_url_without_params(self):
-        hass = self._make_hass("my-ha-id")
-        result = _append_ha_install_id("https://culiplan.com/premium", hass)
-        assert "ha_install_id=my-ha-id" in result
-        assert "?" in result
-
-    def test_does_not_duplicate_ha_install_id(self):
-        hass = self._make_hass("my-ha-id")
-        url_with_id = "https://culiplan.com/premium?ha_install_id=existing-id"
-        result = _append_ha_install_id(url_with_id, hass)
-        assert result.count("ha_install_id=") == 1
-
-    def test_no_ha_id_returns_original_url(self):
-        hass = MagicMock()
-        hass.data = {}
-        url = "https://culiplan.com/premium?ref=ha_gate"
-        result = _append_ha_install_id(url, hass)
-        assert result == url
-
-    def test_exception_in_hass_data_returns_original_url(self):
-        hass = MagicMock()
-        # Make hass.data.get raise to simulate edge case
-        hass.data = MagicMock()
-        hass.data.get.side_effect = RuntimeError("unexpected")
-        url = "https://culiplan.com/premium"
-        result = _append_ha_install_id(url, hass)
-        assert result == url
-
-
-# ─── async_create_premium_repair ─────────────────────────────────────────────
-
-
-class TestAsyncCreatePremiumRepair:
-    """AC#1, AC#2, AC#3: issue is created with correct copy and upgrade URL."""
-
-    def _make_hass(self) -> MagicMock:
-        hass = MagicMock()
-        hass.data = {"core.uuid": "test-uuid-abc"}
-        return hass
-
-    def test_creates_issue_for_ai_suggestion(self):
-        hass = self._make_hass()
         with patch(
             "custom_components.culiplan.repairs.ir.async_create_issue"
         ) as mock_create:
-            async_create_premium_repair(
-                hass, "ai.suggestion", "https://culiplan.com/premium?ref=ha_gate"
-            )
-            mock_create.assert_called_once()
-            call_kwargs = mock_create.call_args[1]
-            assert call_kwargs["domain"] == DOMAIN
-            assert call_kwargs["issue_id"] == _repair_issue_id("ai.suggestion")
-            assert call_kwargs["is_fixable"] is True
+            async_create_premium_repair(hass, feature, url)
+        mock_create.assert_called_once()
+        return mock_create.call_args[1]
 
-    def test_issue_title_is_plain_language(self):
-        """AC#2: Issue copy is human-readable, not machine-readable."""
-        hass = self._make_hass()
-        with patch(
-            "custom_components.culiplan.repairs.ir.async_create_issue"
-        ) as mock_create:
-            async_create_premium_repair(
-                hass, "ai.suggestion", "https://culiplan.com/premium?ref=ha_gate"
-            )
-            placeholders = mock_create.call_args[1]["translation_placeholders"]
-            title = placeholders["title"]
-            # Must be human-readable (not the raw feature key)
-            assert "Premium" in title
-            assert "AI" in title
+    def test_creates_non_fixable_issue(self):
+        kwargs = self._create("ai.suggestion")
+        assert kwargs["domain"] == DOMAIN
+        assert kwargs["issue_id"] == _repair_issue_id("ai.suggestion")
+        assert kwargs["is_fixable"] is False
+        assert kwargs["translation_key"] == "feature_unavailable"
 
-    def test_upgrade_url_includes_ha_install_id(self):
-        """AC#3: upgrade_url in placeholders contains ha_install_id."""
-        hass = self._make_hass()
-        with patch(
-            "custom_components.culiplan.repairs.ir.async_create_issue"
-        ) as mock_create:
-            async_create_premium_repair(
-                hass, "ai.suggestion", "https://culiplan.com/premium?ref=ha_gate"
-            )
-            placeholders = mock_create.call_args[1]["translation_placeholders"]
-            upgrade_url = placeholders["upgrade_url"]
-            assert "ha_install_id=test-uuid-abc" in upgrade_url
+    def test_links_to_support_not_upgrade(self):
+        kwargs = self._create("ai.suggestion", "https://culiplan.com/premium?x=1")
+        assert kwargs["learn_more_url"] == SUPPORT_URL
+        placeholders = kwargs["translation_placeholders"]
+        assert placeholders["support_url"] == SUPPORT_URL
+        assert "premium" not in json.dumps(placeholders).lower()
 
-    def test_learn_more_url_set_to_upgrade_url(self):
-        """AC#3: learn_more_url is the billing deep-link."""
-        hass = self._make_hass()
-        with patch(
-            "custom_components.culiplan.repairs.ir.async_create_issue"
-        ) as mock_create:
-            async_create_premium_repair(
-                hass, "ai.suggestion", "https://culiplan.com/premium?ref=ha_gate"
-            )
-            learn_url = mock_create.call_args[1]["learn_more_url"]
-            assert "culiplan.com" in learn_url
+    def test_known_feature_gets_human_name(self):
+        kwargs = self._create("ai.shopping_fill")
+        assert kwargs["translation_placeholders"]["feature"] == "AI shopping list fill"
 
-    def test_unknown_feature_uses_fallback_copy(self):
-        """AC#2: Unknown features get reasonable fallback copy."""
-        hass = self._make_hass()
-        with patch(
-            "custom_components.culiplan.repairs.ir.async_create_issue"
-        ) as mock_create:
-            async_create_premium_repair(
-                hass, "some.unknown_feature", "https://culiplan.com/premium"
-            )
-            placeholders = mock_create.call_args[1]["translation_placeholders"]
-            title = placeholders["title"]
-            assert "Premium" in title
+    def test_unknown_feature_falls_back_to_id(self):
+        kwargs = self._create("some.unknown_feature", None)
+        assert kwargs["translation_placeholders"]["feature"] == "some.unknown_feature"
 
-    def test_all_known_features_have_human_copy(self):
-        """AC#2: All documented features have dedicated copy."""
-        known_features = list(_FEATURE_TITLES.keys())
-        assert len(known_features) >= 2  # At minimum ai.suggestion and ai.shopping_fill
-        for feature in known_features:
-            assert len(_FEATURE_TITLES[feature]) > 10
-            assert len(_FEATURE_DESCRIPTIONS.get(feature, "")) > 20
+    def test_feature_names_have_no_tier_wording(self):
+        for name in _FEATURE_NAMES.values():
+            assert "premium" not in name.lower()
 
-    def test_fill_shopping_list_feature_has_copy(self):
-        """AC#2: fill_shopping_list feature has plain language copy."""
-        assert "ai.shopping_fill" in _FEATURE_TITLES
-        title = _FEATURE_TITLES["ai.shopping_fill"]
-        assert "shopping" in title.lower() or "list" in title.lower()
+
+# ─── Copy guard: no tier / upgrade wording anywhere user-facing ──────────────
+
+
+@pytest.mark.parametrize(
+    "rel_path",
+    [
+        "strings.json",
+        "services.yaml",
+        "translations/en.json",
+        "translations/de.json",
+        "translations/es.json",
+        "translations/fr.json",
+        "translations/nl.json",
+    ],
+)
+def test_no_premium_or_upgrade_wording_in_copy(rel_path):
+    text = (_COMPONENT / rel_path).read_text(encoding="utf-8").lower()
+    for word in ("premium", "upgrade", "billing", "free tier", "abonnement", "suscrip"):
+        assert word not in text, f"{word!r} found in {rel_path}"
+
+
+def test_premium_required_error_message_is_neutral():
+    err = PremiumRequiredError("ai.suggestion", "https://culiplan.com/premium")
+    assert "premium" not in str(err).lower()
+    assert "isn't available" in str(err)
 
 
 # ─── async_resolve_premium_repair ────────────────────────────────────────────
 
 
 class TestAsyncResolvePremiumRepair:
-    """AC#4: Repair auto-resolves on next successful call."""
+    """Repair auto-resolves on next successful call."""
 
     def test_deletes_issue_for_feature(self):
         hass = MagicMock()
@@ -209,11 +144,48 @@ class TestAsyncResolvePremiumRepair:
             )
 
     def test_safe_when_no_issue_exists(self):
-        """AC#4: Resolving a non-existent issue should not raise."""
         hass = MagicMock()
         with patch("custom_components.culiplan.repairs.ir.async_delete_issue"):
-            # Should not raise
             async_resolve_premium_repair(hass, "ai.suggestion")
+
+
+# ─── async_create_fix_flow (repairs platform) ────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_fix_flow_for_first_week_issue(hass):
+    flow = await async_create_fix_flow(hass, "plan_first_week_entry123", None)
+    assert isinstance(flow, FirstWeekRepairFlow)
+    assert flow._entry_id == "entry123"
+
+
+@pytest.mark.asyncio
+async def test_fix_flow_for_other_issue_is_plain_confirm(hass):
+    from homeassistant.components.repairs import ConfirmRepairFlow
+
+    flow = await async_create_fix_flow(hass, "pantry_barcode_not_found_123", None)
+    assert type(flow) is ConfirmRepairFlow
+
+
+@pytest.mark.asyncio
+async def test_first_week_fix_flow_submit_marks_done(hass):
+    flow = FirstWeekRepairFlow("entry123")
+    flow.hass = hass
+    flow.handler = DOMAIN
+    flow.issue_id = "plan_first_week_entry123"
+    flow.flow_id = "abc"
+
+    with patch(
+        "custom_components.culiplan.first_week.async_mark_first_week_done",
+        AsyncMock(),
+    ) as mock_done:
+        shown = await flow.async_step_init()
+        assert shown["step_id"] == "confirm"
+        mock_done.assert_not_called()
+
+        result = await flow.async_step_confirm({})
+    mock_done.assert_awaited_once_with(hass, "entry123")
+    assert result["type"] == "create_entry"
 
 
 # ─── Integration with services.py ────────────────────────────────────────────

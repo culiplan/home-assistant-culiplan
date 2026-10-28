@@ -107,15 +107,16 @@ def _make_flow(hass) -> "OAuth2FlowHandler":  # type: ignore[name-defined]
     return flow
 
 
-# ─── AC#1: mealie_offer step after ai_provider ────────────────────────────────
+# ─── AC#1: mealie_offer step (shown only when Mealie is configured) ───────────
 
 
 @pytest.mark.asyncio
-async def test_ai_provider_leads_to_mealie_offer(hass):
-    """After choosing Cloud AI, the flow should show mealie_offer."""
+async def test_mealie_offer_shown_when_mealie_configured(hass):
+    """With a Mealie entry in HA, the flow shows the mealie_offer form."""
     flow = _make_flow(hass)
 
-    result = await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
+    result = await flow.async_step_mealie_offer()
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "mealie_offer"
@@ -126,8 +127,7 @@ async def test_mealie_offer_skip_creates_entry(hass):
     """Declining migration creates the config entry directly."""
     flow = _make_flow(hass)
 
-    # Prime the entry data via ai_provider step
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     result = await flow.async_step_mealie_offer(user_input={"migrate_mealie": False})
 
@@ -141,7 +141,7 @@ async def test_mealie_offer_skip_creates_entry(hass):
 async def test_mealie_offer_accept_shows_credentials(hass):
     """Accepting migration shows the credentials form."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     result = await flow.async_step_mealie_offer(user_input={"migrate_mealie": True})
 
@@ -160,7 +160,7 @@ async def test_mealie_credentials_success_shows_preview(hass):
     (no per-flow state to encapsulate); patch it there.
     """
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     with patch(
         "custom_components.culiplan.config_flow._call_migrate_preview",
@@ -181,7 +181,7 @@ async def test_mealie_credentials_success_shows_preview(hass):
 async def test_preview_description_placeholders_present(hass):
     """Preview form must include willImport/willFlag/willSkip placeholders."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     preview = _make_preview_response(will_import=15, will_flag=3, will_skip=0)[
         "preview"
@@ -206,7 +206,7 @@ async def test_preview_description_placeholders_present(hass):
 async def test_preview_cancel_creates_entry_without_mealie_data(hass):
     """Cancelling the preview creates the entry without Mealie credentials."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow._mealie_preview = _make_preview_response()["preview"]
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
@@ -227,7 +227,7 @@ async def test_preview_cancel_creates_entry_without_mealie_data(hass):
 async def test_mealie_progress_creates_entry_on_success(hass):
     """Progress step should eventually create the entry with job metadata."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
@@ -255,7 +255,7 @@ async def test_mealie_progress_creates_entry_on_success(hass):
 async def test_mealie_done_creates_entry_with_job_id(hass):
     """mealie_done step creates the entry and records job_id + import timestamp."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     # Done step reads from `_entry_data` (job_id + import_at are written by
     # the progress step before forwarding here); the legacy
@@ -390,7 +390,7 @@ async def test_rollback_calls_delete_endpoint(hass):
 async def test_preview_accepts_v1_mealie_data(hass):
     """dry-run preview should work even when Mealie returns v1-style counts."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     # Simulate backend returning preview for a v1 Mealie instance
     v1_preview = {
@@ -420,7 +420,7 @@ async def test_preview_accepts_v1_mealie_data(hass):
 async def test_preview_accepts_v2_mealie_data(hass):
     """dry-run preview should work when Mealie v2 returns integer recipeServings."""
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     # Simulate backend returning preview for a v2 Mealie instance
     v2_preview = {
@@ -460,7 +460,7 @@ async def test_credentials_error_shows_form_again(hass):
     import aiohttp as _aiohttp
 
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     with patch(
         "custom_components.culiplan.config_flow._call_migrate_preview",
@@ -489,7 +489,7 @@ async def test_start_error_falls_through_to_done(hass):
     persist credentials" rule even on failure.
     """
     flow = _make_flow(hass)
-    await flow.async_step_ai_provider(user_input={CONF_AI_MODE: AI_MODE_CLOUD})
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
 
     flow._entry_data[CONF_MEALIE_URL] = "http://mealie.local:9000"
     flow._entry_data[CONF_MEALIE_TOKEN] = "tok-mealie"
@@ -547,3 +547,20 @@ async def test_rollback_no_type_error_on_network_failure(hass):
 
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "rollback_failed"
+
+
+@pytest.mark.asyncio
+async def test_credentials_missing_fields_show_specific_errors(hass):
+    """Empty URL / token get their own Mealie errors (not the BYOK key error)."""
+    flow = _make_flow(hass)
+    flow._entry_data = {**flow._oauth_data, CONF_AI_MODE: AI_MODE_CLOUD}
+
+    result = await flow.async_step_mealie_credentials(
+        user_input={CONF_MEALIE_URL: "", CONF_MEALIE_TOKEN: "tok"}
+    )
+    assert result["errors"] == {CONF_MEALIE_URL: "invalid_mealie_url"}
+
+    result = await flow.async_step_mealie_credentials(
+        user_input={CONF_MEALIE_URL: "http://mealie:9000", CONF_MEALIE_TOKEN: " "}
+    )
+    assert result["errors"] == {CONF_MEALIE_TOKEN: "mealie_token_required"}

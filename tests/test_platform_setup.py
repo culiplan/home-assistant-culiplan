@@ -48,7 +48,12 @@ async def test_calendar_setup_adds_one_per_meal_plan():
 
 
 @pytest.mark.asyncio
-async def test_calendar_setup_no_plans_adds_nothing():
+async def test_calendar_setup_no_plans_still_adds_empty_calendar():
+    """A brand-new account with nothing planned still gets its calendar.
+
+    v0.16.0: an empty calendar reads "off" (clear); a missing entity looks
+    broken to a new user.
+    """
     from custom_components.culiplan.calendar import async_setup_entry
 
     coordinator = MagicMock()
@@ -57,7 +62,9 @@ async def test_calendar_setup_no_plans_adds_nothing():
     add_entities = MagicMock()
     await async_setup_entry(hass, _make_entry(), add_entities)
     added = list(add_entities.call_args[0][0])
-    assert added == []
+    assert len(added) == 1
+    assert added[0].unique_id.endswith("_current")
+    assert added[0].event is None
 
 
 # ─── todo.async_setup_entry ──────────────────────────────────────────────────

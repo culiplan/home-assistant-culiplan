@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import date
 from typing import Any, cast
 
 from aiohttp import ClientSession
@@ -59,8 +60,16 @@ class CuliplanApiClient:
     async def async_get_user(self) -> dict[str, Any]:
         return cast(dict[str, Any], await self._get("/api/users/me"))
 
-    async def async_get_meal_plans(self) -> list[dict[str, Any]]:
+    async def async_get_meal_plans(
+        self,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[dict[str, Any]]:
         """Fetch meal plans and normalise to a single-plan list shape.
+
+        Without dates the backend returns its default window (the last 7 days
+        plus the next 14). Pass both ``start_date`` and ``end_date`` to ask
+        for a specific range (used by the first-week hint's history check).
 
         The backend returns a date-grouped structure:
             { "<YYYY-MM-DD>": { "<slot>": [ <entry>, ... ], ... }, ... }
@@ -90,7 +99,12 @@ class CuliplanApiClient:
         A bare list-of-dicts response (legacy / test doubles) is returned
         as-is so unit tests injecting the old shape keep working.
         """
-        raw = await self._get("/api/meal-plans")
+        path = "/api/meal-plans"
+        if start_date is not None and end_date is not None:
+            path += (
+                f"?startDate={start_date.isoformat()}&endDate={end_date.isoformat()}"
+            )
+        raw = await self._get(path)
 
         # Legacy / test-double path: bare list already in the expected shape.
         if isinstance(raw, list):

@@ -7,6 +7,10 @@ DOMAIN = "culiplan"
 OAUTH_CLIENT_ID = "ha-core"
 BASE_URL = "https://api.culiplan.com"
 WEB_URL = "https://culiplan.com"
+# Web app meal planner (signed-out visitors land on the login page first).
+PLANNER_URL = f"{WEB_URL}/menu-plan"
+# Where users go when a feature isn't available for their account.
+SUPPORT_URL = f"{WEB_URL}/contact"
 OAUTH2_AUTHORIZE = f"{BASE_URL}/api/oauth/authorize"
 OAUTH2_TOKEN = f"{BASE_URL}/api/oauth/token"
 
@@ -53,6 +57,10 @@ CONF_LOCAL_MODEL = "local_model"
 
 # OptionsFlow: "Advanced AI settings" toggle
 CONF_ADVANCED_AI = "advanced_ai"
+
+# Set on entries created by the v0.16.0+ setup flow. Only those entries are
+# eligible for the one-time "Plan your first week" Repairs hint.
+CONF_FIRST_WEEK_HINT = "first_week_hint"
 
 # binary_sensor added in Phase 2 (tasks 1378 + 1380)
 PLATFORMS: list[str] = ["binary_sensor", "calendar", "sensor", "todo", "update"]

@@ -288,9 +288,11 @@ rules:
   repair-issues:
     status: done
     comment: |
-      repairs.py creates premium_required repair issues with a fix_flow that
-      links to the upgrade page; pantry barcode-not-found issues are
-      auto-resolved when the barcode is added.
+      repairs.py raises a neutral "feature isn't available" issue (links to
+      support) when the backend returns a 403, and first_week.py raises a
+      one-time fixable "Plan your first week" issue for new, empty accounts
+      that auto-resolves when meals appear; pantry barcode-not-found issues
+      are auto-resolved when the barcode is added.
   stale-devices:
     status: exempt
     comment: |

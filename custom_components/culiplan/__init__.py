@@ -33,6 +33,7 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import CuliplanCoordinator
+from .first_week import FirstWeekHint, async_forget_first_week
 from .cooking_services import (
     async_register_cooking_services,
     async_unregister_cooking_services,
@@ -527,6 +528,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry, [Platform(p) for p in PLATFORMS]
     )
 
+    # v0.16.0: one-time "Plan your first week" hint for new, empty accounts.
+    first_week = FirstWeekHint(hass, entry, coordinator)
+    await first_week.async_start()
+    entry.async_on_unload(first_week.async_stop)
+
     await _async_sync_custom_sentences(hass)
     await _register_intents(hass, entry)
     async_register_services(hass)
@@ -549,6 +555,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # (HA ≥ 2025.5) but compatible with the supported 2024.10 / 2025.4 matrix.
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clean up per-entry state when the integration is removed."""
+    await async_forget_first_week(hass, entry.entry_id)
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:

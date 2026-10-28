@@ -4,21 +4,9 @@
       "pick_implementation": {
         "title": "Connecter Culiplan"
       },
-      "ai_provider": {
-        "title": "Fournisseur d'IA",
-        "description": "Choisissez comment les fonctionnalités IA de Culiplan s'exécutent dans Home Assistant.\n\n**Cloud IA** — Culiplan traite les requêtes (abonnement Premium requis).\n**BYOK** — Votre clé API est stockée localement et envoyée directement au fournisseur d'IA ; Culiplan ne la voit jamais.\n**IA locale** — Les requêtes sont envoyées à votre point de terminaison Ollama ou LM Studio local.",
-        "data": {
-          "ai_mode": "Mode IA",
-          "byok_provider": "Fournisseur d'IA",
-          "byok_api_key": "Clé API",
-          "local_endpoint": "URL du point de terminaison IA local",
-          "local_model": "Nom du modèle"
-        },
-        "data_description": {
-          "byok_api_key": "Stockée uniquement dans Home Assistant — jamais envoyée à Culiplan.",
-          "local_endpoint": "ex. http://localhost:11434",
-          "local_model": "ex. llama3.2"
-        }
+      "auth": {
+        "title": "Se connecter à Culiplan",
+        "description": "Connectez-vous et autorisez l'accès. Vous revenez ensuite automatiquement dans Home Assistant et la configuration se termine toute seule.\n\nAstuce : si le navigateur ne revient pas dans Home Assistant après l'autorisation, définissez une URL externe (Paramètres → Système → Réseau) ou activez My Home Assistant, puis réessayez."
       },
       "reauth_confirm": {
         "title": "Réauthentifier Culiplan",
@@ -27,14 +15,46 @@
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à Culiplan",
-      "invalid_api_key": "Clé API invalide — veuillez vérifier la clé et réessayer.",
-      "invalid_endpoint": "Impossible d'atteindre le point de terminaison IA local. Vérifiez l'URL et que le service est en cours d'exécution.",
-      "unknown": "Erreur inattendue"
+      "unknown": "Erreur inattendue",
+      "mealie_token_required": "Veuillez saisir un jeton d'API Mealie."
     },
     "abort": {
       "already_configured": "Culiplan est déjà configuré",
       "oauth_error": "Erreur OAuth : {error}",
       "missing_configuration": "Intégration non configurée. Veuillez la configurer dans l'interface."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "advanced_ai": "Changer le mode IA"
+        },
+        "data_description": {
+          "advanced_ai": "L'IA Cloud est le mode par défaut. Activez cette option pour utiliser votre propre clé API ou un modèle local."
+        }
+      },
+      "advanced_ai": {
+        "title": "Mode IA",
+        "description": "Choisissez comment fonctionnent les fonctions IA de Culiplan.\n\n**Cloud** (par défaut) : Culiplan traite les requêtes IA pour vous. Gratuit, rien à configurer.\n**Votre propre clé** : votre clé API reste dans Home Assistant et les requêtes vont directement au fournisseur d'IA. Culiplan ne voit jamais la clé.\n**Local** : les requêtes vont vers votre propre serveur Ollama ou LM Studio."
+      }
+    }
+  },
+  "issues": {
+    "feature_unavailable": {
+      "title": "Une fonction Culiplan n'est pas disponible",
+      "description": "**{feature}** n'est pas disponible pour votre compte Culiplan. Si vous pensez qu'il s'agit d'une erreur, [contactez le support Culiplan]({support_url})."
+    },
+    "plan_first_week": {
+      "title": "Planifiez votre première semaine dans Culiplan",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Planifiez votre première semaine dans Culiplan",
+            "description": "Votre planning de repas Culiplan est vide, le calendrier et les capteurs de repas n'ont donc rien à afficher pour l'instant.\n\n[Ouvrez le planificateur Culiplan]({planner_url}) et ajoutez quelques repas. Le calendrier se remplit automatiquement, sans redémarrage.\n\nChoisissez **Valider** pour masquer ce message."
+          }
+        }
+      }
     }
   },
   "entity": {

@@ -304,7 +304,7 @@ async def test_scale_tonight_servings_premium_required_creates_repair():
         # Repairs upsell issue must be created (task-1379 AC#1)
         mock_create.assert_called_once()
         issue_kwargs = mock_create.call_args[1]
-        assert "premium_required" in issue_kwargs["issue_id"]
+        assert "feature_unavailable" in issue_kwargs["issue_id"]
 
 
 # ─── Test: error type constructors ────────────────────────────────────────────
