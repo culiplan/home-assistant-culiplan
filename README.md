@@ -1,6 +1,6 @@
 # Culiplan for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/culiplan/home-assistant-culiplan.svg)](https://github.com/culiplan/home-assistant-culiplan/releases)
 [![License](https://img.shields.io/github/license/culiplan/home-assistant-culiplan.svg)](LICENSE)
 
@@ -49,8 +49,8 @@ Example sentences (English; the other languages have equivalents):
 | `culiplan.pantry_add` | Add an item to your pantry stock (name, optional quantity / unit / location / expiration_days). Free. |
 | `culiplan.pantry_decrement` | Decrement stock for a barcode (FEFO); unknown barcodes raise a Repairs issue. Free. |
 | `culiplan.pantry_expiring_items` | Fire `culiplan_pantry_expiring_result` with the items expiring within a window. Free. |
-| `culiplan.scale_tonight_servings` | Scale tonight's servings to the number of people present. Premium. |
-| `culiplan.suggest_meal` / `culiplan.fill_shopping_list` / `culiplan.generate_blueprint` | AI services — Cloud (Premium), BYOK or Local AI. |
+| `culiplan.scale_tonight_servings` | Scale tonight's servings to the number of people present. |
+| `culiplan.suggest_meal` / `culiplan.fill_shopping_list` / `culiplan.generate_blueprint` | AI services: Cloud, BYOK or Local AI. |
 | `culiplan.start_cooking_mode`, `advance_cooking_step`, `set_recipe_timer`, `cancel_recipe_timer`, `pause_cooking_mode`, `resume_cooking_mode`, `complete_cooking_mode` | Guided cooking-session controls. |
 
 ### Lovelace Card Pack
@@ -84,10 +84,7 @@ colour and any token via [card-mod](https://github.com/thomasloven/lovelace-card
 3. Restart Home Assistant.
 4. Go to **Settings → Devices & Services → Add Integration → Culiplan**.
 
-> **Don't see Culiplan in HACS search yet?** The default-store listing
-> ([hacs/default#8290](https://github.com/hacs/default/pull/8290)) is awaiting merge.
-> In the meantime: HACS → ⋮ → **Custom repositories** → add
-> `https://github.com/culiplan/home-assistant-culiplan` as an **Integration**, then download.
+Culiplan is in the HACS default store (since July 2026), so no custom repository is needed.
 
 ### Manual
 
@@ -113,9 +110,9 @@ Culiplan supports three AI execution modes, selectable during setup and changeab
 
 Culiplan's servers process AI requests on your behalf.
 
-- **Requires:** Active Culiplan Premium subscription.
+- **Requires:** A Culiplan account (free).
 - **Privacy:** Prompt content (your voice commands) travels to `api.culiplan.com`. No data is sold or shared with third parties. See the [privacy policy](https://culiplan.com/privacy).
-- **Cost:** Included in the Premium subscription; no additional AI API costs.
+- **Cost:** Included in your free Culiplan account; no AI API costs for you.
 
 ### Bring Your Own Key (BYOK)
 
@@ -124,7 +121,7 @@ Your API key is stored exclusively in Home Assistant's local secrets store. AI c
 - **Requires:** An account with OpenAI, Anthropic, or Google AI Studio.
 - **Privacy:** Your API key and prompt content never reach Culiplan's servers. Zero-custody — Culiplan has nothing to lose.
 - **Cost:** You pay the AI provider directly at their published token rates. For typical household use this is a few euro cents per month.
-- **Free to use** — no Culiplan Premium required.
+- **Free to use.**
 
 ### Local AI
 
@@ -133,9 +130,7 @@ Requests go to your own Ollama or LM Studio instance on your local network.
 - **Requires:** A running local LLM server (e.g., `ollama serve`).
 - **Privacy:** All AI processing stays on your hardware. Nothing leaves your home network.
 - **Cost:** Your electricity and hardware costs only.
-- **Free to use** — no Culiplan Premium required.
-
-> **Note on premium features:** The tier line is on capability, not on AI provider. If a feature requires Premium (e.g., Cloud AI recipe generation), it requires Premium with BYOK too — BYOK doesn't unlock premium features for free. It only removes Culiplan's AI infrastructure costs from the equation for features that are otherwise AI-provider-neutral.
+- **Free to use.**
 
 ---
 
@@ -176,21 +171,21 @@ Full feature surface as of 2026-06-05:
 - **Reconfigure flow** with same-account guard (wrong-account aborts cleanly).
 - **Calendar entity** — one entity (`calendar.culiplan_meal_plan`) with N meal-plan events.
 - **Shopping list todo entity** — two-way sync; `HassListAddItem` standard intent works ("add milk to my shopping list").
-- **Sensors** — meals planned this week, shopping items count, expiring pantry items, planned kWh today (premium, opt-in).
+- **Sensors** — meals planned this week, shopping items count, expiring pantry items, planned kWh today (opt-in).
 - **Binary sensors** — pantry has expiring items, dinner party active (opt-in).
 - **Lovelace card pack** — Kitchen Dashboard, Pantry Tracker, Cooking Mode + a drop-in welcome card.
 - **Cooking Mode** — active-session reader with step list + timer mirroring; `culiplan.advance_cooking_step`, `pause_cooking_session`, `set_servings`, etc.
 - **Sidebar panel** — vanilla web component, embed-mode (hides duplicate Culiplan chrome inside the iframe), HA theme tokens bridged via postMessage (dark mode follows).
 - **AI services** — `culiplan.suggest_meal`, `culiplan.fill_shopping_list`, `culiplan.generate_blueprint` with three modes:
-  - Cloud (Culiplan Premium)
+  - Cloud (included in your Culiplan account)
   - BYOK (your own OpenAI / Anthropic / Google key, stored in HA only)
   - Local (Ollama / LM Studio on your LAN)
 - **Pantry services** — `culiplan.pantry_add` ("add milk to the fridge" from an automation), `culiplan.pantry_decrement` (barcode scan), `culiplan.pantry_expiring_items`.
 - **`llm.API` registration** — seven Culiplan tools (`get_meal_plan`, `suggest_meal`, `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items`, `add_to_pantry`) are available to **any** HA-configured Conversation Agent (OpenAI / Anthropic / Google / Ollama / Voice Preview) — no BYOK needed if you already have an HA LLM agent.
 - **Mealie import wizard** — one-click migration during config flow (24-hour rollback).
-- **Smart pantry recommendations** — premium-gated, surfaced via Repairs upsell when called.
+- **Smart pantry recommendations**, surfaced via Repairs when called.
 - **Assist voice intents** — `what's for dinner tonight`, `what's in my pantry`, `add to shopping list`, `add {item} to the fridge / freezer / pantry` (location optional, defaults to pantry), cooking-mode controls (en / nl / de / fr / es).
-- **Premium gating** — gracefully surfaces Repairs upsell flows on 403; users without Premium see a clean "upgrade" link instead of a stack trace.
+- **Graceful access errors**: a 403 from the API surfaces as a Repairs issue with a clear explanation instead of a stack trace.
 - **Live push updates** via Socket.IO (no polling).
 - **MCP server** — Culiplan tools also reachable via `mcp.culiplan.com` for HA's built-in MCP client. See [docs/integrations/home-assistant-paths.md](https://github.com/culiplan/Flavorplan/blob/master/docs/integrations/home-assistant-paths.md).
 
