@@ -67,6 +67,8 @@ ignore_missing_imports = true
 # Localized per-line ignores still cover specific stub gaps:
 #   - `[untyped-decorator]` on python-socketio @sio.event / @sio.on
 #     handlers in coordinator.py (4 sites).
+#   - `[untyped-decorator]` on HA's @callback in first_week.py (3 sites;
+#     the decorator is untyped in the HA versions CI lints against).
 #   - `[attr-defined]` on 3 HA stub re-exports (runtime exports are
 #     correct, the stubs lag).
 #   - `[override]` on 2 ConfigFlowResult vs dict[str, Any] return-type

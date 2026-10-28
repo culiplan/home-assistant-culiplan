@@ -138,7 +138,7 @@ class FirstWeekHint:
         # Meals may already be there: mark done straight away in that case.
         await self.async_evaluate()
 
-    @callback
+    @callback  # type: ignore[untyped-decorator]
     def async_stop(self) -> None:
         """Stop watching (entry unloaded, or the hint is done)."""
         self._active = False
@@ -148,12 +148,12 @@ class FirstWeekHint:
         if hints.get(self._entry.entry_id) is self:
             hints.pop(self._entry.entry_id)
 
-    @callback
+    @callback  # type: ignore[untyped-decorator]
     def _handle_update(self) -> None:
         if self._active:
             self._hass.async_create_task(self.async_evaluate())
 
-    @callback
+    @callback  # type: ignore[untyped-decorator]
     def _handle_grace_over(self, _now: datetime) -> None:
         self._grace_over = True
         self._handle_update()
