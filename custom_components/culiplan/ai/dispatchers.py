@@ -339,7 +339,16 @@ class AnthropicDispatcher:
             debug:      If True, log prompt content (client-side only, 24h TTL).
             config_dir: HA config directory for debug log files (task-1410).
         """
-        from anthropic import AsyncAnthropic
+        try:
+            from anthropic import AsyncAnthropic
+        except Exception as err:  # noqa: BLE001 - any import-time failure
+            # Anthropic SDK 1.x/2.x can fail to import on Home Assistant versions
+            # before 2026.11 (httpx2 vs the pinned pydantic). Fail this provider
+            # only, with a clear message, instead of breaking the integration.
+            raise ProviderUnavailableError(
+                "The Anthropic SDK could not be loaded on this Home Assistant "
+                "version. Update Home Assistant or use another AI mode."
+            ) from err
 
         self._client = AsyncAnthropic(api_key=api_key)
         self._debug = debug

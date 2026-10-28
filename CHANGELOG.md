@@ -4,6 +4,8 @@ All notable changes to the Culiplan Home Assistant integration are documented he
 
 ## [0.16.1] - 2026-10-28
 
+- **Ready for Home Assistant 2026.11.** HA 2026.11 ships the Anthropic SDK 2.x (`anthropic==2.3.0`), which conflicted with this integration's `anthropic<1` cap. The requirement is now `anthropic>=0.49.0`. If a too-new SDK cannot be imported on an older Home Assistant, only the Anthropic BYOK mode reports a clear error; the rest of the integration keeps working.
+
 ### Fixed
 
 - **Match Home Assistant handles custom themes.** The panel sent Culiplan the raw theme text, so themes that define colours as `var(--other)`, `hsl()`, named colours or `color-mix()` (Catppuccin, iOS, Google, Noctis, Material You and many more) arrived unreadable and Culiplan showed a mix of Home Assistant and Culiplan colours. Each colour is now resolved inside Home Assistant first and sent as `rgb()`/`rgba()`. Values that are not a colour, such as a gradient or wallpaper background, are left out.
