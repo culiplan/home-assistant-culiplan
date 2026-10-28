@@ -140,3 +140,50 @@ def test_dynamic_viewport_height_is_offered(styles: str) -> None:
     assert "100dvh" in host
     # Must come after the 100vh fallback so older browsers keep a usable value.
     assert host.index("100vh") < host.index("100dvh")
+
+
+# ─── Theme bridge (0.16.1) ──────────────────────────────────────────────────
+
+
+def _method(source: str, name: str) -> str:
+    """Return the body of a class method (up to the next method)."""
+    start = source.index(f"  {name}(")
+    nxt = re.search(r"\n  (?:async )?_?[a-zA-Z]+\([^)]*\) \{", source[start + 1 :])
+    return source[start : start + 1 + nxt.start()] if nxt else source[start:]
+
+
+def test_theme_tokens_are_resolved_not_raw() -> None:
+    """Custom themes declare tokens as var()/hsl()/color-mix().
+
+    Posting the raw ``getPropertyValue`` text left the cross-origin app with
+    values it cannot resolve (e.g. ``var(--ctp-blue)``). Each token must go
+    through a probe element so the app receives a computed colour.
+    """
+    source = PANEL_JS.read_text(encoding="utf-8")
+    resolve = _method(source, "_resolveThemeTokens")
+    assert "getComputedStyle(probe)" in resolve
+    assert "`var(${name})`" in resolve
+    assert "THEME_PROBE_SENTINEL" in resolve, (
+        "tokens that are not a colour (gradients, images) must be detected and omitted"
+    )
+    assert ".remove()" in resolve, "the probe must not stay in HA's DOM"
+    post = _method(source, "_postThemeTokens")
+    assert "_resolveThemeTokens()" in post
+    assert "getPropertyValue" not in post
+
+
+def test_theme_payload_carries_dark_mode_and_theme_name() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    post = _method(source, "_postThemeTokens")
+    assert "darkMode: !!themes.darkMode" in post
+    assert "themeName:" in post
+    assert "CULIPLAN_ORIGIN" in post, "never post theme data to '*'"
+
+
+def test_unchanged_theme_payloads_are_skipped_but_reload_forces() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    post = _method(source, "_postThemeTokens")
+    assert "_lastThemePayload" in post
+    assert "this._postThemeTokens(iframe, true)" in source, (
+        "a fresh iframe load must always get the theme, even if unchanged"
+    )

@@ -2,6 +2,17 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-10-28
+
+### Fixed
+
+- **Match Home Assistant handles custom themes.** The panel sent Culiplan the raw theme text, so themes that define colours as `var(--other)`, `hsl()`, named colours or `color-mix()` (Catppuccin, iOS, Google, Noctis, Material You and many more) arrived unreadable and Culiplan showed a mix of Home Assistant and Culiplan colours. Each colour is now resolved inside Home Assistant first and sent as `rgb()`/`rgba()`. Values that are not a colour, such as a gradient or wallpaper background, are left out.
+- The panel now also tells Culiplan whether Home Assistant is in dark mode and which theme is active, so light and dark no longer depend on guessing from the background colour. Unchanged theme updates are no longer re-sent.
+
+### Upgrading
+
+Needs the matching Culiplan web update to use the dark mode signal; older web versions ignore the extra fields and keep working.
+
 ## [0.16.0] - 2026-10-28
 
 Setup is now one login. Most people linking Home Assistant are new to Culiplan, so the flow is shorter and an empty account no longer looks broken.

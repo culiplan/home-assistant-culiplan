@@ -49,7 +49,8 @@ const CULIPLAN_ORIGIN = "https://culiplan.com";
  * HA design tokens we forward to the embedded app. The web app keeps a
  * matching whitelist so an arbitrary postMessage cannot inject arbitrary
  * CSS variables. Keep this list in sync with `ALLOWED_HA_TOKENS` in
- * `packages/front/src/main.tsx`.
+ * `packages/front/src/App.tsx`. Values are resolved to rgb()/rgba() before
+ * posting (see _resolveThemeTokens).
  */
 const HA_THEME_TOKEN_NAMES = [
   "--primary-color",
@@ -65,6 +66,12 @@ const HA_THEME_TOKEN_NAMES = [
   "--success-color",
   "--warning-color",
 ];
+
+/**
+ * Colour the theme probe inherits when a token is not a valid colour. Written
+ * exactly as getComputedStyle reports it so the comparison is a string match.
+ */
+const THEME_PROBE_SENTINEL = "rgb(1, 2, 3)";
 
 const STYLES = `
   /*
@@ -228,6 +235,10 @@ class CuliplanPanel extends HTMLElement {
      */
     this._iframe = null;
     this._iframeLoaded = false;
+    /** Last theme payload posted (JSON), so unchanged hass updates are skipped. */
+    this._lastThemePayload = null;
+    /** @type {CanvasRenderingContext2D | null} Lazily created colour normaliser. */
+    this._colorCtx = null;
 
     // Bound once so addEventListener/removeEventListener pair up correctly.
     this._onMessage = this._onMessage.bind(this);
@@ -256,32 +267,103 @@ class CuliplanPanel extends HTMLElement {
   }
 
   /**
-   * Read HA's design tokens off `document.documentElement` and post them
-   * to the embedded Culiplan app. Called on iframe load and on every
-   * `hass` state update (cheap — getComputedStyle reads are fast, and the
-   * receiving side ignores unknown keys).
+   * Resolve HA's design tokens to final colours and post them to the
+   * embedded Culiplan app. Called on iframe load (`force`) and on every
+   * `hass` state update; identical payloads are skipped.
+   *
+   * `getPropertyValue` returns the raw declared text, and custom themes
+   * (Catppuccin, iOS, Google, Noctis, Material You...) declare tokens as
+   * `var(--other)`, `hsl()`, named colours or `color-mix()`, which the
+   * cross-origin iframe cannot resolve. Each token is therefore resolved here
+   * in HA's document with a hidden probe element (`color: var(--token)`), so
+   * the app always receives `rgb()`/`rgba()`. Tokens that are not a colour
+   * (a gradient or image background) are omitted.
    *
    * Wrapped in try/catch because postMessage can throw if the iframe has
    * been torn down between scheduling and firing.
    */
-  _postThemeTokens(iframe) {
+  _postThemeTokens(iframe, force = false) {
     try {
       if (!iframe || !iframe.contentWindow) return;
-      const styles = getComputedStyle(document.documentElement);
-      /** @type {Record<string, string>} */
-      const tokens = {};
-      for (const name of HA_THEME_TOKEN_NAMES) {
-        const value = styles.getPropertyValue(name);
-        if (value && value.trim()) {
-          tokens[name] = value.trim();
-        }
-      }
-      iframe.contentWindow.postMessage(
-        { type: "culiplan.theme", tokens },
-        CULIPLAN_ORIGIN,
-      );
+      const tokens = this._resolveThemeTokens();
+      const themes = (this._hass && this._hass.themes) || {};
+      const payload = {
+        type: "culiplan.theme",
+        tokens,
+        darkMode: !!themes.darkMode,
+        themeName: typeof themes.theme === "string" ? themes.theme : null,
+      };
+      const key = JSON.stringify(payload);
+      if (!force && key === this._lastThemePayload) return;
+      this._lastThemePayload = key;
+      iframe.contentWindow.postMessage(payload, CULIPLAN_ORIGIN);
     } catch (_) {
       // Defensive: never let theme bridging affect the rest of the panel.
+    }
+  }
+
+  /**
+   * Resolve every HA_THEME_TOKEN_NAMES entry to a computed colour.
+   * @returns {Record<string, string>}
+   */
+  _resolveThemeTokens() {
+    /** @type {Record<string, string>} */
+    const tokens = {};
+    const styles = getComputedStyle(document.documentElement);
+    const host = this.shadowRoot || document.body;
+    // The outer element carries a sentinel colour. A token that is not a
+    // valid colour makes `color: var(--token)` invalid at computed-value
+    // time, so the probe inherits the sentinel and we know to skip it.
+    const outer = document.createElement("div");
+    outer.setAttribute("aria-hidden", "true");
+    outer.style.cssText =
+      "position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;" +
+      "pointer-events:none;color:" + THEME_PROBE_SENTINEL;
+    const probe = document.createElement("div");
+    outer.appendChild(probe);
+    host.appendChild(outer);
+    try {
+      for (const name of HA_THEME_TOKEN_NAMES) {
+        const raw = styles.getPropertyValue(name).trim();
+        if (!raw) continue;
+        probe.style.setProperty("color", `var(${name})`);
+        const computed = getComputedStyle(probe).color.trim();
+        if (!computed || computed === THEME_PROBE_SENTINEL) continue;
+        tokens[name] = this._normalizeColor(computed);
+      }
+    } finally {
+      outer.remove();
+    }
+    return tokens;
+  }
+
+  /**
+   * Browsers report legacy colours as rgb()/rgba(), but newer syntax
+   * (color-mix, oklch, color()) can stay in that space. Paint it onto a 1x1
+   * canvas to get sRGB bytes; fall back to the computed string.
+   * @param {string} computed
+   * @returns {string}
+   */
+  _normalizeColor(computed) {
+    if (/^rgba?\(/i.test(computed)) return computed;
+    try {
+      if (!this._colorCtx) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        this._colorCtx = canvas.getContext("2d", { willReadFrequently: true });
+      }
+      const ctx = this._colorCtx;
+      if (!ctx) return computed;
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = "#000";
+      ctx.fillStyle = computed;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      if (a === 255) return `rgb(${r}, ${g}, ${b})`;
+      return `rgba(${r}, ${g}, ${b}, ${Math.round((a / 255) * 1000) / 1000})`;
+    } catch (_) {
+      return computed;
     }
   }
 
@@ -804,7 +886,7 @@ class CuliplanPanel extends HTMLElement {
     this._iframeLoaded = false;
     iframe.addEventListener("load", () => {
       this._iframeLoaded = true;
-      this._postThemeTokens(iframe);
+      this._postThemeTokens(iframe, true);
       this._postIntegrationStatus(iframe);
     });
     iframe.src = this._redirectUrl;
