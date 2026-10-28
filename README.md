@@ -95,16 +95,21 @@ After v0.6.0 the integration self-updates from GitHub Releases — no terminal o
 
 ## Setup
 
-1. Click **Add Integration** and search for **Culiplan**.
-2. A browser window opens — log in with your Culiplan account and approve the requested scopes.
-3. Choose your AI mode (see below).
-4. Done — entities appear within a few seconds.
+1. Go to **Settings → Devices & Services → Add Integration** and pick **Culiplan**.
+2. A browser window opens. Log in with your Culiplan account (or create one, it's free) and approve access.
+3. That's it. You land back in Home Assistant and the entities appear within a few seconds. Cloud AI is on by default; you can change it later (see [AI Modes](#ai-modes)).
+
+If you also use the Mealie integration in Home Assistant, you get one extra, optional step to import your Mealie recipes.
+
+**Browser doesn't return to Home Assistant after you approve?** Set an external URL (**Settings → System → Network**) or enable [My Home Assistant](https://my.home-assistant.io/), then add the integration again.
+
+**Nothing planned yet?** A new Culiplan account starts with an empty meal plan, so the calendar and meal sensors stay at zero. Home Assistant shows a one-time "Plan your first week in Culiplan" notice under **Settings → Repairs** with a link to the [planner](https://culiplan.com/menu-plan). Plan a few meals there and the calendar fills automatically; the notice disappears by itself.
 
 ---
 
 ## AI Modes
 
-Culiplan supports three AI execution modes, selectable during setup and changeable later via **Configure**:
+Culiplan supports three AI execution modes. New installs start on **Cloud AI**. To switch, open **Settings → Devices & Services → Culiplan → Configure** and turn on **Change AI mode**:
 
 ### Cloud AI (default)
 
@@ -182,10 +187,10 @@ Full feature surface as of 2026-06-05:
   - Local (Ollama / LM Studio on your LAN)
 - **Pantry services** — `culiplan.pantry_add` ("add milk to the fridge" from an automation), `culiplan.pantry_decrement` (barcode scan), `culiplan.pantry_expiring_items`.
 - **`llm.API` registration** — seven Culiplan tools (`get_meal_plan`, `suggest_meal`, `add_to_shopping_list`, `find_recipes_by_ingredients`, `get_recipe`, `get_pantry_items`, `add_to_pantry`) are available to **any** HA-configured Conversation Agent (OpenAI / Anthropic / Google / Ollama / Voice Preview) — no BYOK needed if you already have an HA LLM agent.
-- **Mealie import wizard** — one-click migration during config flow (24-hour rollback).
+- **Mealie import wizard**: one-click migration during setup, offered only when the Mealie integration is set up in Home Assistant (24-hour rollback).
 - **Smart pantry recommendations**, surfaced via Repairs when called.
 - **Assist voice intents** — `what's for dinner tonight`, `what's in my pantry`, `add to shopping list`, `add {item} to the fridge / freezer / pantry` (location optional, defaults to pantry), cooking-mode controls (en / nl / de / fr / es).
-- **Graceful access errors**: a 403 from the API surfaces as a Repairs issue with a clear explanation instead of a stack trace.
+- **Graceful access errors**: a 403 from the API surfaces as a Repairs issue saying the feature isn't available for your account (with a link to support) instead of a stack trace.
 - **Live push updates** via Socket.IO (no polling).
 - **MCP server** — Culiplan tools also reachable via `mcp.culiplan.com` for HA's built-in MCP client. See [docs/integrations/home-assistant-paths.md](https://github.com/culiplan/Flavorplan/blob/master/docs/integrations/home-assistant-paths.md).
 

@@ -15,8 +15,9 @@ Bring your [Culiplan](https://culiplan.com) meal-planning account into Home Assi
 ## Setup
 
 1. After install, go to **Settings → Devices & Services → Add Integration → Culiplan**.
-2. A browser window opens — log in with your Culiplan account and approve the requested scopes.
-3. Choose your AI mode (Cloud is the default and easiest).
-4. Entities appear within a few seconds.
+2. A browser window opens. Log in with your Culiplan account (free) and approve access.
+3. Done. Entities appear within a few seconds. Cloud AI is the default; change it any time under **Configure**.
+
+If the browser doesn't return to Home Assistant after you approve, set an external URL (Settings → System → Network) or enable My Home Assistant, then try again.
 
 Full setup, AI modes, and dashboard documentation: see the [README](https://github.com/culiplan/home-assistant-culiplan/blob/main/README.md).

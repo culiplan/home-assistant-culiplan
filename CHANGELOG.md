@@ -2,6 +2,32 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-10-28
+
+Setup is now one login. Most people linking Home Assistant are new to Culiplan, so the flow is shorter and an empty account no longer looks broken.
+
+### Changed
+
+- **Setup is OAuth only.** After you log in and approve, the integration is created straight away with Cloud AI. The initial-setup copies of the AI provider steps (`ai_provider`, `ai_byok`, `ai_local`, `local_endpoint_remote_warning`) are gone; the AI mode is chosen only in **Configure → Change AI mode**, which reuses the existing `advanced_ai` options steps. The Mealie import offer still appears only when a Mealie config entry exists in this Home Assistant.
+- **Configure shows the AI mode you actually use.** The options form read the mode from `entry.data` only, so after switching to BYOK or Local it still said "cloud". It now reads `entry.options` first, matching the runtime.
+- **No more Premium wording.** Culiplan is free. Setup, options, services and Repairs copy no longer mention Premium, tiers or upgrades, in all five languages. A 403 from the backend now raises a neutral, non-fixable Repairs issue ("A Culiplan feature isn't available") that links to Culiplan support instead of an upgrade page, and the service error says the same.
+- **The meal-plan calendar always exists**, even for an account with nothing planned (it shows "off" instead of being missing).
+
+### Added
+
+- **"Plan your first week in Culiplan" Repairs notice.** Shown once, only on installs created with 0.16.0 or later, when the account has no meals in the backend's window (last 7 days plus the next 14) and none in the past year. It waits two minutes after setup so a first week seeded on link can arrive first. It links to the web planner and disappears by itself as soon as a meal is planned; submitting it also hides it for good. Existing installs never see it.
+- **Redirect tip on the login step and in the README** for when the browser does not return to Home Assistant after approval (set an external URL or enable My Home Assistant, then try again).
+- `async_create_fix_flow` in `repairs.py`, so HA registers it as a valid repairs platform (it previously logged "Invalid repairs platform").
+
+### Fixed
+
+- An empty Mealie token in the import wizard showed the BYOK "API key required" error; it now has its own message.
+- `translations/en.json` had drifted from `strings.json` (options, services and some errors were missing, so HA showed raw keys). It is regenerated from `strings.json`.
+
+### Upgrading
+
+Existing installs keep their AI mode, BYOK provider, Local AI endpoint and options unchanged. No entry migration runs. The new translations for de / es / fr / nl were machine-written and should get a native-speaker check.
+
 ## [0.15.2] — 2026-09-21
 
 ### Fixed
