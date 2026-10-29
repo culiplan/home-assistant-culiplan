@@ -10,10 +10,19 @@ sends the HA bearer token in the ``Authorization`` header.  The view:
   2. Resolves the user's Culiplan config entry and obtains a *fresh* OAuth
      access token via the OAuth2Session helper. ``async_ensure_token_valid``
      refreshes the token if it expired.
-  3. POSTs that bearer token to ``/api/oauth/sso/exchange`` on the Culiplan
-     backend, which returns a one-time, IP-bound, 60-second bridge code.
-  4. Returns JSON: ``{"redirect_url": "https://culiplan.com/ha-bridge#<code>",
-     "expires_in": 60}``
+  3. Generates a one-time ``verifier`` and POSTs that bearer token plus
+     ``code_challenge = base64url(SHA-256(verifier))`` to
+     ``/api/oauth/sso/exchange`` on the Culiplan backend, which returns a
+     one-time, 60-second bridge code bound to that challenge.
+  4. Returns JSON: ``{"redirect_url": "https://culiplan.com/ha-bridge?...#<code>",
+     "expires_in": 60, "verifier": "<verifier>"}``
+
+     The panel posts the verifier to the Culiplan iframe (postMessage,
+     Culiplan origin only), which redeems code + verifier. The verifier never
+     appears in a URL, so a leaked code is useless on its own. This replaces
+     binding the code to the network, which failed whenever the browser and
+     the HA box reach the internet from different addresses (remote access,
+     iCloud Private Relay, VPNs, company proxies).
 
      The code is embedded in the fragment (``#``), so it is never sent to a
      server, never appears in HA access logs, and is scrubbed client-side by
@@ -25,13 +34,16 @@ Failure modes are returned as JSON with a short ``error`` code and a
 - 503 — no config entry / no token.
 - 502 — backend exchange failed or network error.
 
-We NEVER log the SSO code, the bearer token, or the resolved redirect_url —
+We NEVER log the SSO code, the verifier, the bearer token, or the resolved redirect_url —
 all three carry the secret code.
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
+import secrets
 from typing import Any
 
 from aiohttp import ClientTimeout, web
@@ -45,6 +57,14 @@ from .const import BASE_URL, DOMAIN, WEB_URL
 _LOGGER = logging.getLogger(__name__)
 
 _SSO_CODE_EXPIRES_IN = 60  # seconds — must match backend value
+
+
+def _new_verifier_pair() -> tuple[str, str]:
+    """Return ``(verifier, S256 challenge)`` as in RFC 7636."""
+    verifier = secrets.token_urlsafe(32)  # 43 chars, base64url
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
 
 
 class CuliplanLaunchView(HomeAssistantView):
@@ -97,11 +117,14 @@ class CuliplanLaunchView(HomeAssistantView):
                 text='{"error": "token_expired", "message": "Culiplan session has expired. Re-link the integration in Settings → Devices & Services."}',
             )
 
+        verifier, challenge = _new_verifier_pair()
+
         try:
             client = aiohttp_client.async_get_clientsession(self._hass)
             async with client.post(
                 f"{BASE_URL}/api/oauth/sso/exchange",
                 headers={"Authorization": f"Bearer {access_token}"},
+                json={"code_challenge": challenge},
                 timeout=ClientTimeout(total=10),
             ) as resp:
                 if resp.status != 200:
@@ -157,6 +180,11 @@ class CuliplanLaunchView(HomeAssistantView):
         # chrome that HA's own UI already shows.  Not sensitive; safe in the
         # query string.  The fragment stays the LAST component so the
         # one-time code remains in the URL hash (never sent to a server).
+        #
+        # ?pkce=1 tells the bridge page to wait for the verifier from the
+        # panel before redeeming; without it (older panels) it redeems at once.
+        # The verifier goes back in the JSON body only, never in the URL, and
+        # like the code it is never logged.
         import json
 
         return web.Response(
@@ -164,8 +192,9 @@ class CuliplanLaunchView(HomeAssistantView):
             content_type="application/json",
             text=json.dumps(
                 {
-                    "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha#{code}",
+                    "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha&pkce=1#{code}",
                     "expires_in": _SSO_CODE_EXPIRES_IN,
+                    "verifier": verifier,
                 }
             ),
         )

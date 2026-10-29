@@ -418,3 +418,88 @@ class TestNoSecretLeakage:
             resp = await view.get(req)
 
         assert "super_secret_tok" not in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Verifier binding (0.16.2) — the code is bound to a one-time verifier the
+# panel hands to the iframe, not to the network.
+# ---------------------------------------------------------------------------
+
+
+class TestVerifierBinding:
+    @staticmethod
+    async def _launch() -> tuple[MagicMock, dict]:
+        entry = _make_entry(ha_user_id="user-abc")
+        view = _make_view([entry])
+        req = _make_request(ha_user_id="user-abc")
+
+        mock_session = AsyncMock()
+        mock_session.token = {"access_token": "tok_secret"}
+        mock_session.async_ensure_token_valid = AsyncMock()
+
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_resp.json = AsyncMock(return_value={"code": "bridge_code"})
+
+        mock_client = AsyncMock()
+        mock_client.post = MagicMock(return_value=mock_resp)
+
+        with (
+            patch(
+                "custom_components.culiplan.launch_view.config_entry_oauth2_flow"
+                ".async_get_config_entry_implementation",
+                new=AsyncMock(return_value=MagicMock()),
+            ),
+            patch(
+                "custom_components.culiplan.launch_view.config_entry_oauth2_flow"
+                ".OAuth2Session",
+                return_value=mock_session,
+            ),
+            patch(
+                "custom_components.culiplan.launch_view.aiohttp_client"
+                ".async_get_clientsession",
+                return_value=mock_client,
+            ),
+        ):
+            resp = await view.get(req)
+        assert resp.status == 200
+        return mock_client, json.loads(resp.text)
+
+    @pytest.mark.asyncio
+    async def test_exchange_carries_the_challenge_of_the_returned_verifier(
+        self,
+    ) -> None:
+        import base64
+        import hashlib
+
+        client, body = await self._launch()
+        verifier = body["verifier"]
+        assert 43 <= len(verifier) <= 128
+
+        sent = client.post.call_args.kwargs["json"]["code_challenge"]
+        expected = (
+            base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
+            .rstrip(b"=")
+            .decode()
+        )
+        assert sent == expected
+        # Only the challenge goes to Culiplan, never the verifier itself.
+        assert verifier not in json.dumps(client.post.call_args.kwargs["json"])
+
+    @pytest.mark.asyncio
+    async def test_verifier_is_never_in_the_url(self) -> None:
+        _, body = await self._launch()
+        assert body["verifier"] not in body["redirect_url"]
+        # pkce=1 is in the query (before the fragment) so the bridge page waits
+        # for the verifier; the code stays the last component.
+        url = body["redirect_url"]
+        assert "pkce=1" in url.split("#", 1)[0]
+        assert url.endswith("#bridge_code")
+
+    @pytest.mark.asyncio
+    async def test_each_launch_gets_a_fresh_verifier(self) -> None:
+        _, first = await self._launch()
+        _, second = await self._launch()
+        assert first["verifier"] != second["verifier"]

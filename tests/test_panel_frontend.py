@@ -187,3 +187,32 @@ def test_unchanged_theme_payloads_are_skipped_but_reload_forces() -> None:
     assert "this._postThemeTokens(iframe, true)" in source, (
         "a fresh iframe load must always get the theme, even if unchanged"
     )
+
+
+def test_verifier_only_goes_to_the_culiplan_origin() -> None:
+    """The launch verifier is a secret: it must only be posted to the iframe at
+    the Culiplan origin, never to '*' and never placed in a URL."""
+    source = PANEL_JS.read_text(encoding="utf-8")
+    post = _method(source, "_postVerifier")
+    assert '"culiplan.haVerifier"' in post
+    assert "CULIPLAN_ORIGIN" in post
+    assert '"*"' not in post and "'*'" not in post
+    assert "this._verifier" not in _method(source, "_buildContent"), (
+        "the verifier must not be used to build the iframe URL"
+    )
+
+
+def test_verifier_is_handed_over_on_load_and_on_request() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    assert "this._postVerifier(iframe);" in _method(source, "_buildContent")
+    on_message = _method(source, "_onMessage")
+    assert '"culiplan.haBridgeReady"' in on_message
+    assert "this._postVerifier(iframe)" in on_message
+
+
+def test_verifier_is_reset_per_launch_and_for_the_login_fallback() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    launch = _method(source, "async _launch")
+    assert "this._verifier = null;" in launch
+    assert "data.verifier" in launch
+    assert "this._verifier = null;" in _method(source, "_loginFallback")

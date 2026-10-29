@@ -221,6 +221,14 @@ class CuliplanPanel extends HTMLElement {
     this._isFallback = false;
     /** @type {number | null} Timestamp when the current code was fetched */
     this._fetchedAt = null;
+    /**
+     * One-time verifier that pairs with the current launch code (integration
+     * >= 0.16.2). Handed to the Culiplan iframe over postMessage, never put in
+     * a URL; the bridge page redeems code + verifier. Null for the login
+     * fallback or if the launch endpoint didn't return one.
+     * @type {string | null}
+     */
+    this._verifier = null;
 
     /** @type {object | null} HA frontend injects this after the element is attached. */
     this._hass = null;
@@ -440,6 +448,12 @@ class CuliplanPanel extends HTMLElement {
       // launch code and reload the iframe with a new session — instead of the
       // app falling back to the web login, which can't work in an iframe
       // (Google blocks its OAuth pages from being framed).
+      // The bridge page is ready to redeem and asks for the verifier.
+      if (data.type === "culiplan.haBridgeReady") {
+        this._postVerifier(iframe);
+        return;
+      }
+
       if (data.type === "culiplan.haRelaunch") {
         this._fetchedAt = null; // force _isCodeFresh() to return false
         // If we're already in the direct-login fallback, the SSO bridge was
@@ -524,6 +538,7 @@ class CuliplanPanel extends HTMLElement {
 
     this._state = "loading";
     this._redirectUrl = "";
+    this._verifier = null;
     this._errorMessage = "";
     this._render();
 
@@ -592,6 +607,7 @@ class CuliplanPanel extends HTMLElement {
     }
 
     this._redirectUrl = redirectUrl;
+    this._verifier = typeof data.verifier === "string" ? data.verifier : null;
     this._fetchedAt = Date.now();
     this._state = "ready";
     this._render();
@@ -640,6 +656,24 @@ class CuliplanPanel extends HTMLElement {
     }
   }
 
+  /**
+   * Hand the launch verifier to the bridge page. Sent on iframe load and
+   * whenever the page asks (culiplan.haBridgeReady), whichever comes first;
+   * repeats are harmless. Only ever posted to the Culiplan origin, so no
+   * other page can receive it.
+   */
+  _postVerifier(iframe) {
+    try {
+      if (!this._verifier || !iframe || !iframe.contentWindow) return;
+      iframe.contentWindow.postMessage(
+        { type: "culiplan.haVerifier", verifier: this._verifier },
+        CULIPLAN_ORIGIN,
+      );
+    } catch (_) {
+      // iframe torn down between scheduling and firing — nothing to hand over.
+    }
+  }
+
   _onIframeError = () => {
     this._fetchedAt = null;
     this._logFailure("iframe_load", null, "iframe failed to load");
@@ -665,6 +699,7 @@ class CuliplanPanel extends HTMLElement {
    */
   _loginFallback() {
     this._redirectUrl = `${CULIPLAN_ORIGIN}/?embed=ha`;
+    this._verifier = null;
     this._fetchedAt = null; // not a single-use code — never treat as "fresh"
     this._isFallback = true;
     this._errorCode = null;
@@ -886,6 +921,7 @@ class CuliplanPanel extends HTMLElement {
     this._iframeLoaded = false;
     iframe.addEventListener("load", () => {
       this._iframeLoaded = true;
+      this._postVerifier(iframe);
       this._postThemeTokens(iframe, true);
       this._postIntegrationStatus(iframe);
     });

@@ -2,6 +2,16 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2026-10-29
+
+### Fixed
+
+- **The Culiplan panel opens from any network.** The one-time code that signs the panel in was tied to the network of the Home Assistant box, so the browser had to reach the internet from the same address. It failed with "Session could not be started" when Home Assistant was used remotely, or through iCloud Private Relay, a VPN such as Cloudflare WARP, or a company proxy. The launch endpoint now creates a one-time verifier, sends Culiplan only its SHA-256 hash (`code_challenge`, as in PKCE), and returns the verifier to the panel in its JSON response. The panel hands it to the Culiplan iframe with `postMessage`, restricted to the Culiplan origin, and the iframe redeems the code together with the verifier. The verifier never appears in a URL, so a leaked code is useless on its own. The launch URL carries `pkce=1` so the bridge page knows to wait for the verifier.
+
+### Upgrading
+
+Needs the matching Culiplan backend and web update, which are already live. Older integrations keep the previous network check and keep working as before.
+
 ## [0.16.1] - 2026-10-28
 
 - **Ready for Home Assistant 2026.11.** HA 2026.11 ships the Anthropic SDK 2.x (`anthropic==2.3.0`), which conflicted with this integration's `anthropic<1` cap. The requirement is now `anthropic>=0.49.0`. If a too-new SDK cannot be imported on an older Home Assistant, only the Anthropic BYOK mode reports a clear error; the rest of the integration keeps working.
