@@ -732,11 +732,34 @@ async def test_options_updated_triggers_reload():
 
     hass = MagicMock()
     hass.config_entries.async_reload = AsyncMock()
+    hass.data = {DOMAIN: {"e1": {"options": {"ai_mode": "cloud"}}}}
     entry = MagicMock()
     entry.entry_id = "e1"
+    entry.options = {"ai_mode": "byok"}
 
     await _async_options_updated(hass, entry)
     hass.config_entries.async_reload.assert_awaited_once_with("e1")
+
+
+@pytest.mark.asyncio
+async def test_token_refresh_does_not_reload():
+    """A data-only update (OAuth token refresh) must not reload the entry.
+
+    HA runs update listeners for entry.data changes too; before 0.16.3 every
+    token refresh reloaded the integration and broke an open panel.
+    """
+    from custom_components.culiplan import _async_options_updated
+
+    hass = MagicMock()
+    hass.config_entries.async_reload = AsyncMock()
+    hass.data = {DOMAIN: {"e1": {"options": {"ai_mode": "cloud"}}}}
+    entry = MagicMock()
+    entry.entry_id = "e1"
+    entry.options = {"ai_mode": "cloud"}
+    entry.data = {"token": {"access_token": "new"}}
+
+    await _async_options_updated(hass, entry)
+    hass.config_entries.async_reload.assert_not_awaited()
 
 
 # ─── Intent handler additional paths (v0.13.0) ───────────────────────────────

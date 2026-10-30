@@ -216,3 +216,34 @@ def test_verifier_is_reset_per_launch_and_for_the_login_fallback() -> None:
     assert "this._verifier = null;" in launch
     assert "data.verifier" in launch
     assert "this._verifier = null;" in _method(source, "_loginFallback")
+
+
+def test_panel_opts_in_to_the_verifier_binding() -> None:
+    """Only this panel generation hands over a verifier, so it must ask for the
+    binding; an older script left running in an open tab doesn't ask."""
+    source = PANEL_JS.read_text(encoding="utf-8")
+    assert '"culiplan/launch?binding=verifier"' in _method(source, "async _launch")
+
+
+def test_not_ready_is_retried_quietly_before_any_error() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    launch = _method(source, "async _launch")
+    not_ready = launch.index('code === "not_ready"')
+    assert not_ready < launch.index("this._fail(message, code, status)")
+    assert "NOT_READY_MAX_RETRIES" in launch
+    assert "setTimeout(() => this._launch(), NOT_READY_RETRY_MS)" in launch
+
+
+def test_entry_error_offers_settings_not_connect() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    actions = _method(source, "_errorActions")
+    entry_error = actions[
+        actions.index('case "entry_error"') : actions.index('case "token_expired"')
+    ]
+    assert "Open Culiplan settings" in entry_error
+    assert "Connect Culiplan" not in entry_error
+
+
+def test_define_is_guarded_against_module_re_import() -> None:
+    source = PANEL_JS.read_text(encoding="utf-8")
+    assert 'if (!customElements.get("culiplan-panel"))' in source

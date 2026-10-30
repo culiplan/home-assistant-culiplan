@@ -40,15 +40,17 @@ all three carry the secret code.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import logging
 import secrets
+import time
 from typing import Any
 
 from aiohttp import ClientTimeout, web
 from homeassistant.components.http import HomeAssistantView  # type: ignore[attr-defined]
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, config_entry_oauth2_flow
 
@@ -57,6 +59,20 @@ from .const import BASE_URL, DOMAIN, WEB_URL
 _LOGGER = logging.getLogger(__name__)
 
 _SSO_CODE_EXPIRES_IN = 60  # seconds — must match backend value
+
+# How long a launch waits for the user's entry to finish (re)loading before
+# answering ``not_ready``. A reload takes a second or two; HA startup longer.
+_ENTRY_READY_TIMEOUT = 15.0
+_ENTRY_READY_POLL = 0.25
+
+# States waiting won't fix (needs reauth, migration failed, unload failed).
+_ENTRY_FAILED_STATES = frozenset(
+    {
+        ConfigEntryState.SETUP_ERROR,
+        ConfigEntryState.MIGRATION_ERROR,
+        ConfigEntryState.FAILED_UNLOAD,
+    }
+)
 
 
 def _new_verifier_pair() -> tuple[str, str]:
@@ -87,6 +103,27 @@ class CuliplanLaunchView(HomeAssistantView):
         ha_user_id = getattr(ha_user, "id", None) if ha_user is not None else None
 
         entry = self._entry_for_user(ha_user_id)
+        if entry is not None and entry.state in _ENTRY_FAILED_STATES:
+            return web.Response(
+                status=503,
+                content_type="application/json",
+                text='{"error": "entry_error", "message": "Culiplan is not running in Home Assistant. Open Settings → Devices & Services → Culiplan to fix it."}',
+            )
+        if entry is not None and entry.state is not ConfigEntryState.LOADED:
+            # The user's entry exists but is starting or reloading (HA startup,
+            # options change, integration update). Wait for it rather than
+            # telling a linked user to link Culiplan.
+            if not await self._async_wait_until_loaded(entry):
+                _LOGGER.info(
+                    "[culiplan][launch] Entry not ready after %.0fs (state=%s)",
+                    _ENTRY_READY_TIMEOUT,
+                    entry.state,
+                )
+                return web.Response(
+                    status=503,
+                    content_type="application/json",
+                    text='{"error": "not_ready", "message": "Culiplan is still starting in Home Assistant. Try again in a moment."}',
+                )
         if entry is None:
             _LOGGER.warning(
                 "[culiplan][launch] No Culiplan config entry matched ha_user_id=%s",
@@ -117,14 +154,20 @@ class CuliplanLaunchView(HomeAssistantView):
                 text='{"error": "token_expired", "message": "Culiplan session has expired. Re-link the integration in Settings → Devices & Services."}',
             )
 
-        verifier, challenge = _new_verifier_pair()
+        # Verifier binding only when the panel asks for it (0.16.3+ panels send
+        # ?binding=verifier). After an integration update, a browser tab that
+        # stays open keeps running the previous panel script (a custom element
+        # can't be redefined); that panel never hands over a verifier, so it
+        # must keep getting a network-bound code.
+        use_verifier = request.query.get("binding") == "verifier"
+        verifier, challenge = _new_verifier_pair() if use_verifier else (None, None)
 
         try:
             client = aiohttp_client.async_get_clientsession(self._hass)
             async with client.post(
                 f"{BASE_URL}/api/oauth/sso/exchange",
                 headers={"Authorization": f"Bearer {access_token}"},
-                json={"code_challenge": challenge},
+                json={"code_challenge": challenge} if challenge else None,
                 timeout=ClientTimeout(total=10),
             ) as resp:
                 if resp.status != 200:
@@ -187,20 +230,38 @@ class CuliplanLaunchView(HomeAssistantView):
         # like the code it is never logged.
         import json
 
+        launch: dict[str, Any]
+        if verifier is None:
+            launch = {
+                "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha#{code}",
+                "expires_in": _SSO_CODE_EXPIRES_IN,
+            }
+        else:
+            launch = {
+                "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha&pkce=1#{code}",
+                "expires_in": _SSO_CODE_EXPIRES_IN,
+                "verifier": verifier,
+            }
         return web.Response(
             status=200,
             content_type="application/json",
-            text=json.dumps(
-                {
-                    "redirect_url": f"{WEB_URL}/ha-bridge?embed=ha&pkce=1#{code}",
-                    "expires_in": _SSO_CODE_EXPIRES_IN,
-                    "verifier": verifier,
-                }
-            ),
+            text=json.dumps(launch),
         )
 
+    async def _async_wait_until_loaded(self, entry: ConfigEntry) -> bool:
+        """Poll until *entry* is loaded, up to ``_ENTRY_READY_TIMEOUT``."""
+        deadline = time.monotonic() + _ENTRY_READY_TIMEOUT
+        while entry.state is not ConfigEntryState.LOADED:
+            if time.monotonic() >= deadline:
+                return False
+            await asyncio.sleep(_ENTRY_READY_POLL)
+        return True
+
     def _entry_for_user(self, ha_user_id: str | None) -> ConfigEntry | None:
-        """Pick the loaded Culiplan entry that belongs to this HA user.
+        """Pick the enabled Culiplan entry that belongs to this HA user.
+
+        Any state counts: the caller waits for a starting or reloading entry
+        instead of reporting that the user has no Culiplan account linked.
 
         Multi-user safety: each entry is tagged with the HA user id of
         whoever ran the OAuth flow (see ``config_flow.async_oauth_create_entry``).
@@ -208,31 +269,31 @@ class CuliplanLaunchView(HomeAssistantView):
         we fall back to the legacy single-entry-for-everyone behaviour for
         those, with a warning, so existing installs don't break on upgrade.
         """
-        loaded = [
+        candidates = [
             e
             for e in self._hass.config_entries.async_entries(DOMAIN)
-            if e.state.value == "loaded"
+            if e.disabled_by is None
         ]
-        if not loaded:
+        if not candidates:
             return None
 
         if ha_user_id:
-            for e in loaded:
+            for e in candidates:
                 if e.data.get("ha_user_id") == ha_user_id:
                     return e
             # User-bound match failed. If any entry HAS a ha_user_id tag,
             # treat this as a "wrong user" 503 — never silently bridge.
-            if any(e.data.get("ha_user_id") for e in loaded):
+            if any(e.data.get("ha_user_id") for e in candidates):
                 return None
 
         # No user binding available (legacy entry pre-tagging, or anonymous
         # caller). Use the first entry and log so multi-user installs can
         # spot the misconfiguration.
-        if len(loaded) > 1:
+        if len(candidates) > 1:
             _LOGGER.warning(
-                "[culiplan][launch] %d Culiplan entries are loaded and none "
+                "[culiplan][launch] %d Culiplan entries are set up and none "
                 "carry an ha_user_id tag; defaulting to the first. Re-link "
                 "the integration to enable per-user routing.",
-                len(loaded),
+                len(candidates),
             )
-        return loaded[0]
+        return candidates[0]

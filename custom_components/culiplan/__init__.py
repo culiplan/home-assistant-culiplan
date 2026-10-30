@@ -522,6 +522,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
+        # Snapshot for _async_options_updated: only an options change reloads.
+        "options": dict(entry.options),
     }
 
     await hass.config_entries.async_forward_entry_setups(
@@ -549,10 +551,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(lambda: async_unregister_services(hass))
     entry.async_on_unload(lambda: async_unregister_cooking_services(hass))
     entry.async_on_unload(lambda: async_unregister_llm_api(hass))
-    # Reload the entry whenever OptionsFlow saves so the new ai_mode / pantry
+    # Reload the entry when OptionsFlow saves so the new ai_mode / pantry
     # windows / debug toggle take effect without requiring the user to
     # disable+enable the integration. Equivalent to OptionsFlowWithReload
     # (HA ≥ 2025.5) but compatible with the supported 2024.10 / 2025.4 matrix.
+    # HA calls update listeners on data changes too, and every OAuth token
+    # refresh rewrites entry.data, so the listener ignores anything but options.
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
 
@@ -563,7 +567,18 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload the integration when its options change."""
+    """Reload the integration when its options change, and only then.
+
+    HA runs update listeners for every ``async_update_entry`` change, including
+    ``entry.data``. ``OAuth2Session.async_ensure_token_valid`` saves each
+    refreshed token there, so before 0.16.3 every token refresh reloaded the
+    whole integration: the coordinator reconnected, the sidebar panel was
+    re-registered (HA rebuilt any open panel) and, mid-reload, the panel's
+    launch request found no loaded entry and told the user to link Culiplan.
+    """
+    stored = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    if stored.get("options") == dict(entry.options):
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

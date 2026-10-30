@@ -38,6 +38,14 @@
 const CODE_VALID_MS = 50_000;
 
 /**
+ * `not_ready` (the integration is starting or reloading): how many more times
+ * the panel quietly re-asks, and how long it waits between tries. The launch
+ * view has already waited 15 s on its side, so this covers a slow HA startup.
+ */
+const NOT_READY_MAX_RETRIES = 4;
+const NOT_READY_RETRY_MS = 3000;
+
+/**
  * Origin of the embedded Culiplan web app. The launch endpoint returns a
  * `redirect_url` on this origin (https://culiplan.com/ha-bridge#...), so
  * postMessage must target it explicitly — `"*"` would leak the message to
@@ -229,6 +237,8 @@ class CuliplanPanel extends HTMLElement {
      * @type {string | null}
      */
     this._verifier = null;
+    /** Silent retries spent on `not_ready` (integration still starting). */
+    this._notReadyRetries = 0;
 
     /** @type {object | null} HA frontend injects this after the element is attached. */
     this._hass = null;
@@ -557,7 +567,11 @@ class CuliplanPanel extends HTMLElement {
 
     let data;
     try {
-      data = await this._hass.callApi("GET", "culiplan/launch");
+      // ?binding=verifier: this panel hands the verifier to the iframe, so the
+      // launch view may bind the code to it. Without it (an older panel script
+      // still running in an open tab after an update) the code stays
+      // network-bound, which that older panel can complete.
+      data = await this._hass.callApi("GET", "culiplan/launch?binding=verifier");
     } catch (err) {
       this._fetchedAt = null;
       const status = err && err.status_code;
@@ -570,6 +584,16 @@ class CuliplanPanel extends HTMLElement {
         `Unexpected error from launch endpoint${status ? ` (HTTP ${status})` : ""}.`;
 
       this._logFailure(code, status, message);
+
+      // The integration is starting or reloading (HA startup, options change,
+      // update). The launch view already waited 15 s; keep the spinner and try
+      // a few more times before showing anything.
+      if (code === "not_ready" && this._notReadyRetries < NOT_READY_MAX_RETRIES) {
+        this._notReadyRetries += 1;
+        this._fetchedAt = null;
+        setTimeout(() => this._launch(), NOT_READY_RETRY_MS);
+        return;
+      }
 
       // HA's own session expired (the panel couldn't even authenticate to its
       // own backend) — re-fetching won't help until the page reloads.
@@ -607,6 +631,7 @@ class CuliplanPanel extends HTMLElement {
     }
 
     this._redirectUrl = redirectUrl;
+    this._notReadyRetries = 0;
     this._verifier = typeof data.verifier === "string" ? data.verifier : null;
     this._fetchedAt = Date.now();
     this._state = "ready";
@@ -686,6 +711,7 @@ class CuliplanPanel extends HTMLElement {
 
   _retry = () => {
     this._fetchedAt = null;
+    this._notReadyRetries = 0;
     this._launch();
   };
 
@@ -795,6 +821,12 @@ class CuliplanPanel extends HTMLElement {
       case "no_entry":
         // Not linked yet → only re-linking helps.
         return [{ label: "Connect Culiplan", primary: true, onClick: this._reconnect }];
+      case "entry_error":
+        // The entry failed to start (often: needs reauthentication).
+        return [
+          { label: "Open Culiplan settings", primary: true, onClick: this._reconnect },
+          { label: "Reload integration", primary: false, onClick: this._reloadIntegration },
+        ];
       case "token_expired":
         // Grant went stale → re-link, or try a softer integration reload first.
         return [
@@ -931,4 +963,9 @@ class CuliplanPanel extends HTMLElement {
   }
 }
 
-customElements.define("culiplan-panel", CuliplanPanel);
+// HA re-imports the panel module when the integration re-registers the panel
+// (for example after an update). A custom element can't be redefined, so the
+// first definition stays for the life of the page; skip instead of throwing.
+if (!customElements.get("culiplan-panel")) {
+  customElements.define("culiplan-panel", CuliplanPanel);
+}

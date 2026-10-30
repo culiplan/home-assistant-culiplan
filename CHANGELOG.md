@@ -2,6 +2,14 @@
 
 All notable changes to the Culiplan Home Assistant integration are documented here. Format adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.3] - 2026-10-30
+
+### Fixed
+
+- **Token refreshes no longer reload the integration.** The options update listener reloaded the config entry on every `async_update_entry`, and Home Assistant also runs update listeners for `entry.data` changes, which `OAuth2Session` makes each time it saves a refreshed token. So every token refresh (about hourly while in use) reloaded the whole integration: the coordinator reconnected, the sidebar panel was removed and re-added (tearing down an open panel), and intents and the LLM API were re-registered. The listener now reloads only when the options actually changed. Present since 0.2.0.
+- **The panel no longer says "has not linked a Culiplan account" while the integration is starting or reloading.** The launch view only looked at loaded entries. It now waits up to 15 seconds for the user's entry to finish loading; if it still isn't ready it answers `not_ready` and the panel retries quietly behind its spinner. An entry that failed to start (for example one that needs reauthentication) answers `entry_error` with a button to the integration page instead of "Connect Culiplan".
+- **The verifier binding from 0.16.2 is opt-in per panel.** After an update, a browser tab that stays open keeps running the previous panel script, because a custom element can't be redefined. That script never hands over a verifier, so a verifier-bound code would fail. The panel now asks for the binding (`?binding=verifier`); without it the launch view issues the previous network-bound code. The module also skips `customElements.define` when the element already exists instead of throwing.
+
 ## [0.16.2] - 2026-10-29
 
 ### Fixed

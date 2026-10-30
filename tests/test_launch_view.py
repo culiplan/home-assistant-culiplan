@@ -27,6 +27,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 
 
 # ---------------------------------------------------------------------------
@@ -41,17 +42,26 @@ def _make_hass(entries: list) -> MagicMock:
     return hass
 
 
-def _make_entry(loaded: bool = True, ha_user_id: str | None = None) -> MagicMock:
+def _make_entry(
+    loaded: bool = True,
+    ha_user_id: str | None = None,
+    state: ConfigEntryState | None = None,
+) -> MagicMock:
     entry = MagicMock()
-    entry.state = MagicMock()
-    entry.state.value = "loaded" if loaded else "not_loaded"
+    entry.state = state or (
+        ConfigEntryState.LOADED if loaded else ConfigEntryState.NOT_LOADED
+    )
+    entry.disabled_by = None
     entry.data = {"ha_user_id": ha_user_id} if ha_user_id else {}
     return entry
 
 
-def _make_request(ha_user_id: str | None = "user-abc") -> MagicMock:
+def _make_request(
+    ha_user_id: str | None = "user-abc", query: dict[str, str] | None = None
+) -> MagicMock:
     """Return a minimal aiohttp request mock with hass_user populated."""
     req = MagicMock()
+    req.query = query or {}
     if ha_user_id is not None:
         user = MagicMock()
         user.id = ha_user_id
@@ -428,10 +438,13 @@ class TestNoSecretLeakage:
 
 class TestVerifierBinding:
     @staticmethod
-    async def _launch() -> tuple[MagicMock, dict]:
+    async def _launch(query: dict[str, str] | None = None) -> tuple[MagicMock, dict]:
         entry = _make_entry(ha_user_id="user-abc")
         view = _make_view([entry])
-        req = _make_request(ha_user_id="user-abc")
+        req = _make_request(
+            ha_user_id="user-abc",
+            query={"binding": "verifier"} if query is None else query,
+        )
 
         mock_session = AsyncMock()
         mock_session.token = {"access_token": "tok_secret"}
@@ -503,3 +516,110 @@ class TestVerifierBinding:
         _, first = await self._launch()
         _, second = await self._launch()
         assert first["verifier"] != second["verifier"]
+
+    @pytest.mark.asyncio
+    async def test_panel_without_opt_in_gets_a_network_bound_code(self) -> None:
+        """A tab still running the pre-0.16.3 panel script never hands over a
+        verifier, so without ?binding=verifier the code stays network-bound."""
+        client, body = await self._launch(query={})
+        assert "verifier" not in body
+        assert "pkce=1" not in body["redirect_url"]
+        assert body["redirect_url"].endswith("#bridge_code")
+        assert client.post.call_args.kwargs["json"] is None
+
+
+# ---------------------------------------------------------------------------
+# Entry starting or reloading (0.16.3): wait instead of "not linked"
+# ---------------------------------------------------------------------------
+
+
+class TestEntryNotReady:
+    @pytest.mark.asyncio
+    async def test_waits_for_a_reloading_entry_then_launches(self) -> None:
+        entry = _make_entry(ha_user_id="user-abc", state=ConfigEntryState.NOT_LOADED)
+        view = _make_view([entry])
+        req = _make_request(ha_user_id="user-abc")
+
+        mock_session = AsyncMock()
+        mock_session.token = {"access_token": "tok"}
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_resp.__aexit__ = AsyncMock(return_value=False)
+        mock_resp.json = AsyncMock(return_value={"code": "c"})
+        mock_client = AsyncMock()
+        mock_client.post = MagicMock(return_value=mock_resp)
+
+        polls = 0
+
+        async def fake_sleep(_: float) -> None:
+            nonlocal polls
+            polls += 1
+            if polls == 3:
+                entry.state = ConfigEntryState.LOADED
+
+        with (
+            patch("custom_components.culiplan.launch_view.asyncio.sleep", fake_sleep),
+            patch(
+                "custom_components.culiplan.launch_view.config_entry_oauth2_flow"
+                ".async_get_config_entry_implementation",
+                new=AsyncMock(return_value=MagicMock()),
+            ),
+            patch(
+                "custom_components.culiplan.launch_view.config_entry_oauth2_flow"
+                ".OAuth2Session",
+                return_value=mock_session,
+            ),
+            patch(
+                "custom_components.culiplan.launch_view.aiohttp_client"
+                ".async_get_clientsession",
+                return_value=mock_client,
+            ),
+        ):
+            resp = await view.get(req)
+
+        assert resp.status == 200
+        assert polls == 3
+
+    @pytest.mark.asyncio
+    async def test_not_ready_after_timeout_is_not_reported_as_unlinked(self) -> None:
+        entry = _make_entry(ha_user_id="user-abc", state=ConfigEntryState.SETUP_RETRY)
+        view = _make_view([entry])
+        req = _make_request(ha_user_id="user-abc")
+        clock = iter(range(0, 100))
+
+        with (
+            patch("custom_components.culiplan.launch_view.asyncio.sleep", AsyncMock()),
+            patch(
+                "custom_components.culiplan.launch_view.time.monotonic",
+                side_effect=lambda: float(next(clock)),
+            ),
+        ):
+            resp = await view.get(req)
+
+        assert resp.status == 503
+        body = json.loads(resp.text)
+        assert body["error"] == "not_ready"
+
+    @pytest.mark.asyncio
+    async def test_failed_entry_says_so_without_waiting(self) -> None:
+        entry = _make_entry(ha_user_id="user-abc", state=ConfigEntryState.SETUP_ERROR)
+        view = _make_view([entry])
+        req = _make_request(ha_user_id="user-abc")
+        sleep = AsyncMock()
+
+        with patch("custom_components.culiplan.launch_view.asyncio.sleep", sleep):
+            resp = await view.get(req)
+
+        assert resp.status == 503
+        assert json.loads(resp.text)["error"] == "entry_error"
+        sleep.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_disabled_entry_still_counts_as_not_linked(self) -> None:
+        entry = _make_entry(ha_user_id="user-abc")
+        entry.disabled_by = "user"
+        view = _make_view([entry])
+        resp = await view.get(_make_request(ha_user_id="user-abc"))
+        assert resp.status == 503
+        assert json.loads(resp.text)["error"] == "no_entry"
